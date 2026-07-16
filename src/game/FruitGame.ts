@@ -6,6 +6,7 @@ import {
   Graphics,
   Text,
 } from "pixi.js";
+import "pixi.js/unsafe-eval";
 import Matter from "matter-js";
 import { FRUITS, LEVELS, WORLD } from "./data";
 import { haptic, sounds } from "./audio";
@@ -540,7 +541,7 @@ export class FruitGame implements GameControls {
 
   private tick = (ticker: { deltaMS: number }) => {
     if (this.paused || this.destroyed) return;
-    const deltaMs = Math.min(ticker.deltaMS, 34);
+    const deltaMs = Math.min(ticker.deltaMS, 16.667);
     const delta = deltaMs / 16.667;
     this.elapsed += deltaMs / 1000;
     Engine.update(this.engine, deltaMs);

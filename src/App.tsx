@@ -59,6 +59,9 @@ function GameCanvas({
         game = created;
         onReady(created);
       }
+    }).catch((error) => {
+      console.error("game renderer failed to start", error);
+      if (!cancelled) onToast("游戏画面启动失败，请刷新后重试", "pink");
     });
     return () => {
       cancelled = true;
