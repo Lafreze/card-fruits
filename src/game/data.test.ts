@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { FRUITS, LEVELS, WORLD, type LayoutBlock } from "./data.ts";
+import { MODE_INFO, RELICS, pickRelics } from "./modes.ts";
 
 const CARD_WIDTH = 58;
 const CARD_HEIGHT = 66;
@@ -60,4 +61,21 @@ test("all story levels have valid, playable layouts", () => {
       assert.ok(slot.y + CARD_HEIGHT / 2 <= WORLD.stack.y + WORLD.stack.height, `第 ${index + 1} 关卡片超出下边界`);
     });
   });
+});
+
+test("fruit scale and roguelike catalog stay balanced", () => {
+  FRUITS.forEach((fruit, index) => {
+    assert.ok(fruit.radius <= 60, `${fruit.name} 不应重新撑满果箱`);
+    if (index > 0) assert.ok(fruit.radius > FRUITS[index - 1].radius);
+  });
+  assert.equal(new Set(RELICS.map((relic) => relic.id)).size, RELICS.length);
+  assert.deepEqual(Object.keys(MODE_INFO).sort(), ["endless", "expedition", "story"]);
+  assert.equal(new Set(pickRelics([], 3).map((relic) => relic.id)).size, 3);
+  assert.equal(
+    pickRelics(
+      RELICS.slice(0, 6).map((relic) => relic.id),
+      3,
+    ).length,
+    2,
+  );
 });

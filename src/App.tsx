@@ -7,7 +7,19 @@ import {
 } from "./api";
 import { FRUITS, LEVELS } from "./game/data";
 import type { FruitGame } from "./game/FruitGame";
-import type { GameControls, GameResult, GameSnapshot } from "./game/types";
+import {
+  MODE_INFO,
+  RELICS,
+  pickRelics,
+  type GameMode,
+  type RelicDefinition,
+  type RelicId,
+} from "./game/modes";
+import type {
+  GameControls,
+  GameResult,
+  GameSnapshot,
+} from "./game/types";
 
 type Screen = "home" | "game";
 type ToastState = {
@@ -28,6 +40,11 @@ const EMPTY_SNAPSHOT: GameSnapshot = {
   undoLeft: 1,
   shuffleLeft: 3,
   juiceLeft: 1,
+  hammerLeft: 1,
+  magnetLeft: 1,
+  wave: 1,
+  mode: "story",
+  relics: [],
 };
 
 function readProgress() {
@@ -43,6 +60,10 @@ function formatScore(value: number) {
 
 function GameCanvas({
   level,
+  mode,
+  wave,
+  relics,
+  startingScore,
   session,
   onReady,
   onSnapshot,
@@ -50,6 +71,10 @@ function GameCanvas({
   onToast,
 }: {
   level: number;
+  mode: GameMode;
+  wave: number;
+  relics: RelicId[];
+  startingScore: number;
   session: number;
   onReady: (controls: GameControls | null) => void;
   onSnapshot: (snapshot: GameSnapshot) => void;
@@ -64,11 +89,11 @@ function GameCanvas({
     if (!canvasRef.current) return;
     void import("./game/FruitGame")
       .then(({ FruitGame: Game }) =>
-        Game.create(canvasRef.current!, level, {
-          onSnapshot,
-          onFinish,
-          onToast,
-        }),
+        Game.create(
+          canvasRef.current!,
+          { level, mode, wave, relics, startingScore },
+          { onSnapshot, onFinish, onToast },
+        ),
       )
       .then((created) => {
         if (cancelled) created.destroy();
@@ -86,11 +111,11 @@ function GameCanvas({
       onReady(null);
       game?.destroy();
     };
-  }, [level, session, onFinish, onReady, onSnapshot, onToast]);
+  }, [level, mode, onFinish, onReady, onSnapshot, onToast, relics, session, startingScore, wave]);
 
   return (
     <canvas
-      key={`${level}-${session}`}
+      key={`${mode}-${level}-${wave}-${session}`}
       ref={canvasRef}
       className="game-canvas"
       aria-label="叠个果王游戏画面"
@@ -102,12 +127,16 @@ function Leaderboard({
   entries,
   loading,
   offline,
+  mode,
+  onModeChange,
   onClose,
   onRefresh,
 }: {
   entries: LeaderboardEntry[];
   loading: boolean;
   offline: boolean;
+  mode: GameMode;
+  onModeChange: (mode: GameMode) => void;
   onClose: () => void;
   onRefresh: () => void;
 }) {
@@ -122,6 +151,17 @@ function Leaderboard({
         <div className="modal-kicker">GLOBAL JUICE LEAGUE</div>
         <h2>果王排行榜</h2>
         <p className="modal-copy">每一分都来自真实完成的果园挑战。</p>
+        <div className="leaderboard-tabs">
+          {(Object.keys(MODE_INFO) as GameMode[]).map((item) => (
+            <button
+              key={item}
+              className={mode === item ? "active" : ""}
+              onClick={() => onModeChange(item)}
+            >
+              {MODE_INFO[item].icon} {MODE_INFO[item].name}
+            </button>
+          ))}
+        </div>
         <div className="rank-list">
           {loading ? (
             <div className="empty-state">正在采摘最新战绩…</div>
@@ -147,7 +187,11 @@ function Leaderboard({
               <span className="rank-player">
                 <strong>{entry.username}</strong>
                 <small>
-                  第 {entry.level + 1} 关 · 最高{" "}
+                  {mode === "story"
+                    ? `第 ${entry.level + 1} 关`
+                    : mode === "endless"
+                      ? `第 ${entry.level} 波`
+                      : `远征路线 ${entry.level + 1}`} · 最高{" "}
                   {FRUITS[Math.min(entry.fruitTier, FRUITS.length - 1)].emoji} ·{" "}
                   {entry.maxCombo} 连击
                 </small>
@@ -171,6 +215,7 @@ function Leaderboard({
 
 export default function App() {
   const [screen, setScreen] = useState<Screen>("home");
+  const [mode, setMode] = useState<GameMode>("story");
   const [level, setLevel] = useState(readProgress);
   const [unlocked, setUnlocked] = useState(readProgress);
   const [session, setSession] = useState(0);
@@ -187,6 +232,11 @@ export default function App() {
   const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>([]);
   const [leaderboardLoading, setLeaderboardLoading] = useState(false);
   const [leaderboardOffline, setLeaderboardOffline] = useState(false);
+  const [leaderboardMode, setLeaderboardMode] = useState<GameMode>("story");
+  const [wave, setWave] = useState(1);
+  const [relics, setRelics] = useState<RelicId[]>([]);
+  const [carryScore, setCarryScore] = useState(0);
+  const [rewardOptions, setRewardOptions] = useState<RelicDefinition[]>([]);
   const controlsRef = useRef<GameControls | null>(null);
   const toastTimer = useRef<number | null>(null);
 
@@ -209,10 +259,12 @@ export default function App() {
     (next: GameResult) => {
       setResult(next);
       if (next.status === "won") {
-        persistUnlocked(level + 1);
+        if (mode === "story") persistUnlocked(level + 1);
+        if (mode === "expedition" && relics.length < 7)
+          setRewardOptions(pickRelics(relics));
       }
     },
-    [level, persistUnlocked],
+    [level, mode, persistUnlocked, relics],
   );
   const handleToast = useCallback(
     (message: string, tone: "gold" | "pink" | "cyan" = "pink") => {
@@ -224,22 +276,39 @@ export default function App() {
   );
 
   const beginGame = useCallback(
-    (targetLevel = level) => {
+    (
+      targetLevel = level,
+      targetMode = mode,
+      run: { wave?: number; relics?: RelicId[]; score?: number } = {},
+    ) => {
+      const nextWave = run.wave || 1;
+      const nextRelics = run.relics || [];
+      const nextScore = run.score || 0;
       setLevel(targetLevel);
+      setMode(targetMode);
+      setWave(nextWave);
+      setRelics(nextRelics);
+      setCarryScore(nextScore);
       setSnapshot(EMPTY_SNAPSHOT);
       setResult(null);
+      setRewardOptions([]);
       setSaveState("idle");
       setSaveError("");
       setUsername("");
       setRunId(null);
       setScreen("game");
       setSession((value) => value + 1);
-      void startRun(targetLevel)
+      void startRun(targetMode, targetMode === "endless" ? nextWave : targetLevel)
         .then(({ runId: id }) => setRunId(id))
         .catch(() => setRunId(null));
     },
-    [level],
+    [level, mode],
   );
+
+  const startSelectedMode = () => {
+    if (mode === "story") beginGame(level, "story");
+    else beginGame(0, mode, { wave: 1, relics: [], score: 0 });
+  };
 
   const backHome = () => {
     controlsRef.current?.destroy();
@@ -250,27 +319,50 @@ export default function App() {
 
   const continueGame = () => {
     if (!result) return;
-    const nextLevel =
-      result.status === "won" ? Math.min(level + 1, LEVELS.length - 1) : level;
-    if (result.status === "won") persistUnlocked(nextLevel);
-    beginGame(nextLevel);
+    if (mode === "story") {
+      const nextLevel =
+        result.status === "won"
+          ? Math.min(level + 1, LEVELS.length - 1)
+          : level;
+      if (result.status === "won") persistUnlocked(nextLevel);
+      beginGame(nextLevel, "story");
+      return;
+    }
+    beginGame(0, mode, { wave: 1, relics: [], score: 0 });
   };
 
-  const loadLeaderboard = useCallback(() => {
+  const chooseRelic = (relic: RelicId) => {
+    if (!result) return;
+    const nextRelics = [...relics, relic];
+    const nextWave = wave + 1;
+    beginGame(Math.min(LEVELS.length - 1, nextWave - 1), "expedition", {
+      wave: nextWave,
+      relics: nextRelics,
+      score: result.score,
+    });
+  };
+
+  const loadLeaderboard = useCallback((selectedMode = leaderboardMode) => {
     setLeaderboardLoading(true);
     setLeaderboardOffline(false);
-    void getLeaderboard()
+    void getLeaderboard(selectedMode)
       .then((data) => {
         setLeaderboard(data.scores);
         setLeaderboardOffline(Boolean(data.offline));
       })
       .catch(() => setLeaderboardOffline(true))
       .finally(() => setLeaderboardLoading(false));
-  }, []);
+  }, [leaderboardMode]);
 
   const openLeaderboard = () => {
+    setLeaderboardMode(mode);
     setLeaderboardOpen(true);
-    loadLeaderboard();
+    loadLeaderboard(mode);
+  };
+
+  const changeLeaderboardMode = (nextMode: GameMode) => {
+    setLeaderboardMode(nextMode);
+    loadLeaderboard(nextMode);
   };
 
   const submitScore = async () => {
@@ -286,7 +378,7 @@ export default function App() {
         fruitTier: result.maxFruitTier,
       });
       setSaveState("saved");
-      loadLeaderboard();
+      loadLeaderboard(mode);
     } catch (error) {
       setSaveState("idle");
       setSaveError(error instanceof Error ? error.message : "分数保存失败");
@@ -301,6 +393,10 @@ export default function App() {
   );
 
   const target = FRUITS[LEVELS[level].target];
+  const isRelicReward =
+    mode === "expedition" &&
+    result?.status === "won" &&
+    rewardOptions.length > 0;
 
   return (
     <main className="app-shell">
@@ -321,44 +417,75 @@ export default function App() {
             叠个<span>果王</span>
           </h1>
           <p className="tagline">点三张，掉一颗，碰两颗，合成果王！</p>
+          <div className="mode-switch" aria-label="选择游戏模式">
+            {(Object.keys(MODE_INFO) as GameMode[]).map((item) => (
+              <button
+                key={item}
+                className={mode === item ? "active" : ""}
+                onClick={() => setMode(item)}
+              >
+                <i>{MODE_INFO[item].icon}</i>
+                <span>{MODE_INFO[item].name}</span>
+              </button>
+            ))}
+          </div>
           <div className="mode-card">
             <div className="mode-topline">
-              <span>主线挑战</span>
+              <span>{MODE_INFO[mode].name}</span>
               <b>
-                {unlocked + 1}
-                <small> / {LEVELS.length}</small>
+                {mode === "story" ? unlocked + 1 : mode === "endless" ? "∞" : "ROGUE"}
+                {mode === "story" ? <small> / {LEVELS.length}</small> : null}
               </b>
             </div>
-            <div className="level-track">
-              {LEVELS.map((item, index) => (
-                <button
-                  key={item.name}
-                  className={`level-dot ${index <= unlocked ? "unlocked" : ""} ${index === level ? "selected" : ""}`}
-                  disabled={index > unlocked}
-                  aria-label={`${item.name}${index > unlocked ? "，未解锁" : ""}`}
-                  onClick={() => setLevel(index)}
-                >
-                  {index < unlocked ? "✓" : index + 1}
-                </button>
-              ))}
-            </div>
+            {mode === "story" ? (
+              <div className="level-track">
+                {LEVELS.map((item, index) => (
+                  <button
+                    key={item.name}
+                    className={`level-dot ${index <= unlocked ? "unlocked" : ""} ${index === level ? "selected" : ""}`}
+                    disabled={index > unlocked}
+                    aria-label={`${item.name}${index > unlocked ? "，未解锁" : ""}`}
+                    onClick={() => setLevel(index)}
+                  >
+                    {index < unlocked ? "✓" : index + 1}
+                  </button>
+                ))}
+              </div>
+            ) : (
+              <p className="mode-description">{MODE_INFO[mode].tagline}</p>
+            )}
             <div className="mission-preview">
-              <span className="mission-icon">{target.emoji}</span>
+              <span className="mission-icon">
+                {mode === "story" ? target.emoji : MODE_INFO[mode].icon}
+              </span>
               <span>
-                <small>第 {level + 1} 关</small>
-                <strong>{LEVELS[level].name}</strong>
+                <small>
+                  {mode === "story" ? `第 ${level + 1} 关` : mode === "endless" ? "无限波次" : "随机远征"}
+                </small>
+                <strong>
+                  {mode === "story"
+                    ? LEVELS[level].name
+                    : mode === "endless"
+                      ? "双果王 · 彩虹清场"
+                      : "每关三选一奇物"}
+                </strong>
               </span>
               <span className="mission-target">
-                目标
+                {mode === "story" ? "目标" : mode === "endless" ? "生存" : "构筑"}
                 <br />
-                <b>{target.name}</b>
+                <b>{mode === "story" ? target.name : mode === "endless" ? "最高分" : "8 种奇物"}</b>
               </span>
             </div>
           </div>
-          <button className="button button-play" onClick={() => beginGame()}>
-            <span>开始挑战</span>
+          <button className="button button-play" onClick={startSelectedMode}>
+            <span>{mode === "story" ? "开始挑战" : mode === "endless" ? "进入无尽" : "开始远征"}</span>
             <i>▶</i>
           </button>
+          <div className="special-legend">
+            <span>❄ 邻卡解冻</span>
+            <span>💣 爆炸连取</span>
+            <span>🌿 点击剪藤</span>
+          </div>
           <button className="leaderboard-link" onClick={openLeaderboard}>
             <span>🏆</span> 全球排行榜
           </button>
@@ -416,6 +543,10 @@ export default function App() {
           <div className="game-phone">
             <GameCanvas
               level={level}
+              mode={mode}
+              wave={wave}
+              relics={relics}
+              startingScore={carryScore}
               session={session}
               onReady={handleReady}
               onSnapshot={handleSnapshot}
@@ -431,18 +562,32 @@ export default function App() {
                 ‹
               </button>
               <div className="level-chip">
-                <small>LEVEL {level + 1}</small>
-                <strong>{LEVELS[level].name}</strong>
+                <small>
+                  {mode === "story" ? `LEVEL ${level + 1}` : mode === "endless" ? `WAVE ${snapshot.wave}` : `ROUTE ${wave}`}
+                </small>
+                <strong>{mode === "story" ? LEVELS[level].name : MODE_INFO[mode].name}</strong>
               </div>
               <div className="score-chip">
                 <small>SCORE</small>
                 <b>{formatScore(snapshot.score)}</b>
               </div>
               <div className="target-chip">
-                <small>目标</small>
-                <b>{target.emoji}</b>
+                <small>{mode === "endless" ? "最大" : "目标"}</small>
+                <b>
+                  {mode === "endless"
+                    ? FRUITS[Math.min(snapshot.maxFruitTier, FRUITS.length - 1)].emoji
+                    : target.emoji}
+                </b>
               </div>
             </header>
+            {relics.length > 0 ? (
+              <div className="relic-strip">
+                {relics.map((id) => {
+                  const relic = RELICS.find((item) => item.id === id);
+                  return relic ? <span key={id} title={relic.name}>{relic.icon}</span> : null;
+                })}
+              </div>
+            ) : null}
             <div className="power-dock">
               <button
                 disabled={!snapshot.undoLeft}
@@ -468,7 +613,23 @@ export default function App() {
                 <span>榨汁</span>
                 <em>{snapshot.juiceLeft}</em>
               </button>
-              <button onClick={() => beginGame(level)}>
+              <button
+                disabled={!snapshot.hammerLeft}
+                onClick={() => controlsRef.current?.hammer()}
+              >
+                <i>🔨</i>
+                <span>清顶</span>
+                <em>{snapshot.hammerLeft}</em>
+              </button>
+              <button
+                disabled={!snapshot.magnetLeft}
+                onClick={() => controlsRef.current?.magnet()}
+              >
+                <i>🧲</i>
+                <span>合并</span>
+                <em>{snapshot.magnetLeft}</em>
+              </button>
+              <button onClick={() => beginGame(level, mode, { wave, relics, score: carryScore })}>
                 <i>↻</i>
                 <span>重开</span>
               </button>
@@ -489,13 +650,29 @@ export default function App() {
                 <div className={`result-card result-${result.status}`}>
                   <div className="result-rays" />
                   <div className="result-emoji">
-                    {result.status === "won" ? target.emoji : "🍹"}
+                    {result.status === "won" ? target.emoji : mode === "endless" ? "∞" : "🍹"}
                   </div>
                   <div className="result-kicker">
-                    {result.status === "won" ? "LEVEL CLEAR" : "JUICE BREAK"}
+                    {isRelicReward
+                      ? "ROUTE CLEAR"
+                      : mode === "expedition" && result.status === "won"
+                        ? "EXPEDITION CLEAR"
+                      : mode === "endless"
+                        ? `ENDLESS WAVE ${result.wave}`
+                        : result.status === "won"
+                          ? "LEVEL CLEAR"
+                          : "JUICE BREAK"}
                   </div>
                   <h2>
-                    {result.status === "won" ? "甜度通关！" : "差一点就合成了"}
+                    {isRelicReward
+                      ? "选择一件奇物"
+                      : mode === "expedition" && result.status === "won"
+                        ? "远征完成！"
+                      : mode === "endless"
+                        ? "无尽狂欢结算"
+                        : result.status === "won"
+                          ? "甜度通关！"
+                          : "差一点就合成了"}
                   </h2>
                   <p>{result.reason}</p>
                   <div className="score-total">
@@ -524,6 +701,20 @@ export default function App() {
                       </b>
                     </span>
                   </div>
+                  {isRelicReward ? (
+                    <div className="relic-choices">
+                      {rewardOptions.map((relic) => (
+                        <button
+                          key={relic.id}
+                          className={`relic-choice relic-${relic.tone}`}
+                          onClick={() => chooseRelic(relic.id)}
+                        >
+                          <i>{relic.icon}</i>
+                          <span><b>{relic.name}</b><small>{relic.description}</small></span>
+                        </button>
+                      ))}
+                    </div>
+                  ) : (
                   <div className="save-box">
                     {saveState === "saved" ? (
                       <div className="saved-message">
@@ -570,6 +761,12 @@ export default function App() {
                       </>
                     )}
                   </div>
+                  )}
+                  {isRelicReward ? (
+                    <button className="button button-ghost result-home" onClick={backHome}>
+                      暂停远征并返回
+                    </button>
+                  ) : (
                   <div className="result-actions">
                     <button className="button button-ghost" onClick={backHome}>
                       返回果园
@@ -578,11 +775,16 @@ export default function App() {
                       className="button button-primary"
                       onClick={continueGame}
                     >
-                      {result.status === "won" && level < LEVELS.length - 1
+                      {mode === "story" && result.status === "won" && level < LEVELS.length - 1
                         ? "下一关"
-                        : "再来一局"}
+                        : mode === "expedition"
+                          ? "重新远征"
+                          : mode === "endless"
+                            ? "再战无尽"
+                            : "再来一局"}
                     </button>
                   </div>
+                  )}
                 </div>
               </div>
             ) : null}
@@ -594,6 +796,8 @@ export default function App() {
           entries={leaderboard}
           loading={leaderboardLoading}
           offline={leaderboardOffline}
+          mode={leaderboardMode}
+          onModeChange={changeLeaderboardMode}
           onClose={() => setLeaderboardOpen(false)}
           onRefresh={loadLeaderboard}
         />

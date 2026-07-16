@@ -10,6 +10,20 @@ test("rejects unsupported game modes", () => {
   assert.equal(startRunSchema.safeParse({ mode: "ranked", level: 1 }).success, false);
 });
 
+test("accepts expedition runs and endless-scale scores", () => {
+  assert.equal(startRunSchema.safeParse({ mode: "expedition", level: 7 }).success, true);
+  assert.equal(
+    finishRunSchema.safeParse({
+      runId: "8a12c4fd-a84b-4a3d-8e67-66d22f32f375",
+      username: "Rogue果王",
+      score: 125_000_000,
+      maxCombo: 88,
+      fruitTier: 12,
+    }).success,
+    true,
+  );
+});
+
 test("normalizes username whitespace", () => {
   assert.equal(cleanUsername("  果王   007 "), "果王 007");
 });

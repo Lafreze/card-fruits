@@ -1,6 +1,6 @@
 CREATE TABLE IF NOT EXISTS game_runs (
   id UUID PRIMARY KEY,
-  mode VARCHAR(16) NOT NULL CHECK (mode IN ('story', 'endless')),
+  mode VARCHAR(16) NOT NULL CHECK (mode IN ('story', 'endless', 'expedition')),
   level INTEGER NOT NULL CHECK (level BETWEEN 0 AND 99),
   started_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   completed_at TIMESTAMPTZ,
@@ -13,7 +13,7 @@ CREATE TABLE IF NOT EXISTS scores (
   username VARCHAR(20) NOT NULL,
   score INTEGER NOT NULL CHECK (score >= 0),
   level INTEGER NOT NULL CHECK (level BETWEEN 0 AND 99),
-  mode VARCHAR(16) NOT NULL CHECK (mode IN ('story', 'endless')),
+  mode VARCHAR(16) NOT NULL CHECK (mode IN ('story', 'endless', 'expedition')),
   max_combo INTEGER NOT NULL DEFAULT 0 CHECK (max_combo BETWEEN 0 AND 999),
   fruit_tier INTEGER NOT NULL DEFAULT 0 CHECK (fruit_tier BETWEEN 0 AND 20),
   duration_ms INTEGER NOT NULL CHECK (duration_ms >= 0),
@@ -25,3 +25,11 @@ CREATE INDEX IF NOT EXISTS scores_rank_idx
 
 CREATE INDEX IF NOT EXISTS scores_recent_idx
   ON scores (created_at DESC);
+
+ALTER TABLE game_runs DROP CONSTRAINT IF EXISTS game_runs_mode_check;
+ALTER TABLE game_runs ADD CONSTRAINT game_runs_mode_check
+  CHECK (mode IN ('story', 'endless', 'expedition'));
+
+ALTER TABLE scores DROP CONSTRAINT IF EXISTS scores_mode_check;
+ALTER TABLE scores ADD CONSTRAINT scores_mode_check
+  CHECK (mode IN ('story', 'endless', 'expedition'));

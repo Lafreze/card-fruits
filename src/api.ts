@@ -1,3 +1,5 @@
+import type { GameMode } from "./game/modes";
+
 export type LeaderboardEntry = {
   username: string;
   score: number;
@@ -17,10 +19,10 @@ async function api<T>(path: string, options?: RequestInit): Promise<T> {
   return body as T;
 }
 
-export async function startRun(level: number) {
+export async function startRun(mode: GameMode, level: number) {
   return api<{ runId: string }>("/api/runs", {
     method: "POST",
-    body: JSON.stringify({ mode: "story", level }),
+    body: JSON.stringify({ mode, level }),
   });
 }
 
@@ -37,6 +39,8 @@ export async function saveScore(payload: {
   });
 }
 
-export async function getLeaderboard() {
-  return api<{ scores: LeaderboardEntry[]; offline?: boolean }>("/api/leaderboard?mode=story");
+export async function getLeaderboard(mode: GameMode = "story") {
+  return api<{ scores: LeaderboardEntry[]; offline?: boolean }>(
+    `/api/leaderboard?mode=${mode}`,
+  );
 }

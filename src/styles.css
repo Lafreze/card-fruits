@@ -208,6 +208,52 @@ input:focus-visible {
   letter-spacing: 0.08em;
 }
 
+.mode-switch {
+  width: 100%;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 7px;
+  margin-bottom: 10px;
+}
+.mode-switch button {
+  min-width: 0;
+  padding: 9px 5px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  border: 1px solid rgba(183, 139, 255, 0.18);
+  border-radius: 14px;
+  color: #a99abb;
+  background: rgba(22, 13, 48, 0.72);
+  cursor: pointer;
+  font-size: 10px;
+  font-weight: 850;
+}
+.mode-switch button i { font-size: 16px; font-style: normal; }
+.mode-switch button.active {
+  color: #fff;
+  border-color: rgba(255, 216, 94, 0.55);
+  background: linear-gradient(135deg, rgba(129, 73, 226, 0.75), rgba(255, 58, 137, 0.56));
+  box-shadow: 0 7px 22px rgba(106, 46, 204, 0.25);
+}
+.mode-description {
+  min-height: 30px;
+  margin: 11px 0 10px;
+  color: #a99ac2;
+  font-size: 10px;
+  line-height: 1.5;
+}
+.special-legend {
+  width: 100%;
+  margin-top: 9px;
+  display: flex;
+  justify-content: center;
+  gap: 12px;
+  color: #9585ac;
+  font-size: 9px;
+}
+
 .mode-card {
   width: 100%;
   padding: 18px;
@@ -566,16 +612,17 @@ input:focus-visible {
   height: 5.1%;
   display: flex;
   justify-content: center;
-  gap: 2.4%;
+  gap: 1.1%;
 }
 .power-dock button {
-  width: 22%;
+  flex: 1;
+  min-width: 0;
   padding: 0;
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 4px;
-  gap: 0.9cqw;
+  gap: 2px;
+  gap: 0.45cqw;
   border: 1px solid rgba(195, 159, 255, 0.25);
   border-radius: 999px;
   color: #f8f1ff;
@@ -596,15 +643,15 @@ input:focus-visible {
   font-size: 3.3cqw;
 }
 .power-dock span {
-  font-size: 10px;
-  font-size: 2.3cqw;
+  font-size: 8px;
+  font-size: 1.86cqw;
   font-weight: 800;
 }
 .power-dock em {
-  min-width: 14px;
-  min-width: 3.3cqw;
-  height: 14px;
-  height: 3.3cqw;
+  min-width: 12px;
+  min-width: 2.8cqw;
+  height: 12px;
+  height: 2.8cqw;
   display: grid;
   place-items: center;
   border-radius: 50%;
@@ -615,6 +662,20 @@ input:focus-visible {
   font-style: normal;
   font-weight: 900;
 }
+.relic-strip {
+  position: absolute;
+  z-index: 4;
+  top: 10.2%;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  gap: 3px;
+  padding: 3px 7px;
+  border: 1px solid rgba(255, 216, 94, 0.16);
+  border-radius: 999px;
+  background: rgba(20, 10, 43, 0.78);
+}
+.relic-strip span { font-size: 11px; }
 /* 连击标签悬在卡区(y402)与卡槽(y414)的接缝上,居中锚定不压格子 */
 .combo-pill {
   position: absolute;
@@ -882,6 +943,55 @@ input:focus-visible {
   color: #93f6cd;
   font-size: 11px;
   font-weight: 800;
+}
+.relic-choices {
+  display: grid;
+  gap: 7px;
+  margin: 12px 0;
+}
+.relic-choice {
+  width: 100%;
+  padding: 9px 11px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 14px;
+  color: #fff;
+  background: rgba(9, 7, 27, 0.48);
+  text-align: left;
+  cursor: pointer;
+}
+.relic-choice > i { width: 35px; font-size: 25px; font-style: normal; text-align: center; }
+.relic-choice span { display: flex; flex-direction: column; }
+.relic-choice b { font-size: 11px; }
+.relic-choice small { margin-top: 2px; color: #a99abc; font-size: 8px; line-height: 1.4; }
+.relic-choice:hover { transform: translateY(-1px); border-color: rgba(255, 216, 94, 0.45); }
+.relic-gold { box-shadow: inset 3px 0 #ffd85e; }
+.relic-pink { box-shadow: inset 3px 0 #ff4f9a; }
+.relic-cyan { box-shadow: inset 3px 0 #45dcff; }
+.result-home { width: 100%; min-height: 40px; border-radius: 12px; font-size: 11px; }
+
+.leaderboard-tabs {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 6px;
+  margin-top: 13px;
+}
+.leaderboard-tabs button {
+  padding: 8px 5px;
+  border: 1px solid rgba(255,255,255,.1);
+  border-radius: 11px;
+  color: #9687aa;
+  background: rgba(255,255,255,.035);
+  font-size: 9px;
+  cursor: pointer;
+}
+.leaderboard-tabs button.active {
+  color: #26132f;
+  border-color: #ffd85e;
+  background: linear-gradient(135deg, #ffe77b, #ff9c4a);
+  font-weight: 900;
 }
 .result-actions,
 .modal-actions {

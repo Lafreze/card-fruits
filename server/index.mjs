@@ -133,7 +133,9 @@ app.post("/api/scores", submitLimiter, async (req, res) => {
 
 app.get("/api/leaderboard", async (req, res) => {
   if (!pool) return res.json({ scores: [], offline: true });
-  const mode = req.query.mode === "endless" ? "endless" : "story";
+  const mode = ["story", "endless", "expedition"].includes(req.query.mode)
+    ? req.query.mode
+    : "story";
   const result = await pool.query(
     `SELECT username, score, level, max_combo AS "maxCombo",
             fruit_tier AS "fruitTier", created_at AS "createdAt"
