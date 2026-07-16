@@ -1,0 +1,2239 @@
+<title>叠个果王</title>
+<style>
+  :root {
+    --bg0: #221831;
+    --bg1: #150e20;
+    --panel: rgba(255, 240, 222, 0.07);
+    --ink: #f7ecd9;
+    --ink-dim: #b7a8c4;
+    --accent: #ff7a59;
+    --gold: #ffd24a;
+    --danger: #ff4d5e;
+    --card-face: #fbf0dc;
+  }
+  html,
+  body {
+    height: 100%;
+  }
+  body {
+    margin: 0;
+    background: radial-gradient(
+      120% 90% at 50% 0%,
+      var(--bg0) 0%,
+      var(--bg1) 78%
+    );
+    color: var(--ink);
+    font-family:
+      "PingFang SC", "Hiragino Sans GB", "Heiti SC", "Microsoft YaHei",
+      system-ui, sans-serif;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+    -webkit-user-select: none;
+    user-select: none;
+  }
+  #stage {
+    position: relative;
+    aspect-ratio: 420/840;
+    height: min(100vh, 100dvh);
+    max-width: 100vw;
+    touch-action: none;
+  }
+  @supports not (aspect-ratio: 1) {
+    #stage {
+      width: 420px;
+      height: 840px;
+    }
+  }
+  canvas {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    display: block;
+  }
+
+  #hud {
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: 0;
+    height: 6.4%;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 4%;
+    box-sizing: border-box;
+    pointer-events: none;
+    font-variant-numeric: tabular-nums;
+  }
+  #hud .chip {
+    background: var(--panel);
+    border: 1px solid rgba(255, 240, 222, 0.12);
+    border-radius: 999px;
+    padding: 0.35em 0.9em;
+    font-size: clamp(11px, 1.7vh, 15px);
+    font-weight: 600;
+    letter-spacing: 0.02em;
+    display: flex;
+    gap: 0.45em;
+    align-items: center;
+  }
+  #hudScore {
+    font-weight: 800;
+    color: var(--gold);
+  }
+  #hudScore.bump {
+    animation: scoreBump 0.32s ease;
+  }
+  @keyframes scoreBump {
+    50% {
+      transform: scale(1.28);
+    }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    #hudScore.bump {
+      animation: none;
+    }
+  }
+  #hudTarget .tEmoji {
+    font-size: 1.25em;
+    line-height: 1;
+  }
+
+  #toolbar {
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: 55.3%;
+    height: 4.4%;
+    display: flex;
+    gap: 2.2%;
+    justify-content: center;
+    align-items: center;
+  }
+  #toolbar button {
+    font: inherit;
+    font-weight: 700;
+    font-size: clamp(10px, 1.55vh, 14px);
+    white-space: nowrap;
+    color: var(--ink);
+    background: var(--panel);
+    border: 1px solid rgba(255, 240, 222, 0.16);
+    border-radius: 999px;
+    padding: 0.32em 0.75em;
+    cursor: pointer;
+    letter-spacing: 0.03em;
+  }
+  #toolbar button:not(:disabled):active {
+    transform: translateY(1px);
+    background: rgba(255, 240, 222, 0.14);
+  }
+  #toolbar button:disabled {
+    opacity: 0.32;
+    cursor: default;
+  }
+  #toolbar button.active {
+    background: var(--accent);
+    color: #2b1210;
+    border-color: var(--accent);
+  }
+  #toolbar button:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+  }
+
+  #overlay {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(18, 10, 28, 0.78);
+    backdrop-filter: blur(6px);
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.3s;
+  }
+  #overlay.show {
+    opacity: 1;
+    pointer-events: auto;
+  }
+  #overlayCard {
+    width: 78%;
+    text-align: center;
+    display: flex;
+    flex-direction: column;
+    gap: 2.4vh;
+    align-items: center;
+  }
+  #ovTitle {
+    font-size: clamp(30px, 6.5vh, 58px);
+    font-weight: 900;
+    letter-spacing: 0.06em;
+    line-height: 1.15;
+    text-wrap: balance;
+    margin: 0;
+  }
+  #ovTitle .gold {
+    color: var(--gold);
+  }
+  #ovSub {
+    font-size: clamp(13px, 2vh, 17px);
+    color: var(--ink-dim);
+    line-height: 1.7;
+    margin: 0;
+    white-space: pre-line;
+  }
+  #ovBig {
+    font-size: clamp(44px, 9vh, 84px);
+    line-height: 1;
+    margin: 0;
+  }
+  #ovBtns {
+    display: flex;
+    gap: 12px;
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+  #overlay button {
+    font: inherit;
+    font-size: clamp(15px, 2.3vh, 19px);
+    font-weight: 800;
+    letter-spacing: 0.1em;
+    padding: 0.7em 2.2em;
+    border-radius: 999px;
+    cursor: pointer;
+    border: none;
+    background: var(--accent);
+    color: #2b1210;
+    box-shadow: 0 6px 24px rgba(255, 122, 89, 0.35);
+  }
+  #overlay button.ghost {
+    background: transparent;
+    color: var(--ink);
+    border: 1.5px solid rgba(255, 240, 222, 0.3);
+    box-shadow: none;
+  }
+  #overlay button:active {
+    transform: translateY(1px);
+  }
+  #overlay button:focus-visible {
+    outline: 2px solid var(--gold);
+    outline-offset: 3px;
+  }
+  #ovDots {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    justify-content: center;
+    max-width: 80%;
+  }
+  #ovDots .dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: rgba(255, 240, 222, 0.18);
+  }
+  #ovDots .dot.done {
+    background: var(--gold);
+  }
+  #ovDots .dot.cur {
+    background: var(--accent);
+    transform: scale(1.35);
+  }
+  @media (prefers-reduced-motion: reduce) {
+    #overlay {
+      transition: none;
+    }
+  }
+</style>
+
+<div id="stage">
+  <canvas id="cv"></canvas>
+  <div id="hud">
+    <span class="chip" id="hudLevel">第 1 关</span>
+    <span class="chip" id="hudTarget">目标 <span class="tEmoji">🍓</span></span>
+    <span class="chip" id="hudScore">0</span>
+  </div>
+  <div id="toolbar">
+    <button id="btnUndo">↩ 撤回 ×1</button>
+    <button id="btnShuffle">⇄ 洗牌 ×3</button>
+    <button id="btnJuice">🥤 榨汁 ×1</button>
+    <button id="btnRestart">↻ 重开</button>
+  </div>
+  <div id="overlay">
+    <div id="overlayCard">
+      <p id="ovBig">🍉</p>
+      <h1 id="ovTitle">叠个果王</h1>
+      <p id="ovSub"></p>
+      <div id="ovDots"></div>
+      <div id="ovBtns"></div>
+    </div>
+  </div>
+</div>
+
+<script>
+  "use strict";
+  /* ============================================================
+   叠个果王 — 首版原型
+   叠层选卡 → 7格卡槽三消 → 实体水果 → 物理合成 → 果王
+   ============================================================ */
+
+  // ---------- 逻辑坐标系 ----------
+  const W = 420,
+    H = 840;
+  const STACK = { x: 12, y: 62, w: 396, h: 328 }; // 叠层区
+  const TRAY = { y: 402, h: 66, n: 7, cw: 52, ch: 60 }; // 卡槽
+  const BOX = { x: 18, y: 508, w: 384, h: 320 }; // 合成箱
+  const LINE_Y = BOX.y + 46; // 警戒线
+  const DROP_Y = BOX.y + 24; // 待落水果悬停高度
+  const CARD_W = 54,
+    CARD_H = 62;
+
+  // ---------- 水果表 ----------
+  const FRUITS = [
+    { n: "葡萄", e: "🍇", r: 13, c: "#9b6bde" },
+    { n: "樱桃", e: "🍒", r: 16, c: "#e84d5f" },
+    { n: "草莓", e: "🍓", r: 20, c: "#ff6f91" },
+    { n: "柠檬", e: "🍋", r: 24, c: "#ffe066" },
+    { n: "猕猴桃", e: "🥝", r: 29, c: "#8fbf4d" },
+    { n: "橙子", e: "🍊", r: 34, c: "#ffa62b" },
+    { n: "苹果", e: "🍎", r: 40, c: "#ff5a4e" },
+    { n: "桃子", e: "🍑", r: 46, c: "#ffb08c" },
+    { n: "芒果", e: "🥭", r: 53, c: "#ffb347" },
+    { n: "菠萝", e: "🍍", r: 60, c: "#f5c542" },
+    { n: "哈密瓜", e: "🍈", r: 67, c: "#b8e08a" },
+    { n: "西瓜", e: "🍉", r: 74, c: "#4fae5a" },
+    { n: "黄金果王", e: "👑", r: 82, c: "#ffd24a" },
+  ];
+
+  // ---------- 关卡表 ----------
+  // counts[i] = 第 i 种卡的张数(3 的倍数); target = 目标水果下标; spread = 摆放松散度
+  // special = 特殊卡数量:frozen 冰冻(消除旁边解冻) / chained 锁链(任意三消解锁) / mystery 问号(点击揭晓)
+  const LEVELS = [
+    { counts: [6, 3, 3], target: 2, spread: 1.0 },
+    { counts: [6, 6, 9], target: 3, spread: 0.95 },
+    { counts: [6, 6, 6, 6], target: 4, spread: 0.9 },
+    {
+      counts: [9, 6, 6, 6, 6],
+      target: 5,
+      spread: 0.85,
+      special: { frozen: 3 },
+    },
+    {
+      counts: [9, 9, 6, 6, 6, 6],
+      target: 6,
+      spread: 0.8,
+      special: { frozen: 4 },
+    },
+    {
+      counts: [9, 9, 9, 9, 9],
+      target: 6,
+      spread: 0.75,
+      special: { frozen: 3, chained: 3 },
+    },
+    {
+      counts: [6, 9, 9, 9, 12, 9],
+      target: 7,
+      spread: 0.72,
+      special: { frozen: 4, chained: 4 },
+    },
+    {
+      counts: [9, 9, 9, 9, 9, 9],
+      target: 7,
+      spread: 0.7,
+      special: { frozen: 4, chained: 3, mystery: 6 },
+    },
+    {
+      counts: [9, 9, 9, 9, 9, 9, 9],
+      target: 8,
+      spread: 0.68,
+      special: { frozen: 5, chained: 5, mystery: 6 },
+    },
+    {
+      counts: [9, 9, 9, 9, 9, 9, 9, 12],
+      target: 9,
+      spread: 0.66,
+      special: { frozen: 6, chained: 6, mystery: 9 },
+    },
+    {
+      counts: [9, 9, 9, 9, 9, 9, 9, 9, 9],
+      target: 10,
+      spread: 0.64,
+      special: { frozen: 6, chained: 6, mystery: 9 },
+    },
+    {
+      // 终章:出现芒果/菠萝/哈密瓜/西瓜高阶卡,两组西瓜三消 → 双西瓜碰撞 → 黄金果王
+      counts: [9, 9, 9, 0, 0, 0, 0, 9, 9, 9, 9, 6],
+      target: 12,
+      spread: 0.62,
+      special: { frozen: 8, chained: 8, mystery: 12 },
+    },
+  ];
+  const CHAIN_MULT = [1, 1, 1.25, 1.5, 2, 2.5, 3]; // 下标=连击数,6+ 取 3
+  const CHAIN_TEXT = {
+    2: "太甜了！",
+    3: "果汁爆发！",
+    4: "超级连锁！",
+    5: "果王降临！",
+  };
+
+  // ---------- DOM ----------
+  const cv = document.getElementById("cv"),
+    ctx = cv.getContext("2d");
+  const stage = document.getElementById("stage");
+  const hudLevel = document.getElementById("hudLevel");
+  const hudTarget = document.getElementById("hudTarget");
+  const hudScore = document.getElementById("hudScore");
+  const btnUndo = document.getElementById("btnUndo");
+  const btnShuffle = document.getElementById("btnShuffle");
+  const btnJuice = document.getElementById("btnJuice");
+  const btnRestart = document.getElementById("btnRestart");
+  const overlay = document.getElementById("overlay");
+  const ovBig = document.getElementById("ovBig"),
+    ovTitle = document.getElementById("ovTitle");
+  const ovSub = document.getElementById("ovSub"),
+    ovBtns = document.getElementById("ovBtns");
+  const ovDots = document.getElementById("ovDots");
+  const REDUCED = matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+  let view = 1; // 画布像素/逻辑像素
+  function resize() {
+    const r = stage.getBoundingClientRect();
+    const dpr = Math.min(devicePixelRatio || 1, 2);
+    cv.width = Math.round(r.width * dpr);
+    cv.height = Math.round(r.height * dpr);
+    view = cv.width / W;
+  }
+  addEventListener("resize", resize);
+  resize();
+
+  // ---------- 音效(WebAudio 合成) ----------
+  let AC = null;
+  function ac() {
+    if (!AC) {
+      try {
+        AC = new (window.AudioContext || window.webkitAudioContext)();
+      } catch (e) {}
+    }
+    if (AC && AC.state === "suspended") AC.resume();
+    return AC;
+  }
+  function tone(freq, dur, type, vol, slide, delay) {
+    const a = ac();
+    if (!a) return;
+    const t0 = a.currentTime + (delay || 0);
+    const o = a.createOscillator(),
+      g = a.createGain();
+    o.type = type || "sine";
+    o.frequency.setValueAtTime(freq, t0);
+    if (slide)
+      o.frequency.exponentialRampToValueAtTime(
+        Math.max(30, freq + slide),
+        t0 + dur,
+      );
+    g.gain.setValueAtTime(0, t0);
+    g.gain.linearRampToValueAtTime(vol || 0.2, t0 + 0.008);
+    g.gain.exponentialRampToValueAtTime(0.0008, t0 + dur);
+    o.connect(g).connect(a.destination);
+    o.start(t0);
+    o.stop(t0 + dur + 0.02);
+  }
+  function noiseBurst(dur, vol, delay) {
+    const a = ac();
+    if (!a) return;
+    const t0 = a.currentTime + (delay || 0);
+    const n = Math.floor(a.sampleRate * dur);
+    const buf = a.createBuffer(1, n, a.sampleRate);
+    const d = buf.getChannelData(0);
+    for (let i = 0; i < n; i++) d[i] = (Math.random() * 2 - 1) * (1 - i / n);
+    const s = a.createBufferSource();
+    s.buffer = buf;
+    const g = a.createGain();
+    g.gain.value = vol || 0.2;
+    const f = a.createBiquadFilter();
+    f.type = "bandpass";
+    f.frequency.value = 1600;
+    s.connect(f).connect(g).connect(a.destination);
+    s.start(t0);
+  }
+  const sfx = {
+    click() {
+      tone(720, 0.06, "triangle", 0.14, 260);
+    },
+    blocked() {
+      tone(180, 0.08, "square", 0.07, -40);
+    },
+    slot() {
+      tone(430, 0.07, "sine", 0.12, 90);
+    },
+    triple() {
+      noiseBurst(0.14, 0.22);
+      tone(320, 0.2, "sawtooth", 0.12, -160);
+      tone(920, 0.16, "sine", 0.14, 300, 0.02);
+    },
+    drop() {
+      tone(130, 0.1, "sine", 0.2, -50);
+    },
+    merge(lv) {
+      const f = 240 + lv * 62;
+      tone(f, 0.16, "triangle", 0.2, f * 0.5);
+      tone(f * 1.5, 0.2, "sine", 0.12, f * 0.4, 0.03);
+      noiseBurst(0.08, 0.1);
+      if (lv >= 6) {
+        tone(f * 2, 0.4, "sine", 0.16, 120, 0.06);
+        noiseBurst(0.25, 0.18, 0.05);
+      }
+    },
+    warn() {
+      tone(880, 0.1, "square", 0.08);
+    },
+    win() {
+      [523, 659, 784, 1046].forEach((f, i) =>
+        tone(f, 0.3, "triangle", 0.16, 0, i * 0.11),
+      );
+    },
+    crown() {
+      [523, 659, 784, 1046, 1318, 1568].forEach((f, i) =>
+        tone(f, 0.45, "triangle", 0.18, 0, i * 0.09),
+      );
+      noiseBurst(0.5, 0.2, 0.3);
+    },
+    lose() {
+      tone(320, 0.5, "sawtooth", 0.14, -200);
+      tone(160, 0.6, "sine", 0.16, -80, 0.1);
+    },
+    ice() {
+      tone(1500, 0.14, "sine", 0.13, 500);
+      tone(2200, 0.1, "sine", 0.08, 700, 0.03);
+      noiseBurst(0.08, 0.1);
+    },
+    chain() {
+      tone(180, 0.09, "square", 0.12, -60);
+      tone(950, 0.05, "square", 0.07, 0, 0.02);
+      noiseBurst(0.05, 0.12);
+    },
+    big() {
+      tone(90, 0.5, "sine", 0.24, -30);
+      tone(440, 0.4, "sawtooth", 0.1, 220, 0.08);
+      noiseBurst(0.3, 0.22, 0.04);
+    },
+  };
+
+  // ---------- 工具 ----------
+  const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+  const rand = (a, b) => a + Math.random() * (b - a);
+  function shuffleArr(a) {
+    for (let i = a.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [a[i], a[j]] = [a[j], a[i]];
+    }
+    return a;
+  }
+  function roundRect(c, x, y, w, h, r) {
+    c.beginPath();
+    c.moveTo(x + r, y);
+    c.arcTo(x + w, y, x + w, y + h, r);
+    c.arcTo(x + w, y + h, x, y + h, r);
+    c.arcTo(x, y + h, x, y, r);
+    c.arcTo(x, y, x + w, y, r);
+    c.closePath();
+  }
+
+  // ---------- 存档 ----------
+  const save = {
+    get unlocked() {
+      return +(localStorage.getItem("gw.unlocked") || 0);
+    },
+    set unlocked(v) {
+      localStorage.setItem("gw.unlocked", v);
+    },
+    get best() {
+      return +(localStorage.getItem("gw.best") || 0);
+    },
+    set best(v) {
+      localStorage.setItem("gw.best", v);
+    },
+    get endlessBest() {
+      return +(localStorage.getItem("gw.endlessBest") || 0);
+    },
+    set endlessBest(v) {
+      localStorage.setItem("gw.endlessBest", v);
+    },
+  };
+
+  // ---------- 游戏状态 ----------
+  let state = "menu"; // menu | play | win | lose | done
+  let levelIdx = 0,
+    cfg = null;
+  let score = 0,
+    uid = 0;
+  let cards = []; // 叠层区 {id,type,x,y,z,rot,blocked,shakeT}
+  let tray = []; // 卡槽 {id,type,x,y,landed, orig:{x,y,z,rot}}
+  let history = []; // 撤回栈(记录卡槽卡 id)
+  let fruits = []; // 合成箱 {id,lv,x,y,vx,vy,r,held,age,dead,pop}
+  let queue = []; // 待掉落水果等级
+  let held = null,
+    heldCooldown = 0;
+  let undoLeft = 1,
+    shuffleLeft = 3,
+    juiceLeft = 1,
+    juiceMode = false,
+    stuckT = 0;
+  let chain = 0,
+    chainT = 0;
+  let danger = 0,
+    warnBeep = 0;
+  let hitstop = 0,
+    shakeT = 0,
+    shakeMag = 0,
+    flash = 0,
+    flashColor = "#fff";
+  let winDelay = -1,
+    loseDelay = -1,
+    loseReason = "";
+  let particles = [],
+    rings = [],
+    floats = [];
+  let bannerT = 0,
+    bannerText = "",
+    bannerText2 = "";
+  let rescueT = 0; // 全部可点卡被冰冻/锁链卡住时的自动救济计时
+  let endlessTriples = 0, // 无尽模式:累计三消组数(驱动难度与奖励)
+    maxFruitLv = -1; // 本局出现过的最大水果
+  let darkT = 0,
+    darkAt = null; // 大果合成:全屏变暗聚焦
+
+  // ---------- 关卡生成 ----------
+  function genLevel(i) {
+    // i = -1 → 无尽模式:初始 4 种卡,三消后无限补牌,没有目标,只求生存与高分
+    cfg =
+      i < 0
+        ? { endless: true, counts: [9, 6, 6, 3], target: 99, spread: 0.85 }
+        : LEVELS[i];
+    cards = [];
+    tray = [];
+    history = [];
+    fruits = [];
+    queue = [];
+    held = null;
+    heldCooldown = 0;
+    score = 0;
+    chain = 0;
+    chainT = 0;
+    danger = 0;
+    undoLeft = 1;
+    shuffleLeft = 3;
+    juiceLeft = 1;
+    juiceMode = false;
+    stuckT = 0;
+    winDelay = -1;
+    loseDelay = -1;
+    hitstop = 0;
+    shakeT = 0;
+    flash = 0;
+    particles = [];
+    rings = [];
+    floats = [];
+
+    const types = [];
+    cfg.counts.forEach((c, t) => {
+      for (let k = 0; k < c; k++) types.push(t);
+    });
+    shuffleArr(types);
+
+    const cx = W / 2,
+      cy = STACK.y + STACK.h / 2;
+    const hx = (STACK.w / 2 - CARD_W / 2 - 4) * cfg.spread;
+    const hy = (STACK.h / 2 - CARD_H / 2 - 4) * cfg.spread;
+    cards = types.map((t, z) => ({
+      id: ++uid,
+      type: t,
+      z,
+      x: cx + rand(-hx, hx),
+      y: cy + rand(-hy, hy),
+      rot: rand(-0.06, 0.06),
+      blocked: false,
+      cover: 0,
+      shakeT: 0,
+      frozen: 0,
+      chains: 0,
+      mystery: false,
+    }));
+    // 分配特殊卡
+    const sp = cfg.special || {};
+    const pool = shuffleArr([...cards]);
+    let pi = 0;
+    const take = (n) => pool.slice(pi, (pi += n || 0));
+    take(sp.frozen).forEach((c) => (c.frozen = 1));
+    take(sp.chained).forEach((c) => (c.chains = 1));
+    take(sp.mystery).forEach((c) => (c.mystery = true));
+    computeBlocked();
+
+    // 目标高于卡片最高种类时,必须靠碰撞合成——开场明确教这条路
+    if (cfg.endless) {
+      bannerText = "∞ 无尽模式";
+      bannerText2 = "卡片无限补充 · 双果王碰撞清屏 · 活得越久分越高";
+    } else {
+      const maxCard = cfg.counts.length - 1;
+      bannerText =
+        cfg.target > maxCard
+          ? `目标 ${FRUITS[cfg.target].e}:用 ${FRUITS[cfg.target - 1].e}+${FRUITS[cfg.target - 1].e} 碰撞合成!`
+          : `目标:合成 ${FRUITS[cfg.target].e} ${FRUITS[cfg.target].n}`;
+      const tips = [];
+      if (sp.frozen) tips.push("❄ 消除旁边解冻");
+      if (sp.chained) tips.push("⛓ 三消解锁");
+      if (sp.mystery) tips.push("❓ 点击揭晓");
+      bannerText2 = tips.join(" · ");
+    }
+    bannerT = 3.6;
+    rescueT = 0;
+    darkT = 0;
+    endlessTriples = 0;
+    maxFruitLv = -1;
+    updateHud();
+  }
+
+  function computeBlocked() {
+    for (const a of cards) {
+      a.cover = cards.filter(
+        (b) =>
+          b.z > a.z &&
+          Math.abs(b.x - a.x) < CARD_W - 8 &&
+          Math.abs(b.y - a.y) < CARD_H - 8,
+      ).length;
+      a.blocked = a.cover > 0;
+    }
+  }
+
+  // 冰冻解除 / 锁链断裂特效
+  function iceFx(c) {
+    burst(c.x, c.y, "#bfe8ff", 16);
+    rings.push({
+      x: c.x,
+      y: c.y,
+      r: 6,
+      vr: 220,
+      life: 0.3,
+      color: "#bfe8ff",
+      lw: 2,
+    });
+    sfx.ice();
+  }
+  function chainFx(c) {
+    burst(c.x, c.y, "#ffd24a", 12);
+    sfx.chain();
+  }
+
+  // ---------- 卡槽 ----------
+  function slotX(i) {
+    const total = TRAY.n * (TRAY.cw + 4) - 4;
+    return (W - total) / 2 + TRAY.cw / 2 + i * (TRAY.cw + 4);
+  }
+  const slotY = TRAY.y + TRAY.h / 2;
+
+  function pickCard(card) {
+    if (tray.length >= TRAY.n) return;
+    sfx.click();
+    cards = cards.filter((c) => c !== card);
+    // 拾走卡片会解冻旁边的冰冻卡
+    for (const c of cards) {
+      if (
+        c.frozen > 0 &&
+        Math.abs(c.x - card.x) < 110 &&
+        Math.abs(c.y - card.y) < 110
+      ) {
+        c.frozen--;
+        if (c.frozen <= 0) iceFx(c);
+      }
+    }
+    computeBlocked();
+    // 相同类型归组:插到同类最后一张之后
+    let idx = -1;
+    for (let i = tray.length - 1; i >= 0; i--)
+      if (tray[i].type === card.type) {
+        idx = i;
+        break;
+      }
+    const entry = {
+      id: card.id,
+      type: card.type,
+      x: card.x,
+      y: card.y,
+      landed: false,
+      orig: { x: card.x, y: card.y, z: card.z, rot: card.rot },
+    };
+    if (idx >= 0) tray.splice(idx + 1, 0, entry);
+    else tray.push(entry);
+    history.push(card.id);
+  }
+
+  function onTrayLand(entry) {
+    sfx.slot();
+    const group = tray.filter((t) => t.type === entry.type);
+    if (group.length >= 3 && group.every((t) => t.landed)) {
+      doTriple(group.slice(0, 3));
+    } else if (tray.length >= TRAY.n && tray.every((t) => t.landed)) {
+      // 满槽且无三消 → 失败
+      loseReason = "卡槽满了,无法三消";
+      loseDelay = 0.6;
+    }
+  }
+
+  function doTriple(group) {
+    const gx = group.reduce((s, t) => s + t.x, 0) / 3,
+      gy = slotY;
+    tray = tray.filter((t) => !group.includes(t));
+    history = history.filter((id) => !group.some((g) => g.id === id));
+    const lv = group[0].type;
+
+    bumpChain();
+    const pts = Math.round((lv + 1) * 30 * chainMult());
+    addScore(pts);
+    floats.push({
+      text: `+${pts}`,
+      x: gx,
+      y: gy - 44,
+      life: 0.8,
+      size: 16,
+      color: "#f7ecd9",
+    });
+    sfx.triple();
+    hit(0.08);
+    shake(4, 0.18);
+    burst(gx, gy, FRUITS[lv].c, 26);
+    rings.push({
+      x: gx,
+      y: gy,
+      r: 8,
+      vr: 340,
+      life: 0.4,
+      color: FRUITS[lv].c,
+      lw: 3,
+    });
+    burstEmoji(gx, gy, FRUITS[lv].e, 4, 15);
+    // 三消的震动震断锁链
+    for (const c of cards) {
+      if (c.chains > 0) {
+        c.chains--;
+        if (c.chains <= 0) chainFx(c);
+      }
+    }
+    queue.push(lv);
+    if (lv > maxFruitLv) maxFruitLv = lv;
+    // 三消直接产出目标水果,同样算达成
+    if (lv >= cfg.target && winDelay < 0 && state === "play") winDelay = 1.0;
+    if (cfg.endless) {
+      endlessTriples++;
+      updateHud();
+      endlessRefill();
+      // 每 10 组三消奖励一个随机道具
+      if (endlessTriples % 10 === 0) {
+        const roll = Math.floor(rand(0, 3));
+        let txt;
+        if (roll === 0 && undoLeft < 9) {
+          undoLeft++;
+          txt = "+1 ↩撤回";
+        } else if (roll === 1 && shuffleLeft < 9) {
+          shuffleLeft++;
+          txt = "+1 ⇄洗牌";
+        } else if (juiceLeft < 9) {
+          juiceLeft++;
+          txt = "+1 🥤榨汁";
+        }
+        if (txt) {
+          floats.push({
+            text: txt,
+            x: W / 2,
+            y: slotY - 50,
+            life: 1.2,
+            size: 18,
+          });
+          updateHud();
+        }
+      }
+    }
+  }
+
+  // 无尽模式:每次三消补充一组 3 张同类新卡,种类池随进度扩大,特殊卡概率渐增
+  function endlessRefill() {
+    if (cards.length > 57) return;
+    const maxType = Math.min(3 + Math.floor(endlessTriples / 8), 8);
+    const t = Math.floor(rand(0, maxType + 1));
+    const maxZ = cards.reduce((m, c) => Math.max(m, c.z), 0);
+    const cx = W / 2,
+      cy = STACK.y + STACK.h / 2;
+    const hx = (STACK.w / 2 - CARD_W / 2 - 4) * 0.85;
+    const hy = (STACK.h / 2 - CARD_H / 2 - 4) * 0.85;
+    const spChance = Math.min(0.3, 0.04 + endlessTriples * 0.006);
+    for (let k = 0; k < 3; k++) {
+      const c = {
+        id: ++uid,
+        type: t,
+        z: maxZ + 1 + k,
+        x: cx + rand(-hx, hx),
+        y: cy + rand(-hy, hy),
+        rot: rand(-0.06, 0.06),
+        blocked: false,
+        cover: 0,
+        shakeT: 0.3,
+        frozen: 0,
+        chains: 0,
+        mystery: false,
+      };
+      if (Math.random() < spChance) {
+        const s = Math.floor(rand(0, 3));
+        if (s === 0) c.frozen = 1;
+        else if (s === 1) c.chains = 1;
+        else c.mystery = true;
+      }
+      cards.push(c);
+    }
+    computeBlocked();
+  }
+
+  function undo() {
+    if (undoLeft <= 0 || !history.length) return;
+    const id = history.pop();
+    const i = tray.findIndex((t) => t.id === id);
+    if (i < 0) return;
+    const t = tray.splice(i, 1)[0];
+    cards.push({
+      id: t.id,
+      type: t.type,
+      x: t.orig.x,
+      y: t.orig.y,
+      z: t.orig.z,
+      rot: t.orig.rot,
+      blocked: false,
+      shakeT: 0,
+    });
+    computeBlocked();
+    undoLeft--;
+    sfx.slot();
+    updateHud();
+  }
+
+  function doShuffle() {
+    if (shuffleLeft <= 0 || cards.length < 2) return;
+    const types = shuffleArr(cards.map((c) => c.type));
+    cards.forEach((c, i) => {
+      c.type = types[i];
+      c.shakeT = 0.3;
+    });
+    shuffleLeft--;
+    sfx.triple();
+    updateHud();
+  }
+
+  // 榨汁机:点选箱内一个水果,降一级(葡萄直接榨掉),用于疏通堵住的大水果
+  function juiceAt(p) {
+    let best = null,
+      bd = 1e9;
+    for (const f of fruits) {
+      if (f.dead || f.held) continue;
+      const d = Math.hypot(p.x - f.x, p.y - f.y);
+      if (d < f.r + 12 && d < bd) {
+        bd = d;
+        best = f;
+      }
+    }
+    if (!best) return false;
+    juiceMode = false;
+    juiceLeft--;
+    best.dead = true;
+    burst(best.x, best.y, FRUITS[best.lv].c, 22);
+    rings.push({
+      x: best.x,
+      y: best.y,
+      r: 8,
+      vr: 260,
+      life: 0.35,
+      color: FRUITS[best.lv].c,
+      lw: 3,
+    });
+    sfx.triple();
+    if (best.lv > 0) {
+      const nf = makeFruit(best.lv - 1, best.x, best.y);
+      nf.pop = 1;
+      nf.vy = -90;
+      fruits.push(nf);
+    }
+    updateHud();
+    return true;
+  }
+
+  // ---------- 水果 / 物理 ----------
+  const GRAV = 2100;
+  function spawnHeld() {
+    const lv = queue.shift();
+    held = makeFruit(
+      lv,
+      clamp(W / 2, BOX.x + FRUITS[lv].r + 4, BOX.x + BOX.w - FRUITS[lv].r - 4),
+      DROP_Y,
+    );
+    held.held = true;
+    fruits.push(held);
+  }
+  function makeFruit(lv, x, y) {
+    return {
+      id: ++uid,
+      lv,
+      x,
+      y,
+      vx: 0,
+      vy: 0,
+      r: FRUITS[lv].r,
+      held: false,
+      age: 0,
+      dead: false,
+      pop: 0,
+    };
+  }
+  function dropHeld() {
+    if (!held) return;
+    held.held = false;
+    held.age = 0;
+    held = null;
+    heldCooldown = 0.35;
+    sfx.drop();
+  }
+
+  function stepPhysics(dt) {
+    const L = BOX.x + 5,
+      R = BOX.x + BOX.w - 5,
+      F = BOX.y + BOX.h - 5;
+    const sub = 2,
+      h = dt / sub;
+    for (let s = 0; s < sub; s++) {
+      for (const f of fruits) {
+        if (f.held || f.dead) continue;
+        f.vy += GRAV * h;
+        f.x += f.vx * h;
+        f.y += f.vy * h;
+        if (f.x - f.r < L) {
+          f.x = L + f.r;
+          f.vx *= -0.25;
+        }
+        if (f.x + f.r > R) {
+          f.x = R - f.r;
+          f.vx *= -0.25;
+        }
+        if (f.y + f.r > F) {
+          f.y = F - f.r;
+          f.vy *= -0.22;
+          f.vx *= 0.92;
+          if (Math.abs(f.vy) < 30) f.vy = 0;
+        }
+      }
+      // 两两碰撞
+      for (let i = 0; i < fruits.length; i++) {
+        const a = fruits[i];
+        if (a.dead || a.held) continue;
+        for (let j = i + 1; j < fruits.length; j++) {
+          const b = fruits[j];
+          if (b.dead || b.held) continue;
+          const dx = b.x - a.x,
+            dy = b.y - a.y;
+          const rr = a.r + b.r,
+            d2 = dx * dx + dy * dy;
+          if (d2 >= rr * rr || d2 === 0) {
+            // 同级磁吸:安定后轻轻互相靠拢,残局的同级水果也总能碰到一起
+            if (
+              a.lv === b.lv &&
+              a.lv < FRUITS.length - 1 &&
+              d2 > 0 &&
+              a.age > 0.5 &&
+              b.age > 0.5
+            ) {
+              const d = Math.sqrt(d2);
+              const pull = 60 + Math.max(0, 1 - d / 150) * 280;
+              const px = (dx / d) * pull * h,
+                py = (dy / d) * pull * h * 0.3;
+              a.vx += px;
+              a.vy += py;
+              b.vx -= px;
+              b.vy -= py;
+              // 中间被其他水果夹住、拉不动时:小的跳起来翻过障碍
+              if (
+                d < 220 &&
+                Math.abs(a.vx) + Math.abs(a.vy) < 40 &&
+                Math.abs(b.vx) + Math.abs(b.vy) < 40
+              ) {
+                a.pairT = (a.pairT || 0) + h;
+                if (a.pairT > 1.1) {
+                  a.pairT = 0;
+                  const hopper = a.r <= b.r ? a : b;
+                  const other = hopper === a ? b : a;
+                  // 起跳力度按需要翻越的高度给足(约 2 倍自身直径)
+                  hopper.vy = -(420 + hopper.r * 7 + rand(0, 80));
+                  hopper.vx = (other.x > hopper.x ? 1 : -1) * (110 + d * 0.9);
+                }
+              } else a.pairT = 0;
+            }
+            continue;
+          }
+          const d = Math.sqrt(d2),
+            nx = dx / d,
+            ny = dy / d;
+          // 相同等级 → 合成;双果王 → 彩虹爆发清屏
+          if (a.lv === b.lv && a.age > 0.06 && b.age > 0.06) {
+            if (a.lv < FRUITS.length - 1) {
+              mergeFruits(a, b);
+              continue;
+            }
+            kingBoom(a, b);
+            continue;
+          }
+          const ma = a.r * a.r,
+            mb = b.r * b.r,
+            tm = ma + mb;
+          const pen = rr - d,
+            slop = 0.4;
+          if (pen > slop) {
+            const push = (pen - slop) * 0.6;
+            a.x -= nx * push * (mb / tm);
+            a.y -= ny * push * (mb / tm);
+            b.x += nx * push * (ma / tm);
+            b.y += ny * push * (ma / tm);
+          }
+          const rvx = b.vx - a.vx,
+            rvy = b.vy - a.vy;
+          const vn = rvx * nx + rvy * ny;
+          if (vn < 0) {
+            const e = 0.16,
+              jimp = (-(1 + e) * vn) / (1 / ma + 1 / mb);
+            a.vx -= (jimp * nx) / ma;
+            a.vy -= (jimp * ny) / ma;
+            b.vx += (jimp * nx) / mb;
+            b.vy += (jimp * ny) / mb;
+            // 切向摩擦
+            const tx = -ny,
+              ty = nx,
+              vt = rvx * tx + rvy * ty,
+              jf = (-vt * 0.08) / (1 / ma + 1 / mb);
+            a.vx -= (jf * tx) / ma;
+            a.vy -= (jf * ty) / ma;
+            b.vx += (jf * tx) / mb;
+            b.vy += (jf * ty) / mb;
+          }
+        }
+      }
+    }
+    for (const f of fruits) f.age += dt;
+    fruits = fruits.filter((f) => !f.dead);
+  }
+
+  function mergeFruits(a, b) {
+    a.dead = b.dead = true;
+    const nl = a.lv + 1;
+    const mx = (a.x + b.x) / 2,
+      my = (a.y + b.y) / 2;
+    const nf = makeFruit(nl, mx, my);
+    nf.vy = -170;
+    nf.vx = ((a.vx + b.vx) / 2) * 0.3;
+    nf.pop = 1;
+    fruits.push(nf);
+    if (nl > maxFruitLv) maxFruitLv = nl;
+
+    bumpChain();
+    const pts = Math.round(50 * Math.pow(2, nl) * chainMult()); // 50×2^(等级-1):樱桃100 … 果王12800
+    addScore(pts);
+    floats.push({
+      text: `+${pts}`,
+      x: mx,
+      y: my - nf.r - 30,
+      life: 0.9,
+      size: 17,
+      color: "#f7ecd9",
+    });
+    sfx.merge(nl);
+    burst(mx, my, FRUITS[a.lv].c, 14 + nl * 4);
+    burstEmoji(mx, my, FRUITS[a.lv].e, 3 + Math.min(nl, 6), 13 + nl * 2);
+    if (nl >= 3) sparkle(mx, my, 5 + nl * 2);
+    ringByChain(mx, my, nl);
+    // 冲击波推开周围水果
+    for (const o of fruits) {
+      if (o.dead || o.held || o === nf) continue;
+      const dx = o.x - mx,
+        dy = o.y - my,
+        d = Math.hypot(dx, dy) || 1;
+      const range = nf.r + 60;
+      if (d < range) {
+        const k = (1 - d / range) * (140 + nl * 40);
+        o.vx += (dx / d) * k;
+        o.vy += (dy / d) * k - 40;
+      }
+    }
+    if (chain >= 2 && CHAIN_TEXT[Math.min(chain, 5)]) {
+      floats.push({
+        text: CHAIN_TEXT[Math.min(chain, 5)],
+        x: mx,
+        y: my - nf.r - 10,
+        life: 1.1,
+      });
+    }
+    // 4 连以上:金色闪光 + 慢动作
+    if (chain >= 4) {
+      hit(0.12);
+      flash = Math.max(flash, 0.18);
+      flashColor = "#ffd24a";
+      sparkle(mx, my, 14, "#ffd24a");
+    }
+    if (nl >= 9) {
+      // 大果合成(西瓜/果王):全屏变暗聚焦 + 专属演出
+      hit(0.2);
+      shake(12, 0.5);
+      darkT = 0.7;
+      darkAt = { x: mx, y: my };
+      sfx.big();
+      floats.push({
+        text: "大果合成!",
+        x: W / 2,
+        y: my - nf.r - 46,
+        life: 1.3,
+        size: 34,
+      });
+      for (let k = 0; k < 3; k++)
+        rings.push({
+          x: mx,
+          y: my,
+          r: nf.r * 0.4 + k * 22,
+          vr: 380 + k * 90,
+          life: 0.55,
+          color: FRUITS[nl].c,
+          lw: 4 - k,
+        });
+    } else if (nl >= 6) {
+      hit(0.1);
+      shake(8, 0.3);
+      flash = Math.max(flash, 0.16);
+      flashColor = FRUITS[nl].c;
+    } else if (nl >= 4) {
+      hit(0.06);
+      shake(5, 0.22);
+    } else shake(3, 0.15);
+
+    if (nl === FRUITS.length - 1) {
+      // 黄金果王
+      sfx.crown();
+      flash = 0.5;
+      flashColor = "#ffd24a";
+      darkT = 1;
+      darkAt = { x: mx, y: my };
+      burst(mx, my, "#ffd24a", 80);
+      burst(mx, my, "#fff2c2", 40);
+      burstEmoji(mx, my, "👑", 10, 24);
+      sparkle(mx, my, 30, "#fff6d8");
+    }
+    if (nl >= cfg.target && winDelay < 0 && state === "play") {
+      winDelay = 1.3;
+      if (nl < FRUITS.length - 1) sfx.win();
+    }
+  }
+
+  // 双果王碰撞:彩虹爆发,清空全场水果,巨额得分(主要属于无尽模式的终极爽点)
+  function kingBoom(a, b) {
+    a.dead = b.dead = true;
+    const mx = (a.x + b.x) / 2,
+      my = (a.y + b.y) / 2;
+    bumpChain();
+    const pts = Math.round(100000 * chainMult());
+    addScore(pts);
+    floats.push({
+      text: "双果王·彩虹爆发!",
+      x: W / 2,
+      y: my - 90,
+      life: 1.6,
+      size: 30,
+    });
+    floats.push({
+      text: `+${pts}`,
+      x: mx,
+      y: my - 46,
+      life: 1.2,
+      size: 20,
+      color: "#f7ecd9",
+    });
+    for (const o of fruits) {
+      if (o.held || o.dead) continue;
+      burst(o.x, o.y, FRUITS[o.lv].c, 10 + o.lv * 2);
+      burstEmoji(o.x, o.y, FRUITS[o.lv].e, 3, 14);
+      o.dead = true;
+    }
+    for (let k = 0; k < 6; k++)
+      rings.push({
+        x: mx,
+        y: my,
+        r: 20 + k * 26,
+        vr: 420 + k * 70,
+        life: 0.6,
+        color: `hsl(${k * 60},90%,70%)`,
+        lw: 4,
+      });
+    sparkle(mx, my, 40, "#fff6d8");
+    hit(0.25);
+    shake(14, 0.6);
+    darkT = 1;
+    darkAt = { x: mx, y: my };
+    flash = 0.4;
+    flashColor = "#ffd24a";
+    sfx.crown();
+    sfx.big();
+  }
+
+  function ringByChain(x, y, lv) {
+    const col =
+      chain >= 5
+        ? "#ff8ae0"
+        : chain === 4
+          ? "#ffd24a"
+          : chain === 3
+            ? "#b28aff"
+            : chain === 2
+              ? "#7ac8ff"
+              : FRUITS[lv].c;
+    rings.push({
+      x,
+      y,
+      r: FRUITS[lv].r * 0.6,
+      vr: 300 + chain * 60,
+      life: 0.45,
+      color: col,
+      lw: 2 + chain,
+    });
+    if (chain >= 5) {
+      for (let k = 0; k < 5; k++)
+        rings.push({
+          x,
+          y,
+          r: 10 + k * 18,
+          vr: 420,
+          life: 0.5,
+          color: `hsl(${k * 70},90%,70%)`,
+          lw: 2,
+        });
+    }
+  }
+
+  // ---------- 连击 / 分数 ----------
+  function bumpChain() {
+    chain = chainT > 0 ? chain + 1 : 1;
+    chainT = 2;
+  }
+  function chainMult() {
+    return CHAIN_MULT[Math.min(chain, 6)];
+  }
+  function addScore(v) {
+    score += v;
+    if (score > save.best) save.best = score;
+    updateHud();
+    hudScore.classList.remove("bump");
+    void hudScore.offsetWidth;
+    hudScore.classList.add("bump");
+  }
+
+  // ---------- 特效 ----------
+  function burst(x, y, color, n) {
+    for (let i = 0; i < n; i++) {
+      const a = rand(0, Math.PI * 2),
+        sp = rand(60, 340);
+      particles.push({
+        x,
+        y,
+        vx: Math.cos(a) * sp,
+        vy: Math.sin(a) * sp - 80,
+        r: rand(2, 5),
+        life: rand(0.4, 0.9),
+        color,
+      });
+    }
+  }
+  // 果肉碎片:小 emoji 旋转飞溅
+  function burstEmoji(x, y, emoji, n, size) {
+    for (let i = 0; i < n; i++) {
+      const a = rand(0, Math.PI * 2),
+        sp = rand(120, 380);
+      particles.push({
+        x,
+        y,
+        vx: Math.cos(a) * sp,
+        vy: Math.sin(a) * sp - 140,
+        life: rand(0.5, 1),
+        emoji,
+        size: rand(size * 0.6, size),
+        rot: rand(0, 6.3),
+        vr: rand(-7, 7),
+      });
+    }
+  }
+  // 星光四芒闪
+  function sparkle(x, y, n, color) {
+    for (let i = 0; i < n; i++) {
+      const a = rand(0, Math.PI * 2),
+        sp = rand(40, 260);
+      particles.push({
+        x: x + rand(-8, 8),
+        y: y + rand(-8, 8),
+        vx: Math.cos(a) * sp,
+        vy: Math.sin(a) * sp - 60,
+        r: rand(3, 7),
+        life: rand(0.3, 0.7),
+        color: color || "#fff6d8",
+        star: true,
+      });
+    }
+  }
+  function hit(t) {
+    if (!REDUCED) hitstop = Math.max(hitstop, t);
+  }
+  function shake(mag, t) {
+    if (!REDUCED) {
+      shakeMag = Math.max(shakeMag, mag);
+      shakeT = Math.max(shakeT, t);
+    }
+  }
+
+  // ---------- 胜负 ----------
+  function doWin() {
+    state = "win";
+    sfx.win();
+    const last = levelIdx >= LEVELS.length - 1;
+    // 通关最后一关 → unlocked 记到 LEVELS.length,作为无尽模式解锁标记
+    save.unlocked = Math.max(save.unlocked, levelIdx + 1);
+    const noProps = undoLeft === 1 && shuffleLeft === 3 && juiceLeft === 1;
+    const stars = 1 + (maxChainSeen >= 3 ? 1 : 0) + (noProps ? 1 : 0);
+    const starLine =
+      "★".repeat(stars) +
+      "☆".repeat(3 - stars) +
+      (noProps ? " · 无道具通关" : "");
+    showOverlay({
+      big: FRUITS[cfg.target].e,
+      title: last ? '<span class="gold">黄金果王诞生！</span>' : "过关！",
+      sub: `${starLine}\n得分 ${score}${score >= save.best ? "(新纪录!)" : ""} · 最高连锁 ×${maxChainSeen}${last ? "\n🎉 无尽模式已解锁!" : ""}`,
+      btns: last
+        ? [
+            ["∞ 进入无尽模式", () => startLevel(-1)],
+            ["选关", showMenu, true],
+          ]
+        : [
+            ["下一关", () => startLevel(levelIdx + 1)],
+            ["选关", showMenu, true],
+          ],
+    });
+  }
+  function doLose() {
+    state = "lose";
+    sfx.lose();
+    if (cfg.endless) {
+      const newBest = score > save.endlessBest;
+      if (newBest) save.endlessBest = score;
+      showOverlay({
+        big: maxFruitLv >= 0 ? FRUITS[maxFruitLv].e : "💥",
+        title: "无尽结束",
+        sub: `${loseReason}\n得分 ${score}${newBest ? "(无尽新纪录!)" : " · 无尽最高 " + save.endlessBest}\n消除 ${endlessTriples} 组 · 最大水果 ${maxFruitLv >= 0 ? FRUITS[maxFruitLv].e + " " + FRUITS[maxFruitLv].n : "无"}`,
+        btns: [
+          ["再来一次", () => startLevel(-1)],
+          ["选关", showMenu, true],
+        ],
+      });
+      return;
+    }
+    showOverlay({
+      big: "💥",
+      title: "差一点点…",
+      sub: `${loseReason}\n得分 ${score} · 目标 ${FRUITS[cfg.target].e} ${FRUITS[cfg.target].n}`,
+      btns: [
+        ["再来一次", () => startLevel(levelIdx)],
+        ["选关", showMenu, true],
+      ],
+    });
+  }
+  let maxChainSeen = 1;
+
+  // 把同级两两合并推演到顶,看能否达到目标等级(合成只增不减,降级道具救不了火,判负安全)
+  function canReachTarget() {
+    const c = new Array(FRUITS.length).fill(0);
+    for (const f of fruits) if (!f.dead) c[f.lv]++;
+    for (let l = 0; l < FRUITS.length - 1; l++) c[l + 1] += c[l] >> 1;
+    for (let l = cfg.target; l < FRUITS.length; l++) if (c[l] > 0) return true;
+    return false;
+  }
+
+  // ---------- 界面 ----------
+  function updateHud() {
+    if (cfg.endless) {
+      hudLevel.textContent = "∞ 无尽";
+      hudTarget.innerHTML = `已消 ${endlessTriples} 组 <span class="tEmoji">${maxFruitLv >= 0 ? FRUITS[maxFruitLv].e : "🃏"}</span>`;
+    } else {
+      hudLevel.textContent = `第 ${levelIdx + 1} 关`;
+      hudTarget.innerHTML = `目标 <span class="tEmoji">${FRUITS[cfg.target].e}</span>`;
+    }
+    hudScore.textContent = score;
+    btnUndo.textContent = `↩ 撤回 ×${undoLeft}`;
+    btnShuffle.textContent = `⇄ 洗牌 ×${shuffleLeft}`;
+    btnJuice.textContent = `🥤 榨汁 ×${juiceLeft}`;
+    btnUndo.disabled = undoLeft <= 0 || !history.length;
+    btnShuffle.disabled = shuffleLeft <= 0;
+    btnJuice.disabled = juiceLeft <= 0;
+    btnJuice.classList.toggle("active", juiceMode);
+  }
+  function showOverlay(o) {
+    ovBig.textContent = o.big;
+    ovTitle.innerHTML = o.title;
+    ovSub.textContent = o.sub || "";
+    ovDots.innerHTML = "";
+    if (o.dots) {
+      LEVELS.forEach((_, i) => {
+        const d = document.createElement("span");
+        d.className =
+          "dot" +
+          (i < save.unlocked ? " done" : i === save.unlocked ? " cur" : "");
+        ovDots.appendChild(d);
+      });
+    }
+    ovBtns.innerHTML = "";
+    for (const [label, fn, ghost] of o.btns) {
+      const b = document.createElement("button");
+      b.textContent = label;
+      if (ghost) b.className = "ghost";
+      b.addEventListener("click", () => {
+        ac();
+        fn();
+      });
+      ovBtns.appendChild(b);
+    }
+    overlay.classList.add("show");
+  }
+  function showMenu() {
+    state = "menu";
+    const u = Math.min(save.unlocked, LEVELS.length - 1);
+    const endlessOpen = save.unlocked >= LEVELS.length;
+    const btns =
+      save.unlocked > 0
+        ? [
+            [`继续 第 ${u + 1} 关`, () => startLevel(u)],
+            ["从头开始", () => startLevel(0), true],
+          ]
+        : [["开始游戏", () => startLevel(0)]];
+    if (endlessOpen) btns.unshift(["∞ 无尽模式", () => startLevel(-1)]);
+    showOverlay({
+      big: "🍉",
+      title: '叠个<span class="gold">果王</span>',
+      sub: `🃏 点三张相同 → 🍇 掉进箱子 → 💥 碰撞升级\n${FRUITS.map((f) => f.e).join("")}\n最高分 ${save.best}${endlessOpen ? " · 无尽最高 " + save.endlessBest : "\n通关全部关卡,解锁 ∞ 无尽模式"}`,
+      dots: true,
+      btns,
+    });
+  }
+  function startLevel(i) {
+    levelIdx = i;
+    maxChainSeen = 1;
+    genLevel(i);
+    overlay.classList.remove("show");
+    state = "play";
+  }
+
+  btnUndo.addEventListener("click", () => {
+    if (state === "play") {
+      ac();
+      undo();
+    }
+  });
+  btnShuffle.addEventListener("click", () => {
+    if (state === "play") {
+      ac();
+      doShuffle();
+    }
+  });
+  btnJuice.addEventListener("click", () => {
+    if (state !== "play" || juiceLeft <= 0) return;
+    ac();
+    juiceMode = !juiceMode;
+    updateHud();
+  });
+  btnRestart.addEventListener("click", () => {
+    ac();
+    if (state === "play" || state === "lose" || state === "win")
+      startLevel(levelIdx);
+  });
+
+  // ---------- 输入 ----------
+  let dragging = false;
+  function toLogic(e) {
+    const r = cv.getBoundingClientRect();
+    return {
+      x: ((e.clientX - r.left) / r.width) * W,
+      y: ((e.clientY - r.top) / r.height) * H,
+    };
+  }
+  cv.addEventListener("pointerdown", (e) => {
+    ac();
+    if (state !== "play") return;
+    const p = toLogic(e);
+    if (p.y < TRAY.y) {
+      // 叠层区:点卡
+      const hitCard = [...cards]
+        .sort((a, b) => b.z - a.z)
+        .find(
+          (c) =>
+            Math.abs(p.x - c.x) < CARD_W / 2 &&
+            Math.abs(p.y - c.y) < CARD_H / 2,
+        );
+      if (hitCard) {
+        if (hitCard.blocked) {
+          hitCard.shakeT = 0.25;
+          sfx.blocked();
+        } else if (hitCard.frozen > 0) {
+          hitCard.shakeT = 0.25;
+          sfx.blocked();
+          floats.push({
+            text: "❄ 点掉旁边的卡片解冻",
+            x: clamp(hitCard.x, 90, W - 90),
+            y: hitCard.y - 44,
+            life: 1,
+            size: 14,
+            color: "#bfe8ff",
+          });
+        } else if (hitCard.chains > 0) {
+          hitCard.shakeT = 0.25;
+          sfx.blocked();
+          floats.push({
+            text: "⛓ 完成一次三消解锁",
+            x: clamp(hitCard.x, 90, W - 90),
+            y: hitCard.y - 44,
+            life: 1,
+            size: 14,
+            color: "#ffd24a",
+          });
+        } else pickCard(hitCard);
+      }
+      return;
+    }
+    if (juiceMode && p.y > BOX.y - 30) {
+      // 榨汁模式:点选水果降一级
+      juiceAt(p);
+      return;
+    }
+    if (p.y > BOX.y - 30 && held) {
+      // 合成箱:拖动待落水果
+      dragging = true;
+      held.x = clamp(p.x, BOX.x + held.r + 5, BOX.x + BOX.w - held.r - 5);
+    }
+  });
+  cv.addEventListener("pointermove", (e) => {
+    if (dragging && held) {
+      const p = toLogic(e);
+      held.x = clamp(p.x, BOX.x + held.r + 5, BOX.x + BOX.w - held.r - 5);
+    }
+  });
+  addEventListener("pointerup", () => {
+    if (dragging && held) dropHeld();
+    dragging = false;
+  });
+
+  // ---------- 主循环 ----------
+  let last = performance.now();
+  function frame(now) {
+    requestAnimationFrame(frame);
+    tick(now);
+  }
+  // rAF 在窗口被遮挡/后台时会被浏览器暂停,用低频心跳兜底,避免游戏冻结
+  setInterval(() => {
+    const n = performance.now();
+    if (n - last > 80) tick(n);
+  }, 50);
+  function tick(now) {
+    let dt = Math.min((now - last) / 1000, 0.05);
+    last = now;
+
+    if (state === "play") {
+      if (hitstop > 0) {
+        hitstop -= dt;
+        dt *= 0.06;
+      }
+      update(dt);
+    }
+    draw(now / 1000);
+  }
+  requestAnimationFrame(frame);
+
+  function update(dt) {
+    // 卡槽飞行
+    for (const t of tray) {
+      const i = tray.indexOf(t),
+        tx = slotX(i),
+        ty = slotY;
+      t.x += (tx - t.x) * Math.min(1, dt * 14);
+      t.y += (ty - t.y) * Math.min(1, dt * 14);
+      if (!t.landed && Math.abs(t.x - tx) < 3 && Math.abs(t.y - ty) < 3) {
+        t.landed = true;
+        onTrayLand(t);
+      }
+    }
+    // 待落水果
+    if (heldCooldown > 0) heldCooldown -= dt;
+    if (!held && queue.length && heldCooldown <= 0 && winDelay < 0) spawnHeld();
+
+    stepPhysics(dt);
+
+    // 连击计时
+    if (chainT > 0) {
+      chainT -= dt;
+      if (chain > maxChainSeen) maxChainSeen = chain;
+      if (chainT <= 0) chain = 0;
+    }
+
+    // 警戒线
+    let over = false;
+    for (const f of fruits) {
+      if (f.held || f.dead) continue;
+      if (f.y - f.r < LINE_Y && f.age > 0.9 && Math.abs(f.vy) < 60) {
+        over = true;
+        break;
+      }
+    }
+    if (over && winDelay < 0) {
+      danger += dt;
+      warnBeep -= dt;
+      if (warnBeep <= 0) {
+        sfx.warn();
+        warnBeep = 0.5;
+      }
+      if (danger >= 2 && loseDelay < 0) {
+        loseReason = "水果堆过了警戒线";
+        loseDelay = 0.1;
+      }
+    } else danger = Math.max(0, danger - dt * 2);
+
+    // 特效衰减
+    for (const p of particles) {
+      p.life -= dt;
+      p.x += p.vx * dt;
+      p.y += p.vy * dt;
+      p.vy += 900 * dt;
+      if (p.vr) p.rot += p.vr * dt;
+    }
+    particles = particles.filter((p) => p.life > 0);
+    for (const r of rings) {
+      r.life -= dt;
+      r.r += r.vr * dt;
+    }
+    rings = rings.filter((r) => r.life > 0);
+    for (const f of floats) {
+      f.life -= dt;
+      f.y -= 40 * dt;
+    }
+    floats = floats.filter((f) => f.life > 0);
+    for (const c of cards) if (c.shakeT > 0) c.shakeT -= dt;
+    if (shakeT > 0) shakeT -= dt;
+    if (flash > 0) flash -= dt;
+    if (darkT > 0) darkT -= dt;
+    if (bannerT > 0) bannerT -= dt;
+    for (const f of fruits) if (f.pop > 0) f.pop -= dt * 4;
+
+    // 救济:场上还有卡,但全部可点卡都被冰冻/锁链挡住 → 自动融冰断链一层
+    if (cards.length && winDelay < 0 && loseDelay < 0) {
+      const clickable = cards.some(
+        (c) => !c.blocked && c.frozen <= 0 && c.chains <= 0,
+      );
+      if (!clickable) {
+        rescueT += dt;
+        if (rescueT > 1.6) {
+          rescueT = 0;
+          for (const c of cards) {
+            if (c.frozen > 0) {
+              c.frozen--;
+              if (c.frozen <= 0) iceFx(c);
+            } else if (c.chains > 0) {
+              c.chains--;
+              if (c.chains <= 0) chainFx(c);
+            }
+          }
+        }
+      } else rescueT = 0;
+    }
+
+    // 残局判定:没牌可点、没果可掉时,若剩余水果理论上凑不出目标,直接判负(无尽模式无目标,跳过)
+    if (
+      !cfg.endless &&
+      winDelay < 0 &&
+      loseDelay < 0 &&
+      !cards.length &&
+      !tray.length &&
+      !queue.length &&
+      !held
+    ) {
+      stuckT += dt;
+      if (stuckT > 2.5 && !canReachTarget()) {
+        loseReason = "剩下的水果不够合成目标了";
+        loseDelay = 0.1;
+      }
+    } else stuckT = 0;
+
+    // 延迟胜负
+    if (winDelay >= 0) {
+      winDelay -= dt;
+      if (winDelay < 0) doWin();
+    }
+    if (loseDelay >= 0 && winDelay < 0) {
+      loseDelay -= dt;
+      if (loseDelay < 0) doLose();
+    }
+  }
+
+  // ---------- 绘制 ----------
+  function draw(t) {
+    ctx.setTransform(view, 0, 0, view, 0, 0);
+    ctx.clearRect(0, 0, W, H);
+    if (shakeT > 0) {
+      const m = shakeMag * shakeT;
+      ctx.translate(rand(-m, m), rand(-m, m));
+    }
+
+    drawStack(t);
+    drawTray(t);
+    drawBox(t);
+
+    // 粒子 / 冲击波 / 浮字
+    for (const p of particles) {
+      ctx.globalAlpha = clamp(p.life * 1.6, 0, 1);
+      if (p.emoji) {
+        ctx.save();
+        ctx.translate(p.x, p.y);
+        ctx.rotate(p.rot);
+        ctx.font = `${Math.round(p.size)}px system-ui`;
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+        ctx.fillText(p.emoji, 0, 0);
+        ctx.restore();
+      } else if (p.star) {
+        ctx.strokeStyle = p.color;
+        ctx.lineWidth = 1.5;
+        ctx.beginPath();
+        ctx.moveTo(p.x - p.r, p.y);
+        ctx.lineTo(p.x + p.r, p.y);
+        ctx.moveTo(p.x, p.y - p.r);
+        ctx.lineTo(p.x, p.y + p.r);
+        ctx.stroke();
+      } else {
+        ctx.fillStyle = p.color;
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, p.r, 0, 7);
+        ctx.fill();
+      }
+    }
+    ctx.globalAlpha = 1;
+    for (const r of rings) {
+      ctx.globalAlpha = clamp(r.life * 2.2, 0, 1);
+      ctx.strokeStyle = r.color;
+      ctx.lineWidth = r.lw;
+      ctx.beginPath();
+      ctx.arc(r.x, r.y, r.r, 0, 7);
+      ctx.stroke();
+    }
+    ctx.globalAlpha = 1;
+    for (const f of floats) {
+      ctx.globalAlpha = clamp(f.life * 1.4, 0, 1);
+      ctx.font = `900 ${f.size || 26}px "PingFang SC",system-ui,sans-serif`;
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.fillStyle = f.color || "#ffd24a";
+      ctx.strokeStyle = "rgba(40,16,40,.9)";
+      ctx.lineWidth = f.size ? 3 : 5;
+      ctx.strokeText(f.text, f.x, f.y);
+      ctx.fillText(f.text, f.x, f.y);
+    }
+    ctx.globalAlpha = 1;
+
+    // 连击提示
+    if (chain >= 2 && chainT > 0 && state === "play") {
+      ctx.font = "800 15px system-ui,sans-serif";
+      ctx.textAlign = "right";
+      ctx.textBaseline = "top";
+      ctx.fillStyle = "#ffd24a";
+      ctx.fillText(`连击 ×${chainMult()}`, W - 16, STACK.y - 4);
+    }
+
+    // 目标横幅(带底板胶囊)
+    if (bannerT > 0) {
+      ctx.globalAlpha = clamp(Math.min(bannerT, 1) * 1.2, 0, 1);
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      const by = STACK.y + STACK.h / 2 - 10;
+      ctx.font = '800 21px "PingFang SC",system-ui,sans-serif';
+      const bw = ctx.measureText(bannerText).width + 44;
+      const bh = bannerText2 ? 66 : 44;
+      ctx.fillStyle = "rgba(20,10,28,.82)";
+      roundRect(ctx, W / 2 - bw / 2, by - 22, bw, bh, 16);
+      ctx.fill();
+      ctx.strokeStyle = "rgba(255,210,74,.4)";
+      ctx.lineWidth = 1.5;
+      roundRect(ctx, W / 2 - bw / 2, by - 22, bw, bh, 16);
+      ctx.stroke();
+      ctx.fillStyle = "#f7ecd9";
+      ctx.fillText(bannerText, W / 2, by);
+      if (bannerText2) {
+        ctx.font = '600 13px "PingFang SC",system-ui,sans-serif';
+        ctx.fillStyle = "rgba(247,236,217,.75)";
+        ctx.fillText(bannerText2, W / 2, by + 26);
+      }
+      ctx.globalAlpha = 1;
+    }
+
+    // 大果合成:全屏变暗,合成点保持明亮聚焦
+    if (darkT > 0 && darkAt) {
+      ctx.globalAlpha = clamp(darkT * 1.2, 0, 0.5);
+      const dg = ctx.createRadialGradient(
+        darkAt.x,
+        darkAt.y,
+        60,
+        darkAt.x,
+        darkAt.y,
+        H * 0.55,
+      );
+      dg.addColorStop(0, "rgba(10,4,16,0)");
+      dg.addColorStop(1, "rgba(10,4,16,.95)");
+      ctx.fillStyle = dg;
+      ctx.fillRect(-20, -20, W + 40, H + 40);
+      ctx.globalAlpha = 1;
+    }
+
+    // 全屏闪光 / 危险泛红
+    if (flash > 0) {
+      ctx.globalAlpha = clamp(flash * 1.6, 0, 0.55);
+      ctx.fillStyle = flashColor;
+      ctx.fillRect(-20, -20, W + 40, H + 40);
+      ctx.globalAlpha = 1;
+    }
+    if (danger > 0) {
+      const a = clamp(danger / 2, 0, 1) * (0.22 + 0.1 * Math.sin(t * 12));
+      const g = ctx.createRadialGradient(
+        W / 2,
+        H / 2,
+        H * 0.25,
+        W / 2,
+        H / 2,
+        H * 0.62,
+      );
+      g.addColorStop(0, "rgba(255,77,94,0)");
+      g.addColorStop(1, `rgba(255,77,94,${clamp(a, 0, 0.4)})`);
+      ctx.fillStyle = g;
+      ctx.fillRect(-20, -20, W + 40, H + 40);
+    }
+  }
+
+  function drawStack(t) {
+    ctx.fillStyle = "rgba(255,240,222,.045)";
+    roundRect(ctx, STACK.x, STACK.y, STACK.w, STACK.h, 18);
+    ctx.fill();
+    const sorted = [...cards].sort((a, b) => a.z - b.z);
+    for (const c of sorted) {
+      const jx = c.shakeT > 0 ? Math.sin(c.shakeT * 70) * 3 : 0;
+      ctx.save();
+      ctx.translate(c.x + jx, c.y);
+      ctx.rotate(c.rot);
+      ctx.fillStyle = "rgba(20,10,28,.5)";
+      roundRect(ctx, -CARD_W / 2 + 2, -CARD_H / 2 + 3, CARD_W, CARD_H, 10);
+      ctx.fill();
+      ctx.fillStyle = "#fbf0dc";
+      roundRect(ctx, -CARD_W / 2, -CARD_H / 2, CARD_W, CARD_H, 10);
+      ctx.fill();
+      ctx.strokeStyle = "rgba(90,50,70,.28)";
+      ctx.lineWidth = 1.5;
+      roundRect(ctx, -CARD_W / 2, -CARD_H / 2, CARD_W, CARD_H, 10);
+      ctx.stroke();
+      ctx.font = "34px system-ui";
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      // 问号卡:揭晓前只显示卡背问号
+      if (c.mystery) {
+        ctx.fillStyle = "rgba(155,107,222,.16)";
+        roundRect(ctx, -CARD_W / 2, -CARD_H / 2, CARD_W, CARD_H, 10);
+        ctx.fill();
+        ctx.font = "800 30px system-ui";
+        ctx.fillStyle = "#9b6bde";
+        ctx.fillText("?", 0, 2);
+      } else ctx.fillText(FRUITS[c.type].e, 0, 2);
+      // 被压住:越深越暗
+      if (c.blocked) {
+        ctx.fillStyle = `rgba(30,16,42,${Math.min(0.68, 0.4 + c.cover * 0.09)})`;
+        roundRect(ctx, -CARD_W / 2, -CARD_H / 2, CARD_W, CARD_H, 10);
+        ctx.fill();
+      }
+      // 冰冻:蓝色冰面 + 雪花
+      if (c.frozen > 0) {
+        ctx.fillStyle = "rgba(150,210,255,.42)";
+        roundRect(ctx, -CARD_W / 2, -CARD_H / 2, CARD_W, CARD_H, 10);
+        ctx.fill();
+        ctx.strokeStyle = "rgba(220,244,255,.75)";
+        ctx.lineWidth = 2;
+        roundRect(ctx, -CARD_W / 2, -CARD_H / 2, CARD_W, CARD_H, 10);
+        ctx.stroke();
+        ctx.font = "16px system-ui";
+        ctx.fillText("❄", CARD_W / 2 - 12, -CARD_H / 2 + 12);
+      }
+      // 锁链:暗压 + 交叉链条
+      if (c.chains > 0) {
+        ctx.fillStyle = "rgba(30,20,40,.35)";
+        roundRect(ctx, -CARD_W / 2, -CARD_H / 2, CARD_W, CARD_H, 10);
+        ctx.fill();
+        ctx.strokeStyle = "rgba(200,190,170,.8)";
+        ctx.lineWidth = 3.5;
+        ctx.beginPath();
+        ctx.moveTo(-CARD_W / 2 + 3, -CARD_H / 2 + 8);
+        ctx.lineTo(CARD_W / 2 - 3, CARD_H / 2 - 8);
+        ctx.moveTo(CARD_W / 2 - 3, -CARD_H / 2 + 8);
+        ctx.lineTo(-CARD_W / 2 + 3, CARD_H / 2 - 8);
+        ctx.stroke();
+        ctx.font = "15px system-ui";
+        ctx.fillText("🔒", 0, 0);
+      }
+      ctx.restore();
+    }
+    if (!cards.length && state === "play") {
+      ctx.font = "600 15px system-ui,sans-serif";
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.fillStyle = "rgba(247,236,217,.4)";
+      ctx.fillText(
+        "卡片已清空 · 用合成箱完成目标!",
+        W / 2,
+        STACK.y + STACK.h / 2,
+      );
+    }
+  }
+
+  function drawTray(t) {
+    for (let i = 0; i < TRAY.n; i++) {
+      ctx.fillStyle = "rgba(255,240,222,.06)";
+      ctx.strokeStyle = "rgba(255,240,222,.14)";
+      ctx.lineWidth = 1.5;
+      roundRect(
+        ctx,
+        slotX(i) - TRAY.cw / 2,
+        slotY - TRAY.ch / 2,
+        TRAY.cw,
+        TRAY.ch,
+        9,
+      );
+      ctx.fill();
+      ctx.stroke();
+    }
+    const full = tray.length >= TRAY.n - 1;
+    if (full && state === "play") {
+      ctx.strokeStyle = `rgba(255,77,94,${0.5 + 0.4 * Math.sin(t * 10)})`;
+      ctx.lineWidth = 2;
+      roundRect(
+        ctx,
+        slotX(0) - TRAY.cw / 2 - 5,
+        slotY - TRAY.ch / 2 - 5,
+        TRAY.n * (TRAY.cw + 4) - 4 + 10,
+        TRAY.ch + 10,
+        12,
+      );
+      ctx.stroke();
+    }
+    for (const c of tray) {
+      ctx.save();
+      ctx.translate(c.x, c.y);
+      ctx.fillStyle = "rgba(20,10,28,.45)";
+      roundRect(
+        ctx,
+        -TRAY.cw / 2 + 2,
+        -TRAY.ch / 2 + 3,
+        TRAY.cw - 4,
+        TRAY.ch - 4,
+        8,
+      );
+      ctx.fill();
+      ctx.fillStyle = "#fbf0dc";
+      roundRect(
+        ctx,
+        -TRAY.cw / 2 + 1,
+        -TRAY.ch / 2 + 1,
+        TRAY.cw - 4,
+        TRAY.ch - 4,
+        8,
+      );
+      ctx.fill();
+      ctx.font = "30px system-ui";
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.fillText(FRUITS[c.type].e, 0, 1);
+      ctx.restore();
+    }
+  }
+
+  function drawBox(t) {
+    // 玻璃箱
+    ctx.fillStyle = "rgba(255,240,222,.05)";
+    roundRect(ctx, BOX.x, BOX.y, BOX.w, BOX.h, 16);
+    ctx.fill();
+    ctx.strokeStyle = "rgba(255,240,222,.2)";
+    ctx.lineWidth = 2.5;
+    roundRect(ctx, BOX.x, BOX.y, BOX.w, BOX.h, 16);
+    ctx.stroke();
+
+    // 合成路线图:画在箱底、水果后面,目标高亮
+    {
+      const step = (BOX.w - 44) / (FRUITS.length - 1);
+      const cy = BOX.y + BOX.h - 20;
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      for (let i = 0; i < FRUITS.length; i++) {
+        const xx = BOX.x + 22 + i * step;
+        const isT = i === cfg.target;
+        // 无尽模式没有目标,高亮当前达成的最大水果
+        const isMax = cfg.endless && i === maxFruitLv;
+        if (i < FRUITS.length - 1) {
+          ctx.globalAlpha = 0.18;
+          ctx.fillStyle = "#f7ecd9";
+          ctx.font = "8px system-ui";
+          ctx.fillText("▸", xx + step / 2, cy);
+        }
+        ctx.globalAlpha = isT || isMax ? 0.95 : i < cfg.target ? 0.38 : 0.16;
+        ctx.font = `${isT || isMax ? 19 : 12}px system-ui`;
+        ctx.fillText(FRUITS[i].e, xx, cy);
+        if (isT || isMax) {
+          ctx.globalAlpha = 0.85;
+          ctx.strokeStyle = "#ffd24a";
+          ctx.lineWidth = 1.5;
+          ctx.beginPath();
+          ctx.arc(xx, cy, 13, 0, 7);
+          ctx.stroke();
+          ctx.fillStyle = "#ffd24a";
+          ctx.font = "600 9px system-ui";
+          ctx.fillText(isT ? "目标" : "最大", xx, cy - 20);
+        }
+      }
+      ctx.globalAlpha = 1;
+    }
+
+    // 警戒线
+    const hot = danger > 0;
+    ctx.save();
+    ctx.setLineDash([8, 7]);
+    ctx.strokeStyle = hot
+      ? `rgba(255,77,94,${0.6 + 0.4 * Math.sin(t * 14)})`
+      : "rgba(255,210,74,.35)";
+    ctx.lineWidth = hot ? 3 : 2;
+    ctx.beginPath();
+    ctx.moveTo(BOX.x + 8, LINE_Y);
+    ctx.lineTo(BOX.x + BOX.w - 8, LINE_Y);
+    ctx.stroke();
+    ctx.restore();
+    if (hot) {
+      ctx.font = "800 14px system-ui,sans-serif";
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.fillStyle = `rgba(255,77,94,${0.7 + 0.3 * Math.sin(t * 14)})`;
+      ctx.fillText(
+        `⚠ 超过警戒线!快合成自救 ${Math.max(0, 2 - danger).toFixed(1)}s`,
+        W / 2,
+        LINE_Y - 14,
+      );
+    }
+
+    // 待落引导线
+    if (held) {
+      ctx.save();
+      ctx.setLineDash([3, 8]);
+      ctx.strokeStyle = "rgba(255,240,222,.28)";
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(held.x, held.y + held.r + 4);
+      ctx.lineTo(held.x, BOX.y + BOX.h - 6);
+      ctx.stroke();
+      ctx.restore();
+    }
+
+    // 水果
+    for (const f of fruits) {
+      if (f.dead) continue;
+      const sc = 1 + Math.max(0, f.pop) * 0.25;
+      ctx.save();
+      ctx.translate(f.x, f.y);
+      ctx.scale(sc, sc);
+      const isKing = f.lv === FRUITS.length - 1;
+      if (isKing) {
+        ctx.shadowColor = "#ffd24a";
+        ctx.shadowBlur = 30;
+        ctx.fillStyle = "#ffd24a";
+        ctx.beginPath();
+        ctx.arc(0, 0, f.r, 0, 7);
+        ctx.fill();
+        ctx.shadowBlur = 0;
+        ctx.fillStyle = "#fff2c2";
+        ctx.beginPath();
+        ctx.arc(-f.r * 0.3, -f.r * 0.35, f.r * 0.4, 0, 7);
+        ctx.fill();
+      } else {
+        const g = ctx.createRadialGradient(
+          -f.r * 0.3,
+          -f.r * 0.35,
+          f.r * 0.15,
+          0,
+          0,
+          f.r,
+        );
+        g.addColorStop(0, "rgba(255,255,255,.28)");
+        g.addColorStop(1, FRUITS[f.lv].c + "33");
+        ctx.fillStyle = g;
+        ctx.beginPath();
+        ctx.arc(0, 0, f.r, 0, 7);
+        ctx.fill();
+      }
+      ctx.font = `${Math.round(f.r * 1.72)}px system-ui`;
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.fillText(FRUITS[f.lv].e, 0, f.r * 0.06);
+      if (f.held) {
+        ctx.globalAlpha = 0.5 + 0.3 * Math.sin(t * 6);
+        ctx.strokeStyle = "#f7ecd9";
+        ctx.lineWidth = 2;
+        ctx.setLineDash([4, 5]);
+        ctx.beginPath();
+        ctx.arc(0, 0, f.r + 5, 0, 7);
+        ctx.stroke();
+      }
+      ctx.restore();
+    }
+
+    // 待落队列提示
+    if (queue.length) {
+      ctx.font = "600 13px system-ui,sans-serif";
+      ctx.textAlign = "left";
+      ctx.textBaseline = "middle";
+      ctx.fillStyle = "rgba(247,236,217,.55)";
+      let s = "待落:";
+      for (const q of queue.slice(0, 4)) s += " " + FRUITS[q].e;
+      if (queue.length > 4) s += " +" + (queue.length - 4);
+      ctx.fillText(s, BOX.x + 10, BOX.y - 12);
+    }
+    if (held && !dragging) {
+      ctx.font = "600 13px system-ui,sans-serif";
+      ctx.textAlign = "right";
+      ctx.textBaseline = "middle";
+      ctx.fillStyle = "rgba(247,236,217,.5)";
+      ctx.fillText("按住拖动 · 松手掉落", BOX.x + BOX.w - 10, BOX.y - 12);
+    }
+    if (juiceMode) {
+      ctx.strokeStyle = `rgba(255,122,89,${0.5 + 0.35 * Math.sin(t * 8)})`;
+      ctx.lineWidth = 2.5;
+      roundRect(ctx, BOX.x + 3, BOX.y + 3, BOX.w - 6, BOX.h - 6, 14);
+      ctx.stroke();
+      ctx.font = "700 14px system-ui,sans-serif";
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.fillStyle = "#ff7a59";
+      ctx.fillText("🥤 点击一个水果,榨小一级", W / 2, BOX.y - 12);
+    }
+  }
+
+  // ---------- 启动 ----------
+  cfg = LEVELS[0];
+  updateHud();
+  showMenu();
+</script>

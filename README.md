@@ -1,0 +1,57 @@
+# 叠个果王 · Neon Orchard
+
+一款为手机操作习惯设计的水果三消 + 物理合成网页游戏：从叠放的果卡中选出三张同类卡，生成实体水果；两个同级水果碰撞后继续升级，最终合成黄金果王。
+
+## 游戏亮点
+
+- **PixiJS 8 游戏渲染**：游戏主画面、卡片、物理水果、星空背景与粒子效果全部运行在 WebGL/Canvas 渲染层中。
+- **Matter.js 物理合成**：真实重力、回弹、摩擦与碰撞检测；同级水果碰撞自动合成。
+- **手游式反馈**：连击倍率、粒子爆裂、冲击波、震屏、音效、触觉反馈、警戒线与华丽结算。
+- **12 关主线**：逐步解锁更高级水果与冰晶卡，支持撤回、洗牌、榨汁降压道具。
+- **PostgreSQL 排行榜**：每局由服务端签发唯一记录，结束后输入用户名即可保存成绩，避免重复提交。
+- **响应式设计**：手机全屏游玩，桌面端保留沉浸式竖屏游戏框。
+
+## 技术栈
+
+- React 19 + TypeScript + Vite
+- PixiJS 8 + Matter.js
+- Node.js 22 + Express 5
+- PostgreSQL + `pg`
+- Zod、Helmet、限流与压缩中间件
+
+## 本地运行
+
+```bash
+npm install
+cp .env.example .env
+npm run dev
+```
+
+游戏页面默认运行在 `http://localhost:5173`，接口服务默认运行在 `http://localhost:3000`。
+
+没有配置 PostgreSQL 时仍可正常游玩，但排行榜会显示离线。若需要完整功能，请创建数据库并将连接地址写入 `.env` 的 `DATABASE_URL`。服务启动时会自动执行幂等表结构初始化。
+
+## Railway 部署
+
+1. 在 Railway 中创建项目，并连接本 GitHub 仓库。
+2. 在同一项目中添加 **PostgreSQL** 服务；Railway 会向游戏服务注入 `DATABASE_URL`。
+3. 游戏服务使用仓库中的 `railway.json` 与 `nixpacks.toml` 自动构建和启动。
+4. 如使用 Railway 代理，设置环境变量 `TRUST_PROXY=1`。
+5. 部署完成后，健康检查地址为 `/api/health`。
+
+生产服务由 Express 同时提供静态游戏与 `/api` 接口，无需拆分前后端服务。
+
+## 常用命令
+
+```bash
+npm run build      # TypeScript 检查与生产构建
+npm test           # 服务端校验测试
+npm start          # 启动生产服务
+```
+
+## 数据表
+
+- `game_runs`：每局开始时创建，记录模式、关卡、开始与完成时间。
+- `scores`：保存用户名、分数、最高连击、最大水果与游戏时长。
+
+数据库定义位于 `database/schema.sql`。
