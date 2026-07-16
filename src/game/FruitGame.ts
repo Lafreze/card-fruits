@@ -140,6 +140,10 @@ export class FruitGame implements GameControls {
       resolution: Math.min(window.devicePixelRatio || 1, 2),
       powerPreference: "high-performance",
     });
+    // autoDensity 会写死内联 width/height(430×860 px),容器变小时画布溢出被裁;
+    // 强制回到 CSS 控制,让画布始终随 .game-phone 等比缩放
+    canvas.style.width = "100%";
+    canvas.style.height = "100%";
     this.app.stage.addChild(this.root);
     this.root.addChild(
       this.ambientLayer,
@@ -251,7 +255,7 @@ export class FruitGame implements GameControls {
         letterSpacing: 1.6,
       },
     });
-    stackLabel.position.set(29, 114);
+    stackLabel.position.set(29, WORLD.stack.y + 8);
     this.ambientLayer.addChild(stackLabel);
 
     const dangerLabel = new Text({
@@ -332,26 +336,65 @@ export class FruitGame implements GameControls {
         Array.from({ length: count }, () => tier),
       ),
     );
-    const perLayer = 9;
+    // 布局块展开成卡位,按层从低到高排序;设计上卡位数 = 卡片数,不足时向上叠补
+    const slots = definition.layout
+      .flatMap((block) =>
+        Array.from({ length: block.cols * block.rows }, (_, cell) => ({
+          layer: block.layer,
+          x: block.x + ((cell % block.cols) - (block.cols - 1) / 2) * block.sx,
+          y:
+            block.y +
+            (Math.floor(cell / block.cols) - (block.rows - 1) / 2) * block.sy,
+        })),
+      )
+      .sort((a, b) => a.layer - b.layer);
+    while (slots.length < tiers.length) {
+      const top = slots[slots.length - 1];
+      slots.push({ layer: top.layer + 1, x: top.x + 5, y: top.y - 6 });
+    }
+    const maxLayer = slots[slots.length - 1].layer;
+    const exposedSlotIndexes = slots
+      .map((slot, index) => ({ slot, index }))
+      .filter(({ slot }) =>
+        !slots.some((other) => {
+          if (other.layer <= slot.layer) return false;
+          const overlapX = Math.max(0, CARD_W - Math.abs(other.x - slot.x));
+          const overlapY = Math.max(0, CARD_H - Math.abs(other.y - slot.y));
+          return overlapX * overlapY > 300;
+        }),
+      )
+      .map(({ index }) => index);
+
+    // 每关开局至少亮出同类三张,避免随机洗牌后顶部卡片无法组成第一组三消。
+    const openingTier = definition.cards.find(({ count }) => count >= 3)?.tier;
+    const protectedOpeningSlots = new Set(exposedSlotIndexes.slice(0, 3));
+    if (openingTier !== undefined && protectedOpeningSlots.size === 3) {
+      [...protectedOpeningSlots].forEach((targetIndex, openingIndex) => {
+        const earlierTargets = exposedSlotIndexes.slice(0, openingIndex);
+        const sourceIndex = tiers.findIndex(
+          (tier, index) => tier === openingTier && !earlierTargets.includes(index),
+        );
+        if (sourceIndex >= 0 && sourceIndex !== targetIndex) {
+          [tiers[targetIndex], tiers[sourceIndex]] = [
+            tiers[sourceIndex],
+            tiers[targetIndex],
+          ];
+        }
+      });
+    }
 
     tiers.forEach((tier, index) => {
-      const layer = Math.floor(index / perLayer);
-      const slot = index % perLayer;
-      const col = slot % 5;
-      const row = Math.floor(slot / 5);
-      const layerShiftX = ((layer % 3) - 1) * 17;
-      const layerShiftY = ((layer * 13) % 24) - 12;
-      const rowWidth = row === 0 ? 5 : 4;
-      const xStart = WORLD.width / 2 - ((rowWidth - 1) * 69) / 2;
-      const x = xStart + col * 69 + layerShiftX + (Math.random() - 0.5) * 4;
-      const y = 185 + row * 88 + layerShiftY + (Math.random() - 0.5) * 5;
+      const slot = slots[index];
+      const x = slot.x + (Math.random() - 0.5) * 3;
+      const y = slot.y + (Math.random() - 0.5) * 3;
       const locked =
+        !protectedOpeningSlots.has(index) &&
         Math.random() < definition.specialRate &&
-        layer < Math.max(1, Math.floor(tiers.length / perLayer) - 1);
+        slot.layer < maxLayer;
       const card: CardNode = {
         id: index + 1,
         tier,
-        layer,
+        layer: slot.layer,
         active: true,
         x,
         y,
@@ -359,7 +402,7 @@ export class FruitGame implements GameControls {
         locked,
       };
       card.view.position.set(x, y);
-      card.view.zIndex = layer;
+      card.view.zIndex = slot.layer * 100 + index;
       card.view.on("pointertap", (event: FederatedPointerEvent) => {
         event.stopPropagation();
         this.pickCard(card);
@@ -397,7 +440,12 @@ export class FruitGame implements GameControls {
     });
     emoji.anchor.set(0.5);
     emoji.position.set(0, -3);
-    view.addChild(shadow, glow, face, sheen, emoji);
+    const shade = new Graphics()
+      .roundRect(-CARD_W / 2, -CARD_H / 2, CARD_W, CARD_H, 15)
+      .fill({ color: 0x140b2c, alpha: 0.66 });
+    shade.label = "shade";
+    shade.visible = false;
+    view.addChild(shadow, glow, face, sheen, emoji, shade);
     if (locked) {
       const lock = new Text({ text: "❄", style: { fontSize: 13 } });
       lock.anchor.set(0.5);
@@ -414,7 +462,8 @@ export class FruitGame implements GameControls {
         return false;
       const overlapX = Math.max(0, CARD_W - Math.abs(other.x - card.x));
       const overlapY = Math.max(0, CARD_H - Math.abs(other.y - card.y));
-      return overlapX * overlapY > 520;
+      // 布局最小的刻意遮盖(dx36+dy38 双向半错位)约 616,擦边接触 <240
+      return overlapX * overlapY > 300;
     });
   }
 
@@ -433,8 +482,13 @@ export class FruitGame implements GameControls {
       const usable = !covered && !card.locked;
       card.view.eventMode = usable ? "static" : "none";
       card.view.cursor = usable ? "pointer" : "default";
-      card.view.alpha = usable ? 1 : covered ? 0.46 : 0.72;
-      card.view.scale.set(usable ? 1 : 0.97);
+      const shade = card.view.getChildByLabel("shade");
+      if (shade) {
+        shade.visible = !usable;
+        shade.alpha = covered ? 1 : 0.55;
+      }
+      card.view.alpha = 1;
+      card.view.scale.set(usable ? 1 : 0.96);
     });
   }
 
@@ -1108,10 +1162,14 @@ export class FruitGame implements GameControls {
     if (this.paused || this.status !== "playing" || this.shuffleLeft <= 0)
       return;
     const active = this.cards.filter((card) => card.active);
-    const positions = shuffle(active.map(({ x, y }) => ({ x, y })));
+    const positions = shuffle(
+      active.map(({ x, y, layer }) => ({ x, y, layer })),
+    );
     active.forEach((card, index) => {
       card.x = positions[index].x;
       card.y = positions[index].y;
+      card.layer = positions[index].layer;
+      card.view.zIndex = card.layer * 100 + index;
       card.view.position.set(card.x, card.y);
     });
     this.shuffleLeft -= 1;

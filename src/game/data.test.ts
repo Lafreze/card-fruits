@@ -1,0 +1,63 @@
+import assert from "node:assert/strict";
+import test from "node:test";
+import { FRUITS, LEVELS, WORLD, type LayoutBlock } from "./data.ts";
+
+const CARD_WIDTH = 58;
+const CARD_HEIGHT = 66;
+
+function expandLayout(layout: LayoutBlock[]) {
+  return layout.flatMap((block) =>
+    Array.from({ length: block.cols * block.rows }, (_, cell) => ({
+      layer: block.layer,
+      x: block.x + ((cell % block.cols) - (block.cols - 1) / 2) * block.sx,
+      y:
+        block.y +
+        (Math.floor(cell / block.cols) - (block.rows - 1) / 2) * block.sy,
+    })),
+  );
+}
+
+function isCovered(
+  slot: ReturnType<typeof expandLayout>[number],
+  slots: ReturnType<typeof expandLayout>,
+) {
+  return slots.some((other) => {
+    if (other.layer <= slot.layer) return false;
+    const overlapX = Math.max(0, CARD_WIDTH - Math.abs(other.x - slot.x));
+    const overlapY = Math.max(0, CARD_HEIGHT - Math.abs(other.y - slot.y));
+    return overlapX * overlapY > 300;
+  });
+}
+
+test("all story levels have valid, playable layouts", () => {
+  assert.equal(LEVELS.length, 12);
+
+  LEVELS.forEach((level, index) => {
+    const slots = expandLayout(level.layout);
+    const cardCount = level.cards.reduce((sum, card) => sum + card.count, 0);
+    const exposedCount = slots.filter((slot) => !isCovered(slot, slots)).length;
+    const maxCardTier = Math.max(...level.cards.map((card) => card.tier));
+    const synthesisUnits =
+      level.cards.reduce(
+        (sum, card) => sum + (card.count / 3) * 2 ** card.tier,
+        0,
+      ) + (index === 0 ? 2 : 0);
+
+    assert.equal(slots.length, cardCount, `第 ${index + 1} 关卡位数必须等于卡片数`);
+    assert.ok(exposedCount >= 3, `第 ${index + 1} 关开局至少需要三张可点卡`);
+    assert.equal(level.target, maxCardTier + 1, `第 ${index + 1} 关必须通过碰撞合成目标`);
+    assert.ok(synthesisUnits >= 2 ** level.target, `第 ${index + 1} 关水果总量不足以合成目标`);
+
+    level.cards.forEach((card) => {
+      assert.equal(card.count % 3, 0, `第 ${index + 1} 关每种卡片数量必须是 3 的倍数`);
+      assert.ok(card.tier >= 0 && card.tier < FRUITS.length);
+    });
+
+    slots.forEach((slot) => {
+      assert.ok(slot.x - CARD_WIDTH / 2 >= WORLD.stack.x, `第 ${index + 1} 关卡片超出左边界`);
+      assert.ok(slot.x + CARD_WIDTH / 2 <= WORLD.stack.x + WORLD.stack.width, `第 ${index + 1} 关卡片超出右边界`);
+      assert.ok(slot.y - CARD_HEIGHT / 2 >= WORLD.stack.y, `第 ${index + 1} 关卡片超出上边界`);
+      assert.ok(slot.y + CARD_HEIGHT / 2 <= WORLD.stack.y + WORLD.stack.height, `第 ${index + 1} 关卡片超出下边界`);
+    });
+  });
+});

@@ -11,7 +11,7 @@
     "build": "tsc -b && vite build",
     "start": "node server/index.mjs",
     "typecheck": "tsc -b --pretty false",
-    "test": "node --test server/*.test.mjs"
+    "test": "node --disable-warning=ExperimentalWarning --experimental-strip-types --test src/game/data.test.ts && node --test server/*.test.mjs"
   },
   "dependencies": {
     "compression": "^1.8.1",
