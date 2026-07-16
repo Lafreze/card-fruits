@@ -72,6 +72,8 @@ export class FruitGame implements GameControls {
   private ambientLayer = new Container();
   private cardLayer = new Container();
   private fruitLayer = new Container();
+  private dropLayer = new Container();
+  private dropPreviewLayer = new Container();
   private fxLayer = new Container();
   private trayLayer = new Container();
   private cards: CardNode[] = [];
@@ -80,6 +82,8 @@ export class FruitGame implements GameControls {
   private rings: Ring[] = [];
   private labels: FloatLabel[] = [];
   private tray: number[] = [];
+  private pendingDrops: number[] = [];
+  private dropToken = 0;
   private merging = new Set<number>();
   private timers = new Set<number>();
   private callbacks: GameCallbacks;
@@ -126,8 +130,9 @@ export class FruitGame implements GameControls {
       powerPreference: "high-performance",
     });
     this.app.stage.addChild(this.root);
-    this.root.addChild(this.ambientLayer, this.world, this.fxLayer);
+    this.root.addChild(this.ambientLayer, this.world, this.dropLayer, this.fxLayer);
     this.world.addChild(this.cardLayer, this.trayLayer, this.fruitLayer);
+    this.dropLayer.addChild(this.dropPreviewLayer);
     this.drawScene();
     this.createPhysicsWorld();
     this.createCards();
@@ -135,6 +140,11 @@ export class FruitGame implements GameControls {
     Events.on(this.engine, "collisionStart", this.onCollision);
     this.app.ticker.add(this.tick);
     this.emitSnapshot();
+    if (this.levelIndex === 0) {
+      this.callbacks.onToast("合成演示 · 两颗葡萄正在相遇", "cyan");
+      this.setTimer(() => this.spawnFruit(0, WORLD.width / 2 - 24, WORLD.box.y + 28), 320);
+      this.setTimer(() => this.spawnFruit(0, WORLD.width / 2 + 24, WORLD.box.y + 28), 480);
+    }
   }
 
   private drawScene() {
@@ -192,6 +202,24 @@ export class FruitGame implements GameControls {
     });
     dangerLabel.position.set(31, WORLD.dangerY - 18);
     this.ambientLayer.addChild(dangerLabel);
+
+    const mergeLabel = new Text({
+      text: "MERGE LAB  ·  同级水果相撞升级",
+      style: { fontFamily: "system-ui", fontSize: 9, fontWeight: "800", fill: 0x76e7ff, letterSpacing: 1.1 },
+    });
+    mergeLabel.anchor.set(1, 0);
+    mergeLabel.position.set(WORLD.box.x + WORLD.box.width - 20, WORLD.box.y + 12);
+    this.ambientLayer.addChild(mergeLabel);
+
+    const dropTarget = new Graphics()
+      .roundRect(WORLD.box.x, WORLD.box.y, WORLD.box.width, WORLD.box.height, 28)
+      .fill({ color: 0xffffff, alpha: 0.001 });
+    dropTarget.eventMode = "static";
+    dropTarget.cursor = "crosshair";
+    dropTarget.on("pointertap", (event: FederatedPointerEvent) => {
+      if (this.pendingDrops.length > 0) this.dropPending(event.global.x);
+    });
+    this.dropLayer.addChildAt(dropTarget, 0);
   }
 
   private createPhysicsWorld() {
@@ -265,13 +293,7 @@ export class FruitGame implements GameControls {
     });
     emoji.anchor.set(0.5);
     emoji.position.set(0, -3);
-    const tierText = new Text({
-      text: `LV.${tier + 1}`,
-      style: { fontFamily: "system-ui", fontSize: 7, fontWeight: "900", fill: 0x5d416b, letterSpacing: 0.6 },
-    });
-    tierText.anchor.set(0.5);
-    tierText.position.set(0, 24);
-    view.addChild(shadow, glow, face, sheen, emoji, tierText);
+    view.addChild(shadow, glow, face, sheen, emoji);
     if (locked) {
       const lock = new Text({ text: "❄", style: { fontSize: 13 } });
       lock.anchor.set(0.5);
@@ -343,7 +365,7 @@ export class FruitGame implements GameControls {
       this.ring(WORLD.width / 2, WORLD.tray.y + 30, FRUITS[card.tier].glow);
       this.shake = Math.max(this.shake, 7 + this.combo * 1.2);
       this.callbacks.onToast(this.comboMessage(), this.combo >= 4 ? "gold" : "pink");
-      this.setTimer(() => this.spawnFruit(card.tier), 260);
+      this.setTimer(() => this.queueDrop(card.tier), 260);
       this.drawTray();
     }
 
@@ -385,6 +407,72 @@ export class FruitGame implements GameControls {
       }
       void slotWidth;
     }
+  }
+
+  private queueDrop(tier: number) {
+    if (this.destroyed || this.status !== "playing") return;
+    const wasEmpty = this.pendingDrops.length === 0;
+    this.pendingDrops.push(tier);
+    this.renderDropPreview();
+    if (wasEmpty) {
+      this.callbacks.onToast(`获得 ${FRUITS[tier].emoji} · 点击果箱选择落点`, "gold");
+      this.scheduleAutoDrop();
+    }
+  }
+
+  private preferredDropX(tier: number) {
+    const sameTier = [...this.fruits.values()]
+      .filter((fruit) => fruit.tier === tier && !this.merging.has(fruit.body.id))
+      .sort((a, b) => b.body.position.y - a.body.position.y)[0];
+    return sameTier?.body.position.x ?? WORLD.box.x + WORLD.box.width / 2;
+  }
+
+  private renderDropPreview() {
+    this.dropPreviewLayer.removeChildren().forEach((child) => child.destroy({ children: true }));
+    const tier = this.pendingDrops[0];
+    if (tier === undefined || this.status !== "playing") return;
+    const x = this.preferredDropX(tier);
+    const guide = new Graphics()
+      .moveTo(0, 0)
+      .lineTo(0, 52)
+      .stroke({ color: FRUITS[tier].glow, alpha: 0.7, width: 2 });
+    guide.position.set(x, WORLD.box.y + 22);
+    guide.blendMode = "add";
+    const halo = new Graphics()
+      .circle(0, 0, FRUITS[tier].radius + 10)
+      .fill({ color: FRUITS[tier].glow, alpha: 0.2 })
+      .stroke({ color: 0xffffff, alpha: 0.7, width: 1.5 });
+    halo.position.set(x, WORLD.box.y + 27);
+    const emoji = new Text({ text: FRUITS[tier].emoji, style: { fontSize: Math.max(24, FRUITS[tier].radius * 1.15) } });
+    emoji.anchor.set(0.5);
+    emoji.position.copyFrom(halo.position);
+    const hint = new Text({
+      text: `点击果箱投放  ${FRUITS[tier].emoji}${this.pendingDrops.length > 1 ? `  ×${this.pendingDrops.length}` : ""}`,
+      style: { fontFamily: "system-ui", fontSize: 10, fontWeight: "900", fill: 0xffffff, stroke: { color: 0x25123f, width: 4 } },
+    });
+    hint.anchor.set(0.5);
+    hint.position.set(WORLD.width / 2, WORLD.box.y + 82);
+    this.dropPreviewLayer.addChild(guide, halo, emoji, hint);
+  }
+
+  private scheduleAutoDrop() {
+    const token = ++this.dropToken;
+    this.setTimer(() => {
+      if (token === this.dropToken && this.pendingDrops.length > 0) this.dropPending();
+    }, 2_800);
+  }
+
+  private dropPending(chosenX?: number) {
+    if (this.status !== "playing") return;
+    const tier = this.pendingDrops.shift();
+    if (tier === undefined) return;
+    this.dropToken += 1;
+    const margin = FRUITS[tier].radius + 9;
+    const fallbackX = this.preferredDropX(tier);
+    const x = Math.max(WORLD.box.x + margin, Math.min(WORLD.box.x + WORLD.box.width - margin, chosenX ?? fallbackX));
+    this.spawnFruit(tier, x, WORLD.box.y + 18);
+    this.renderDropPreview();
+    if (this.pendingDrops.length > 0) this.scheduleAutoDrop();
   }
 
   private spawnFruit(tier: number, x = WORLD.box.x + 55 + Math.random() * (WORLD.box.width - 110), y = WORLD.box.y + 18) {
@@ -541,7 +629,7 @@ export class FruitGame implements GameControls {
 
   private tick = (ticker: { deltaMS: number }) => {
     if (this.paused || this.destroyed) return;
-    const deltaMs = Math.min(ticker.deltaMS, 16.667);
+    const deltaMs = Math.min(ticker.deltaMS, 1000 / 60);
     const delta = deltaMs / 16.667;
     this.elapsed += deltaMs / 1000;
     Engine.update(this.engine, deltaMs);
@@ -554,6 +642,11 @@ export class FruitGame implements GameControls {
         fruit.view.scale.set(next);
       }
     });
+    this.attractMatchingFruits();
+
+    if (this.dropPreviewLayer.children.length > 0) {
+      this.dropPreviewLayer.alpha = 0.8 + Math.sin(this.elapsed * 5.5) * 0.2;
+    }
 
     this.ambientLayer.children.forEach((child, index) => {
       if (child.label?.startsWith("star-")) child.alpha = 0.35 + Math.sin(this.elapsed * 1.7 + index) * 0.25;
@@ -610,6 +703,29 @@ export class FruitGame implements GameControls {
     });
   }
 
+  private attractMatchingFruits() {
+    const fruits = [...this.fruits.values()];
+    for (let firstIndex = 0; firstIndex < fruits.length; firstIndex += 1) {
+      const first = fruits[firstIndex];
+      if (this.merging.has(first.body.id)) continue;
+      for (let secondIndex = firstIndex + 1; secondIndex < fruits.length; secondIndex += 1) {
+        const second = fruits[secondIndex];
+        if (first.tier !== second.tier || this.merging.has(second.body.id)) continue;
+        const dx = second.body.position.x - first.body.position.x;
+        const dy = second.body.position.y - first.body.position.y;
+        const distance = Math.hypot(dx, dy);
+        if (distance < 1 || distance > 250) continue;
+        const settled = first.body.speed + second.body.speed < 7;
+        if (!settled && Math.abs(dy) > 120) continue;
+        const strength = Math.min(0.00016 + first.tier * 0.000012, distance * 0.0000012);
+        const forceX = (dx / distance) * strength;
+        const forceY = (dy / distance) * strength * 0.18;
+        Body.applyForce(first.body, first.body.position, { x: forceX, y: forceY });
+        Body.applyForce(second.body, second.body.position, { x: -forceX, y: -forceY });
+      }
+    }
+  }
+
   private updateDanger() {
     if (this.status !== "playing") return;
     const now = performance.now();
@@ -630,7 +746,7 @@ export class FruitGame implements GameControls {
   }
 
   private checkExhausted() {
-    if (this.status !== "playing" || this.cards.some((card) => card.active) || this.tray.length > 0) {
+    if (this.status !== "playing" || this.cards.some((card) => card.active) || this.tray.length > 0 || this.pendingDrops.length > 0) {
       this.exhaustedSince = 0;
       return;
     }
@@ -668,6 +784,9 @@ export class FruitGame implements GameControls {
   private finish(status: "won" | "lost", reason: string) {
     if (this.status !== "playing") return;
     this.status = status;
+    this.pendingDrops = [];
+    this.dropToken += 1;
+    this.renderDropPreview();
     this.shake = status === "won" ? 18 : 7;
     if (status === "won") {
       const bonus = Math.max(0, this.cards.filter((card) => card.active).length * 150 + (7 - this.tray.length) * 300);

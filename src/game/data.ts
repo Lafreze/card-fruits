@@ -30,7 +30,7 @@ export const FRUITS: FruitDefinition[] = [
 ];
 
 export const LEVELS: LevelDefinition[] = [
-  { name: "晨露初甜", target: 2, cards: [{ tier: 0, count: 9 }, { tier: 1, count: 6 }, { tier: 2, count: 3 }], specialRate: 0 },
+  { name: "晨露初甜", target: 2, cards: [{ tier: 0, count: 12 }, { tier: 1, count: 6 }], specialRate: 0 },
   { name: "莓好时光", target: 3, cards: [{ tier: 0, count: 9 }, { tier: 1, count: 9 }, { tier: 2, count: 6 }], specialRate: 0 },
   { name: "青柠电波", target: 4, cards: [{ tier: 0, count: 9 }, { tier: 1, count: 9 }, { tier: 2, count: 9 }, { tier: 3, count: 6 }], specialRate: 0.06 },
   { name: "橙光派对", target: 5, cards: [{ tier: 1, count: 9 }, { tier: 2, count: 9 }, { tier: 3, count: 9 }, { tier: 4, count: 6 }], specialRate: 0.08 },

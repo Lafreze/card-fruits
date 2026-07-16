@@ -132,17 +132,21 @@ export default function App() {
   const handleReady = useCallback((controls: GameControls | null) => {
     controlsRef.current = controls;
   }, []);
+  const persistUnlocked = useCallback((nextLevel: number) => {
+    const safeLevel = Math.max(0, Math.min(nextLevel, LEVELS.length - 1));
+    const persisted = readProgress();
+    const nextUnlocked = Math.max(persisted, safeLevel);
+    localStorage.setItem("fruit-king-unlocked", String(nextUnlocked));
+    setUnlocked((current) => Math.max(current, nextUnlocked));
+    return nextUnlocked;
+  }, []);
   const handleSnapshot = useCallback((next: GameSnapshot) => setSnapshot(next), []);
   const handleFinish = useCallback((next: GameResult) => {
     setResult(next);
     if (next.status === "won") {
-      setUnlocked((current) => {
-        const nextUnlocked = Math.min(LEVELS.length - 1, Math.max(current, level + 1));
-        localStorage.setItem("fruit-king-unlocked", String(nextUnlocked));
-        return nextUnlocked;
-      });
+      persistUnlocked(level + 1);
     }
-  }, [level]);
+  }, [level, persistUnlocked]);
   const handleToast = useCallback((message: string, tone: "gold" | "pink" | "cyan" = "pink") => {
     if (toastTimer.current) window.clearTimeout(toastTimer.current);
     setToast({ id: Date.now(), message, tone });
@@ -167,6 +171,13 @@ export default function App() {
     controlsRef.current = null;
     setResult(null);
     setScreen("home");
+  };
+
+  const continueGame = () => {
+    if (!result) return;
+    const nextLevel = result.status === "won" ? Math.min(level + 1, LEVELS.length - 1) : level;
+    if (result.status === "won") persistUnlocked(nextLevel);
+    beginGame(nextLevel);
   };
 
   const loadLeaderboard = useCallback(() => {
@@ -341,7 +352,7 @@ export default function App() {
                   </div>
                   <div className="result-actions">
                     <button className="button button-ghost" onClick={backHome}>返回果园</button>
-                    <button className="button button-primary" onClick={() => beginGame(result.status === "won" ? Math.min(level + 1, LEVELS.length - 1) : level)}>
+                    <button className="button button-primary" onClick={continueGame}>
                       {result.status === "won" && level < LEVELS.length - 1 ? "下一关" : "再来一局"}
                     </button>
                   </div>
