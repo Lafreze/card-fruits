@@ -3,7 +3,7 @@
     Inter, ui-rounded, "SF Pro Rounded", "PingFang SC", "Microsoft YaHei",
     system-ui, sans-serif;
   color: #fff9ff;
-  background: #100720;
+  background: #241044;
   font-synthesis: none;
   text-rendering: optimizeLegibility;
   --pink: #ff4f9a;
@@ -47,21 +47,22 @@ input:focus-visible {
   background:
     radial-gradient(
       circle at 14% 12%,
-      rgba(129, 60, 246, 0.28),
+      rgba(162, 99, 255, 0.46),
       transparent 28rem
     ),
     radial-gradient(
       circle at 88% 80%,
-      rgba(255, 47, 126, 0.2),
+      rgba(255, 83, 164, 0.36),
       transparent 32rem
     ),
-    linear-gradient(145deg, #170b2e 0%, #0c081d 52%, #111734 100%);
+    radial-gradient(circle at 52% 38%, rgba(67, 221, 255, 0.12), transparent 24rem),
+    linear-gradient(145deg, #32175c 0%, #18143a 52%, #153052 100%);
 }
 
 .noise {
   position: fixed;
   inset: 0;
-  opacity: 0.07;
+  opacity: 0.045;
   pointer-events: none;
   z-index: 20;
   background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 180 180' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='.5'/%3E%3C/svg%3E");
@@ -222,10 +223,10 @@ input:focus-visible {
   align-items: center;
   justify-content: center;
   gap: 6px;
-  border: 1px solid rgba(183, 139, 255, 0.18);
+  border: 1px solid rgba(214, 187, 255, 0.32);
   border-radius: 14px;
-  color: #a99abb;
-  background: rgba(22, 13, 48, 0.72);
+  color: #eadfff;
+  background: rgba(68, 43, 110, 0.76);
   cursor: pointer;
   font-size: 10px;
   font-weight: 850;
@@ -254,16 +255,16 @@ input:focus-visible {
 .mode-card {
   width: 100%;
   padding: 18px;
-  border: 1px solid rgba(196, 156, 255, 0.2);
+  border: 1px solid rgba(224, 203, 255, 0.36);
   border-radius: 27px;
   background: linear-gradient(
     145deg,
-    rgba(53, 28, 91, 0.82),
-    rgba(26, 17, 56, 0.86)
+    rgba(94, 55, 139, 0.9),
+    rgba(42, 37, 94, 0.92)
   );
   box-shadow:
-    inset 0 1px rgba(255, 255, 255, 0.07),
-    0 24px 60px rgba(0, 0, 0, 0.28);
+    inset 0 1px rgba(255, 255, 255, 0.15),
+    0 24px 60px rgba(23, 8, 54, 0.34);
   backdrop-filter: blur(18px);
 }
 .mode-topline {
@@ -325,7 +326,8 @@ input:focus-visible {
   align-items: center;
   gap: 12px;
   padding: 11px 13px;
-  background: rgba(10, 7, 30, 0.46);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(26, 26, 75, 0.62);
   border-radius: 18px;
 }
 .mission-icon {
@@ -479,8 +481,8 @@ input:focus-visible {
   overflow: hidden;
   isolation: isolate;
   container-type: inline-size;
-  box-shadow: 0 28px 90px rgba(0, 0, 0, 0.45);
-  background: #130b28;
+  box-shadow: 0 28px 90px rgba(5, 3, 28, 0.55), 0 0 55px rgba(127, 79, 255, 0.2);
+  background: #1c1240;
   touch-action: none;
 }
 .game-canvas {
@@ -504,8 +506,8 @@ input:focus-visible {
   height: 75px;
   height: 17.4cqw;
   display: flex;
-  gap: 7px;
-  gap: 1.6cqw;
+  gap: 6px;
+  gap: 1.35cqw;
   align-items: center;
   pointer-events: none;
 }
@@ -517,15 +519,34 @@ input:focus-visible {
   width: 7.9cqw;
   height: 34px;
   height: 7.9cqw;
-  border: 1px solid rgba(255, 255, 255, 0.15);
+  border: 1px solid rgba(255, 255, 255, 0.28);
   border-radius: 12px;
   border-radius: 2.8cqw;
   color: #fff;
-  background: rgba(34, 19, 66, 0.76);
+  background: linear-gradient(145deg, rgba(91, 61, 142, 0.96), rgba(49, 38, 93, 0.94));
   font-size: 28px;
   font-size: 6.5cqw;
   line-height: 1;
   cursor: pointer;
+}
+.hud-buttons {
+  display: flex;
+  gap: 3px;
+  gap: 0.7cqw;
+}
+.hud-buttons .icon-button {
+  width: 31px;
+  width: 7.2cqw;
+  height: 34px;
+  height: 7.9cqw;
+  padding: 0;
+  font-size: 24px;
+  font-size: 5.6cqw;
+}
+.hud-buttons .restart-button {
+  color: #ffe879;
+  font-size: 20px;
+  font-size: 4.7cqw;
 }
 .level-chip {
   flex: 1;
@@ -551,14 +572,14 @@ input:focus-visible {
   text-overflow: ellipsis;
 }
 .score-chip {
-  min-width: 84px;
-  min-width: 19.5cqw;
+  min-width: 78px;
+  min-width: 18.1cqw;
   padding: 8px 10px;
   padding: 1.9cqw 2.3cqw;
-  border: 1px solid rgba(255, 214, 91, 0.19);
+  border: 1px solid rgba(255, 226, 129, 0.35);
   border-radius: 13px;
   border-radius: 3cqw;
-  background: rgba(34, 19, 66, 0.76);
+  background: rgba(76, 51, 123, 0.9);
 }
 .score-chip b {
   display: block;
@@ -601,19 +622,19 @@ input:focus-visible {
   align-items: center;
   justify-content: center;
   gap: 0;
-  border: 1px solid rgba(195, 159, 255, 0.25);
+  border: 1px solid rgba(221, 202, 255, 0.4);
   border-radius: 12px;
   border-radius: 2.8cqw;
   color: #f8f1ff;
-  background: rgba(35, 20, 66, 0.9);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.22);
+  background: linear-gradient(155deg, rgba(87, 58, 135, 0.98), rgba(44, 35, 91, 0.98));
+  box-shadow: inset 0 1px rgba(255, 255, 255, 0.12), 0 5px 14px rgba(8, 5, 36, 0.28);
   cursor: pointer;
 }
 .power-dock button:active {
-  transform: scale(0.96);
+  transform: translateY(1px) scale(0.95);
 }
 .power-dock button:disabled {
-  opacity: 0.35;
+  opacity: 0.28;
   cursor: default;
 }
 .power-dock i {
@@ -1106,6 +1127,7 @@ input:focus-visible {
 /* 果园温室(永久成长商店) */
 .shop-card {
   width: min(94vw, 470px);
+  background: linear-gradient(160deg, rgba(67, 72, 120, 0.98), rgba(35, 30, 82, 0.99));
 }
 .coin-balance {
   margin: 4px 0 12px;
@@ -1113,6 +1135,173 @@ input:focus-visible {
   font-size: 22px;
   font-weight: 900;
   font-variant-numeric: tabular-nums;
+}
+.greenhouse-stage {
+  height: 132px;
+  position: relative;
+  overflow: hidden;
+  margin: 3px 0 14px;
+  border: 1px solid rgba(192, 255, 222, 0.58);
+  border-radius: 22px;
+  background:
+    linear-gradient(90deg, transparent 49.4%, rgba(255, 255, 255, 0.18) 50%, transparent 50.6%),
+    linear-gradient(rgba(255, 255, 255, 0.1) 1px, transparent 1px),
+    linear-gradient(155deg, #64d8f2 0%, #9ce9d1 53%, #dff5aa 100%);
+  background-size: 100% 100%, 100% 31px, 100% 100%;
+  box-shadow: inset 0 -28px 35px rgba(63, 151, 79, 0.2), 0 12px 28px rgba(5, 25, 45, 0.26);
+}
+.greenhouse-stage::before {
+  content: "";
+  position: absolute;
+  left: 8%;
+  right: 8%;
+  top: -56px;
+  height: 92px;
+  transform: perspective(150px) rotateX(36deg);
+  border: 2px solid rgba(238, 255, 249, 0.76);
+  border-radius: 48% 48% 8px 8px;
+  box-shadow: inset 0 0 25px rgba(255, 255, 255, 0.25);
+}
+.greenhouse-stage::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 28px;
+  background: linear-gradient(#79b958, #447d45);
+  box-shadow: inset 0 6px 10px rgba(255, 255, 255, 0.2);
+}
+.greenhouse-sun {
+  position: absolute;
+  top: 12px;
+  right: 21px;
+  font-size: 28px;
+  filter: drop-shadow(0 0 12px rgba(255, 236, 95, 0.9));
+  animation: greenhouseSun 3.8s ease-in-out infinite;
+}
+.greenhouse-cloud {
+  position: absolute;
+  color: white;
+  font-size: 22px;
+  opacity: 0.68;
+  animation: cloudDrift 7s ease-in-out infinite alternate;
+}
+.cloud-a {
+  top: 23px;
+  left: 16px;
+}
+.cloud-b {
+  top: 48px;
+  left: 46%;
+  font-size: 16px;
+  animation-delay: -3s;
+}
+.greenhouse-vines {
+  position: absolute;
+  left: 50%;
+  bottom: 24px;
+  transform: translateX(-50%);
+  color: #236f45;
+  font-size: 17px;
+  white-space: nowrap;
+  opacity: 0.16;
+  transition: opacity 0.3s ease;
+}
+.greenhouse-stage.growth-2 .greenhouse-vines,
+.greenhouse-stage.growth-3 .greenhouse-vines {
+  opacity: 0.48;
+}
+.greenhouse-stage.growth-4 .greenhouse-vines,
+.greenhouse-stage.growth-5 .greenhouse-vines,
+.greenhouse-stage.growth-6 .greenhouse-vines {
+  opacity: 0.88;
+}
+.greenhouse-plants {
+  position: absolute;
+  z-index: 2;
+  left: 12px;
+  right: 12px;
+  bottom: 12px;
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-around;
+}
+.greenhouse-plant {
+  width: 45px;
+  height: 54px;
+  position: relative;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  padding-bottom: 5px;
+  border-radius: 0 0 12px 12px;
+  background: linear-gradient(90deg, #b45e36, #e49454 50%, #a75031);
+  box-shadow: 0 5px 8px rgba(54, 65, 29, 0.3);
+}
+.greenhouse-plant b {
+  position: absolute;
+  bottom: 25px;
+  font-size: 22px;
+  transform-origin: bottom center;
+  animation: plantSway 2.8s ease-in-out infinite alternate;
+}
+.greenhouse-plant:nth-child(even) b {
+  animation-delay: -1.4s;
+}
+.greenhouse-plant i {
+  position: absolute;
+  z-index: 2;
+  right: -4px;
+  top: -5px;
+  width: 20px;
+  height: 20px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: #fff8cb;
+  box-shadow: 0 3px 8px rgba(44, 61, 24, 0.32);
+  font-size: 12px;
+  font-style: normal;
+}
+.plant-level-0 {
+  opacity: 0.48;
+  filter: saturate(0.5);
+}
+.plant-level-2 b,
+.plant-level-3 b {
+  font-size: 27px;
+}
+.greenhouse-burst {
+  position: absolute;
+  z-index: 5;
+  inset: 0;
+  pointer-events: none;
+}
+.greenhouse-burst span {
+  position: absolute;
+  left: 50%;
+  top: 52%;
+  font-size: 21px;
+  animation: greenhouseBurst 0.9s cubic-bezier(0.2, 0.9, 0.3, 1) both;
+}
+.greenhouse-burst span:nth-child(2) { --burst-x: -95px; --burst-y: -48px; }
+.greenhouse-burst span:nth-child(3) { --burst-x: 92px; --burst-y: -38px; }
+.greenhouse-burst span:nth-child(4) { --burst-x: -58px; --burst-y: 42px; }
+.greenhouse-burst span:nth-child(5) { --burst-x: 62px; --burst-y: 37px; }
+@keyframes greenhouseSun {
+  50% { transform: scale(1.12) rotate(12deg); }
+}
+@keyframes cloudDrift {
+  to { transform: translateX(20px); }
+}
+@keyframes plantSway {
+  to { transform: rotate(5deg) scale(1.04); }
+}
+@keyframes greenhouseBurst {
+  0% { opacity: 0; transform: translate(-50%, -50%) scale(0.4); }
+  25% { opacity: 1; }
+  100% { opacity: 0; transform: translate(calc(-50% + var(--burst-x, 0px)), calc(-50% + var(--burst-y, -70px))) scale(1.25) rotate(20deg); }
 }
 .upgrade-list {
   display: flex;

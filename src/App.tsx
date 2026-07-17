@@ -47,6 +47,7 @@ const EMPTY_SNAPSHOT: GameSnapshot = {
   magnetLeft: 1,
   wildLeft: 1,
   bubbleLeft: 1,
+  sunLeft: 1,
   wave: 1,
   mode: "story",
   relics: [],
@@ -54,6 +55,8 @@ const EMPTY_SNAPSHOT: GameSnapshot = {
   feverActive: false,
   mutator: "",
 };
+
+const GREENHOUSE_PLANTS = ["🌱", "🌿", "🌸", "🍓"];
 
 function readProgress() {
   const stored = Number(localStorage.getItem("fruit-king-unlocked") || 0);
@@ -75,6 +78,7 @@ function readUpgrades(): UpgradeLevels {
     fever: 0,
     danger: 0,
     coin: 0,
+    sun: 0,
     relic_start: 0,
   };
   try {
@@ -310,6 +314,7 @@ export default function App() {
   const [coins, setCoins] = useState(readCoins);
   const [upgrades, setUpgrades] = useState<UpgradeLevels>(readUpgrades);
   const [shopOpen, setShopOpen] = useState(false);
+  const [shopPulse, setShopPulse] = useState(0);
   const [lastCoinReward, setLastCoinReward] = useState(0);
   const controlsRef = useRef<GameControls | null>(null);
   const toastTimer = useRef<number | null>(null);
@@ -318,6 +323,7 @@ export default function App() {
     pack: upgrades.pack,
     fever: upgrades.fever,
     danger: upgrades.danger,
+    sun: upgrades.sun,
   });
 
   const persistCoins = useCallback((next: number) => {
@@ -336,10 +342,12 @@ export default function App() {
     localStorage.setItem("fruit-king-upgrades", JSON.stringify(nextUpgrades));
     setUpgrades(nextUpgrades);
     persistCoins(coins - cost);
+    setShopPulse((value) => value + 1);
     gameUpgrades.current = {
       pack: nextUpgrades.pack,
       fever: nextUpgrades.fever,
       danger: nextUpgrades.danger,
+      sun: nextUpgrades.sun,
     };
   };
 
@@ -522,6 +530,10 @@ export default function App() {
   );
 
   const target = FRUITS[LEVELS[level].target];
+  const greenhouseGrowth = Object.values(upgrades).reduce(
+    (total, value) => total + value,
+    0,
+  );
   const isRelicReward =
     mode === "expedition" &&
     result?.status === "won" &&
@@ -688,13 +700,24 @@ export default function App() {
               onToast={handleToast}
             />
             <header className="game-hud">
-              <button
-                className="icon-button"
-                onClick={backHome}
-                aria-label="返回主菜单"
-              >
-                ‹
-              </button>
+              <div className="hud-buttons">
+                <button
+                  className="icon-button"
+                  onClick={backHome}
+                  aria-label="返回主菜单"
+                >
+                  ‹
+                </button>
+                <button
+                  className="icon-button restart-button"
+                  onClick={() =>
+                    beginGame(level, mode, { wave, relics, score: carryScore })
+                  }
+                  aria-label="重新开始"
+                >
+                  ↻
+                </button>
+              </div>
               <div className="level-chip">
                 <small>
                   {mode === "story"
@@ -791,12 +814,12 @@ export default function App() {
                 <em>{snapshot.bubbleLeft}</em>
               </button>
               <button
-                onClick={() =>
-                  beginGame(level, mode, { wave, relics, score: carryScore })
-                }
+                disabled={!snapshot.sunLeft}
+                onClick={() => controlsRef.current?.sunshine()}
               >
-                <i>↻</i>
-                <span>重开</span>
+                <i>☀️</i>
+                <span>净化</span>
+                <em>{snapshot.sunLeft}</em>
               </button>
             </div>
             <div
@@ -994,6 +1017,41 @@ export default function App() {
               每局结算都会攒下果币，在这里兑换跨局永久成长。
             </p>
             <div className="coin-balance">🪙 {formatScore(coins)}</div>
+            <div
+              className={`greenhouse-stage growth-${Math.min(6, greenhouseGrowth)}`}
+              aria-label={`温室成长等级 ${greenhouseGrowth}`}
+            >
+              <span className="greenhouse-sun">☀️</span>
+              <span className="greenhouse-cloud cloud-a">☁️</span>
+              <span className="greenhouse-cloud cloud-b">☁️</span>
+              <div className="greenhouse-vines" aria-hidden="true">
+                〰 🌿 〰 🌿 〰
+              </div>
+              <div className="greenhouse-plants">
+                {UPGRADES.map((item) => {
+                  const plantLevel = Math.min(3, upgrades[item.id]);
+                  return (
+                    <span
+                      className={`greenhouse-plant plant-level-${plantLevel}`}
+                      key={item.id}
+                      title={`${item.name} ${upgrades[item.id]}/${item.maxLevel}`}
+                    >
+                      <b>{GREENHOUSE_PLANTS[plantLevel]}</b>
+                      {plantLevel > 0 ? <i>{item.icon}</i> : null}
+                    </span>
+                  );
+                })}
+              </div>
+              {shopPulse > 0 ? (
+                <div className="greenhouse-burst" key={shopPulse}>
+                  <span>✨</span>
+                  <span>🍃</span>
+                  <span>🪙</span>
+                  <span>✨</span>
+                  <span>🍓</span>
+                </div>
+              ) : null}
+            </div>
             <div className="upgrade-list">
               {UPGRADES.map((item) => {
                 const levelNow = upgrades[item.id];

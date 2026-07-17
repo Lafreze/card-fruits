@@ -18,6 +18,7 @@ export type GameSnapshot = {
   magnetLeft: number;
   wildLeft: number;
   bubbleLeft: number;
+  sunLeft: number;
   wave: number;
   mode: GameMode;
   relics: RelicId[];
@@ -41,6 +42,7 @@ export type GameUpgrades = {
   pack?: number;
   fever?: number;
   danger?: number;
+  sun?: number;
 };
 
 export type GameOptions = {
@@ -60,6 +62,7 @@ export type GameControls = {
   magnet: () => void;
   wild: () => void;
   bubble: () => void;
+  sunshine: () => void;
   pause: () => void;
   resume: () => void;
   destroy: () => void;

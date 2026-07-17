@@ -33,12 +33,30 @@ function isCovered(
     if (other.layer <= slot.layer) return false;
     const overlapX = Math.max(0, CARD_WIDTH - Math.abs(other.x - slot.x));
     const overlapY = Math.max(0, CARD_HEIGHT - Math.abs(other.y - slot.y));
-    return overlapX * overlapY > 300;
+    return overlapX > 0.5 && overlapY > 0.5;
   });
 }
 
+test("a lower card is locked by even a slight upper overlap", () => {
+  const lower = { layer: 0, x: 100, y: 100 };
+  assert.equal(
+    isCovered(lower, [
+      lower,
+      { layer: 1, x: 100 + CARD_WIDTH - 1, y: 100 },
+    ]),
+    true,
+  );
+  assert.equal(
+    isCovered(lower, [
+      lower,
+      { layer: 1, x: 100 + CARD_WIDTH, y: 100 },
+    ]),
+    false,
+  );
+});
+
 test("all story levels have valid, playable layouts", () => {
-  assert.equal(LEVELS.length, 14);
+  assert.equal(LEVELS.length, 16);
 
   LEVELS.forEach((level, index) => {
     const slots = expandLayout(level.layout);
@@ -81,7 +99,7 @@ test("all story levels have valid, playable layouts", () => {
 });
 
 test("fruit scale and roguelike catalog stay balanced", () => {
-  assert.equal(FRUITS.length, 17);
+  assert.equal(FRUITS.length, 19);
   FRUITS.forEach((fruit, index) => {
     assert.ok(fruit.radius <= 60, `${fruit.name} 不应重新撑满果箱`);
     if (index > 0) assert.ok(fruit.radius > FRUITS[index - 1].radius);
@@ -89,7 +107,7 @@ test("fruit scale and roguelike catalog stay balanced", () => {
   assert.equal(new Set(RELICS.map((relic) => relic.id)).size, RELICS.length);
   assert.equal(RELICS.length, 16);
   assert.equal(MUTATORS.length, 7);
-  assert.equal(UPGRADES.length, 5);
+  assert.equal(UPGRADES.length, 6);
   assert.ok(Array.from({ length: 40 }, () => rollMutator(2)).every((item) => item.id !== "calm"));
   assert.deepEqual(Object.keys(MODE_INFO).sort(), ["endless", "expedition", "story"]);
   assert.equal(new Set(pickRelics([], 3).map((relic) => relic.id)).size, 3);

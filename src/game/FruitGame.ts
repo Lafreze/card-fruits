@@ -61,6 +61,9 @@ type FloatLabel = { view: Text; life: number; maxLife: number };
 const { Engine, Bodies, Body, Composite, Events } = Matter;
 const CARD_W = 58;
 const CARD_H = 66;
+const CARD_COVER_W = CARD_W + 6;
+const CARD_COVER_H = CARD_H + 6;
+const COVER_EPSILON = 0.5;
 
 function shuffle<T>(items: T[]) {
   const copy = [...items];
@@ -132,6 +135,7 @@ export class FruitGame implements GameControls {
   private magnetLeft = 1;
   private wildLeft = 1;
   private bubbleLeft = 1;
+  private sunLeft = 1;
   private aimX: number | null = null;
   private chainLayer = new Container();
   private mutator: WaveMutator = rollMutator(1);
@@ -175,6 +179,7 @@ export class FruitGame implements GameControls {
     if ((upgrades.pack || 0) >= 1) this.shuffleLeft += 1;
     if ((upgrades.pack || 0) >= 2) this.hammerLeft += 1;
     if ((upgrades.pack || 0) >= 3) this.wildLeft += 1;
+    this.sunLeft += Math.min(2, upgrades.sun || 0);
     this.feverEnergy = [0, 20, 35, 50][Math.min(3, upgrades.fever || 0)];
     this.dangerLimit += 0.3 * Math.min(3, upgrades.danger || 0);
     if (this.mode !== "story") this.mutator = rollMutator(this.wave);
@@ -309,7 +314,7 @@ export class FruitGame implements GameControls {
   private drawScene() {
     const background = new Graphics()
       .rect(0, 0, WORLD.width, WORLD.height)
-      .fill({ color: 0x130b28 });
+      .fill({ color: 0x1c1240 });
     this.ambientLayer.addChild(background);
 
     const haloA = new Graphics()
@@ -347,8 +352,8 @@ export class FruitGame implements GameControls {
         WORLD.stack.height,
         30,
       )
-      .fill({ color: 0x211443, alpha: 0.72 })
-      .stroke({ color: 0xa56cff, alpha: 0.25, width: 1.5 });
+      .fill({ color: 0x352268, alpha: 0.78 })
+      .stroke({ color: 0xc79cff, alpha: 0.42, width: 1.5 });
     const trayPanel = new Graphics()
       .roundRect(
         WORLD.tray.x,
@@ -357,8 +362,8 @@ export class FruitGame implements GameControls {
         WORLD.tray.height,
         22,
       )
-      .fill({ color: 0x241647, alpha: 0.94 })
-      .stroke({ color: 0xff5fa2, alpha: 0.35, width: 1.5 });
+      .fill({ color: 0x3b245f, alpha: 0.96 })
+      .stroke({ color: 0xff86bd, alpha: 0.55, width: 1.5 });
     const boxPanel = new Graphics()
       .roundRect(
         WORLD.box.x,
@@ -367,8 +372,8 @@ export class FruitGame implements GameControls {
         WORLD.box.height,
         28,
       )
-      .fill({ color: 0x0d1731, alpha: 0.72 })
-      .stroke({ color: 0x46ddff, alpha: 0.42, width: 2 });
+      .fill({ color: 0x16345d, alpha: 0.78 })
+      .stroke({ color: 0x72e9ff, alpha: 0.62, width: 2 });
     const danger = new Graphics()
       .moveTo(WORLD.box.x + 14, WORLD.dangerY)
       .lineTo(WORLD.box.x + WORLD.box.width - 14, WORLD.dangerY)
@@ -486,7 +491,7 @@ export class FruitGame implements GameControls {
       )
       .fill({ color: 0xffffff, alpha: 0.001 });
     dropTarget.eventMode = "static";
-    dropTarget.cursor = "crosshair";
+    dropTarget.cursor = "grab";
     // 有待投水果:按住拖动瞄准、松手投放;没有:点箱内水果戳它一把
     dropTarget.on("pointerdown", (event: FederatedPointerEvent) => {
       if (this.status !== "playing" || this.paused) return;
@@ -576,7 +581,7 @@ export class FruitGame implements GameControls {
     }
   }
 
-  // 戳一戳:朝最近的同级伙伴推一把,没有伙伴就原地向上蹦
+  // 戳一戳只做横向滚动；向上弹跳只保留给合成后诞生的新水果。
   private pokeFruit(x: number, y: number) {
     const node = [...this.fruits.values()].find(
       (fruit) =>
@@ -615,8 +620,9 @@ export class FruitGame implements GameControls {
         : 1;
     Body.setVelocity(node.body, {
       x: node.body.velocity.x + direction * 3 * force,
-      y: node.body.velocity.y - 3.6 * force,
+      y: Math.max(0, node.body.velocity.y),
     });
+    Body.setAngularVelocity(node.body, direction * 0.08 * force);
     this.ring(
       node.body.position.x,
       node.body.position.y,
@@ -693,9 +699,15 @@ export class FruitGame implements GameControls {
         ({ slot }) =>
           !slots.some((other) => {
             if (other.layer <= slot.layer) return false;
-            const overlapX = Math.max(0, CARD_W - Math.abs(other.x - slot.x));
-            const overlapY = Math.max(0, CARD_H - Math.abs(other.y - slot.y));
-            return overlapX * overlapY > 300;
+            const overlapX = Math.max(
+              0,
+              CARD_COVER_W - Math.abs(other.x - slot.x),
+            );
+            const overlapY = Math.max(
+              0,
+              CARD_COVER_H - Math.abs(other.y - slot.y),
+            );
+            return overlapX > COVER_EPSILON && overlapY > COVER_EPSILON;
           }),
       )
       .map(({ index }) => index);
@@ -822,16 +834,16 @@ export class FruitGame implements GameControls {
       slot.x += globalDx + layerDrift.dx + (Math.random() - 0.5) * 22;
       slot.y += globalDy + layerDrift.dy + (Math.random() - 0.5) * 20;
     });
-    // 同层挤在一起的卡位沿重叠较小的轴推开,保证同层卡牌彼此可辨认
-    for (let pass = 0; pass < 4; pass += 1) {
+    // 同层牌不允许互相压住；真正的遮挡只来自更高层。
+    for (let pass = 0; pass < 6; pass += 1) {
       let moved = false;
       for (let a = 0; a < slots.length; a += 1)
         for (let b = a + 1; b < slots.length; b += 1) {
           const first = slots[a];
           const second = slots[b];
           if (first.layer !== second.layer) continue;
-          const overlapX = CARD_W - 10 - Math.abs(first.x - second.x);
-          const overlapY = CARD_H - 10 - Math.abs(first.y - second.y);
+          const overlapX = CARD_W + 2 - Math.abs(first.x - second.x);
+          const overlapY = CARD_H + 2 - Math.abs(first.y - second.y);
           if (overlapX <= 0 || overlapY <= 0) continue;
           moved = true;
           if (overlapX < overlapY) {
@@ -864,6 +876,9 @@ export class FruitGame implements GameControls {
     const glow = new Graphics()
       .roundRect(-CARD_W / 2 - 2, -CARD_H / 2 - 2, CARD_W + 4, CARD_H + 4, 17)
       .fill({ color: fruit.glow, alpha: 0.15 });
+    const edge = new Graphics()
+      .roundRect(-CARD_W / 2, -CARD_H / 2 + 3, CARD_W, CARD_H, 15)
+      .fill({ color: fruit.color, alpha: 0.72 });
     const face = new Graphics()
       .roundRect(-CARD_W / 2, -CARD_H / 2, CARD_W, CARD_H, 15)
       .fill({ color: 0xfff7ed })
@@ -886,7 +901,7 @@ export class FruitGame implements GameControls {
       .fill({ color: 0x140b2c, alpha: 0.66 });
     shade.label = "shade";
     shade.visible = false;
-    view.addChild(shadow, glow, face, sheen, emoji, shade);
+    view.addChild(shadow, glow, edge, face, sheen, emoji, shade);
     if (special === "frozen") {
       const lock = new Text({ text: "❄", style: { fontSize: 13 } });
       lock.anchor.set(0.5);
@@ -919,10 +934,16 @@ export class FruitGame implements GameControls {
     return this.cards.some((other) => {
       if (!other.active || other.layer <= card.layer || other.id === card.id)
         return false;
-      const overlapX = Math.max(0, CARD_W - Math.abs(other.x - card.x));
-      const overlapY = Math.max(0, CARD_H - Math.abs(other.y - card.y));
-      // 布局最小的刻意遮盖(dx36+dy38 双向半错位)约 616,擦边接触 <240
-      return overlapX * overlapY > 300;
+      const overlapX = Math.max(
+        0,
+        CARD_COVER_W - Math.abs(other.x - card.x),
+      );
+      const overlapY = Math.max(
+        0,
+        CARD_COVER_H - Math.abs(other.y - card.y),
+      );
+      // 上层牌只要真实压住就锁住下层牌，避免露出一点边角时误点。
+      return overlapX > COVER_EPSILON && overlapY > COVER_EPSILON;
     });
   }
 
@@ -1127,6 +1148,7 @@ export class FruitGame implements GameControls {
     }
     if (this.wave % 4 === 0) this.wildLeft += 1;
     if (this.wave % 5 === 0) this.bubbleLeft += 1;
+    if (this.wave % 6 === 0) this.sunLeft += 1;
     this.callbacks.onToast(
       `∞ 第 ${this.wave} 波 · ${this.mutator.icon} ${this.mutator.name}`,
       "gold",
@@ -1188,7 +1210,7 @@ export class FruitGame implements GameControls {
     this.renderDropPreview();
     if (wasEmpty) {
       this.callbacks.onToast(
-        `获得 ${FRUITS[tier].emoji} · 点击果箱选择落点`,
+        `获得 ${FRUITS[tier].emoji} · 点一下或拖动投放`,
         "gold",
       );
       this.scheduleAutoDrop();
@@ -1222,29 +1244,33 @@ export class FruitGame implements GameControls {
     );
     const guide = new Graphics()
       .moveTo(0, 0)
-      .lineTo(0, aiming ? WORLD.box.height - 44 : 52)
+      .lineTo(0, WORLD.box.height - 44)
       .stroke({
         color: FRUITS[tier].glow,
-        alpha: aiming ? 0.42 : 0.7,
+        alpha: 0.42,
         width: 2,
       });
     guide.position.set(x, WORLD.box.y + 22);
     guide.blendMode = "add";
-    const halo = new Graphics()
-      .circle(0, 0, radius + 9)
-      .fill({ color: FRUITS[tier].glow, alpha: 0.2 })
-      .stroke({ color: 0xffffff, alpha: 0.7, width: 1.5 });
-    halo.position.set(x, WORLD.box.y + 27);
+    guide.visible = aiming;
     const emoji = new Text({
       text: FRUITS[tier].emoji,
-      style: { fontSize: Math.max(21, radius * 1.08) },
+      style: {
+        fontSize: Math.max(21, radius * 1.08),
+        dropShadow: {
+          color: FRUITS[tier].glow,
+          alpha: 0.8,
+          blur: 8,
+          distance: 0,
+        },
+      },
     });
     emoji.anchor.set(0.5);
-    emoji.position.copyFrom(halo.position);
+    emoji.position.set(x, WORLD.box.y + 27);
     const hint = new Text({
       text: aiming
         ? "松手投放"
-        : `按住果箱拖动瞄准  ${FRUITS[tier].emoji}${this.pendingDrops.length > 1 ? `  ×${this.pendingDrops.length}` : ""}`,
+        : `点一下或拖动  ${this.pendingDrops.length > 1 ? `待投 ×${this.pendingDrops.length}` : "投放"}`,
       style: {
         fontFamily: "system-ui",
         fontSize: 10,
@@ -1255,7 +1281,7 @@ export class FruitGame implements GameControls {
     });
     hint.anchor.set(0.5);
     hint.position.set(WORLD.width / 2, WORLD.box.y + 82);
-    this.dropPreviewLayer.addChild(guide, halo, emoji, hint);
+    this.dropPreviewLayer.addChild(guide, emoji, hint);
     // 排队中的后续水果缩略显示
     this.pendingDrops.slice(1, 5).forEach((queuedTier, index) => {
       const mini = new Text({
@@ -1305,7 +1331,7 @@ export class FruitGame implements GameControls {
     const definition = FRUITS[tier];
     const radius = this.fruitRadius(tier);
     const body = Bodies.circle(x, y, radius, {
-      restitution: 0.22,
+      restitution: 0.07,
       friction: 0.16,
       frictionAir: 0.008,
       density: 0.0012 + tier * 0.00008,
@@ -1632,7 +1658,7 @@ export class FruitGame implements GameControls {
             seconds) /
           60;
         const pullX = (dx / distance) * pull;
-        const pullY = (dy / distance) * pull * 0.3;
+        const pullY = 0;
         Body.setVelocity(first.body, {
           x: first.body.velocity.x + pullX,
           y: first.body.velocity.y + pullY,
@@ -1641,7 +1667,7 @@ export class FruitGame implements GameControls {
           x: second.body.velocity.x - pullX,
           y: second.body.velocity.y - pullY,
         });
-        // 被夹住或吸不动时:1.1s 后起跳翻越障碍,保证残局同级水果必然相遇
+        // 被夹住时改为强力横向滚动，不再自动向上跳。
         const stuck =
           Math.abs(first.body.velocity.x) + Math.abs(first.body.velocity.y) <
             0.67 &&
@@ -1652,12 +1678,12 @@ export class FruitGame implements GameControls {
           plugin.pairT = (plugin.pairT || 0) + seconds;
           if (plugin.pairT > 1.1) {
             plugin.pairT = 0;
-            const radius = this.fruitRadius(first.tier);
             const direction = dx > 0 ? 1 : -1;
             Body.setVelocity(first.body, {
-              x: (direction * (110 + distance * 0.9)) / 60,
-              y: -(420 + radius * 7 + Math.random() * 80) / 60,
+              x: (direction * (210 + distance * 1.1)) / 60,
+              y: Math.max(0, first.body.velocity.y),
             });
+            Body.setAngularVelocity(first.body, direction * 0.12);
           }
         } else {
           plugin.pairT = 0;
@@ -1797,6 +1823,7 @@ export class FruitGame implements GameControls {
       magnetLeft: this.magnetLeft,
       wildLeft: this.wildLeft,
       bubbleLeft: this.bubbleLeft,
+      sunLeft: this.sunLeft,
       wave: this.wave,
       mode: this.mode,
       relics: [...this.relics],
@@ -1990,6 +2017,39 @@ export class FruitGame implements GameControls {
     this.burst(WORLD.width / 2, WORLD.tray.y + 30, 0x8be9fd, 30);
     this.callbacks.onToast(`🫧 弹出 ${ordered.length} 张`, "cyan");
     haptic([12, 25, 12]);
+    this.emitSnapshot();
+  };
+
+  // 阳光净化:一次清掉整副牌堆上的冰晶和藤蔓，不改变牌序与遮挡关系。
+  sunshine = () => {
+    if (this.paused || this.status !== "playing" || this.sunLeft <= 0) return;
+    const obstacles = this.cards.filter(
+      (card) =>
+        card.active &&
+        (card.locked || card.special === "frozen" || card.special === "vine"),
+    );
+    if (obstacles.length === 0) {
+      this.callbacks.onToast("牌堆里没有冰晶或藤蔓", "cyan");
+      return;
+    }
+    this.sunLeft -= 1;
+    obstacles.forEach((card, index) => {
+      card.locked = false;
+      card.special = "normal";
+      card.view.getChildByLabel("lock")?.destroy();
+      card.view.getChildByLabel("special-icon")?.destroy();
+      if (index < 12) this.burst(card.x, card.y, 0xffe878, 8);
+    });
+    this.updateCardAccess();
+    this.burst(
+      WORLD.width / 2,
+      WORLD.stack.y + WORLD.stack.height / 2,
+      0xffe878,
+      42,
+    );
+    this.ring(WORLD.width / 2, WORLD.stack.y + 160, 0xfff5b5, 1.25);
+    this.callbacks.onToast(`☀️ 净化 ${obstacles.length} 张障碍牌`, "gold");
+    haptic([16, 28, 16]);
     this.emitSnapshot();
   };
 

@@ -148,7 +148,7 @@ export const MODE_INFO: Record<
   story: {
     icon: "🗺️",
     name: "闯关模式",
-    tagline: "14 关，逐关合成果王",
+    tagline: "16 关，逐关合成果王",
   },
   endless: {
     icon: "∞",
@@ -196,7 +196,13 @@ export function rollMutator(wave: number): WaveMutator {
 }
 
 // 果园温室:果币购买的跨局永久成长
-export type UpgradeId = "pack" | "fever" | "danger" | "coin" | "relic_start";
+export type UpgradeId =
+  | "pack"
+  | "fever"
+  | "danger"
+  | "coin"
+  | "sun"
+  | "relic_start";
 
 export type UpgradeDefinition = {
   id: UpgradeId;
@@ -247,6 +253,14 @@ export const UPGRADES: UpgradeDefinition[] = [
     maxLevel: 3,
     costs: [120, 300, 620],
     describe: (level) => (level ? `结算果币 +${level * 20}%` : "未装备"),
+  },
+  {
+    id: "sun",
+    icon: "☀️",
+    name: "暖棚日光",
+    maxLevel: 2,
+    costs: [180, 460],
+    describe: (level) => (level ? `开局阳光净化 +${level}` : "未装备"),
   },
   {
     id: "relic_start",
