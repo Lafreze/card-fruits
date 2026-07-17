@@ -10,15 +10,18 @@ import type { FruitGame } from "./game/FruitGame";
 import {
   MODE_INFO,
   RELICS,
+  UPGRADES,
   pickRelics,
   type GameMode,
   type RelicDefinition,
   type RelicId,
+  type UpgradeId,
 } from "./game/modes";
 import type {
   GameControls,
   GameResult,
   GameSnapshot,
+  GameUpgrades,
 } from "./game/types";
 
 type Screen = "home" | "game";
@@ -42,9 +45,13 @@ const EMPTY_SNAPSHOT: GameSnapshot = {
   juiceLeft: 1,
   hammerLeft: 1,
   magnetLeft: 1,
+  wildLeft: 1,
   wave: 1,
   mode: "story",
   relics: [],
+  feverEnergy: 0,
+  feverActive: false,
+  mutator: "",
 };
 
 function readProgress() {
@@ -52,6 +59,54 @@ function readProgress() {
   return Number.isFinite(stored)
     ? Math.max(0, Math.min(stored, LEVELS.length - 1))
     : 0;
+}
+
+type UpgradeLevels = Record<UpgradeId, number>;
+
+function readCoins() {
+  const stored = Number(localStorage.getItem("fruit-king-coins") || 0);
+  return Number.isFinite(stored) ? Math.max(0, Math.floor(stored)) : 0;
+}
+
+function readUpgrades(): UpgradeLevels {
+  const empty: UpgradeLevels = {
+    pack: 0,
+    fever: 0,
+    danger: 0,
+    coin: 0,
+    relic_start: 0,
+  };
+  try {
+    const stored = JSON.parse(
+      localStorage.getItem("fruit-king-upgrades") || "{}",
+    ) as Partial<Record<UpgradeId, number>>;
+    for (const definition of UPGRADES) {
+      const level = Number(stored[definition.id] || 0);
+      empty[definition.id] = Number.isFinite(level)
+        ? Math.max(0, Math.min(definition.maxLevel, Math.floor(level)))
+        : 0;
+    }
+  } catch {
+    /* 损坏数据回退为全 0 */
+  }
+  return empty;
+}
+
+// 结算果币:分数 + 进度里程,受果币磁铁升级与果币雨奇物加成
+function computeCoinReward(result: GameResult, upgrades: UpgradeLevels) {
+  const progress =
+    result.mode === "endless"
+      ? result.wave * 12
+      : result.mode === "expedition"
+        ? result.wave * 18
+        : 0;
+  const base =
+    Math.floor(result.score / 800) +
+    progress +
+    (result.status === "won" ? 30 : 10);
+  const bonus =
+    (1 + 0.2 * upgrades.coin) * (result.relics.includes("gold_rain") ? 1.5 : 1);
+  return Math.max(1, Math.round(base * bonus));
 }
 
 function formatScore(value: number) {
@@ -64,6 +119,7 @@ function GameCanvas({
   wave,
   relics,
   startingScore,
+  upgrades,
   session,
   onReady,
   onSnapshot,
@@ -75,6 +131,7 @@ function GameCanvas({
   wave: number;
   relics: RelicId[];
   startingScore: number;
+  upgrades: GameUpgrades;
   session: number;
   onReady: (controls: GameControls | null) => void;
   onSnapshot: (snapshot: GameSnapshot) => void;
@@ -91,7 +148,7 @@ function GameCanvas({
       .then(({ FruitGame: Game }) =>
         Game.create(
           canvasRef.current!,
-          { level, mode, wave, relics, startingScore },
+          { level, mode, wave, relics, startingScore, upgrades },
           { onSnapshot, onFinish, onToast },
         ),
       )
@@ -111,7 +168,18 @@ function GameCanvas({
       onReady(null);
       game?.destroy();
     };
-  }, [level, mode, onFinish, onReady, onSnapshot, onToast, relics, session, startingScore, wave]);
+  }, [
+    level,
+    mode,
+    onFinish,
+    onReady,
+    onSnapshot,
+    onToast,
+    relics,
+    session,
+    upgrades,
+    wave,
+  ]);
 
   return (
     <canvas
@@ -191,7 +259,8 @@ function Leaderboard({
                     ? `第 ${entry.level + 1} 关`
                     : mode === "endless"
                       ? `第 ${entry.level} 波`
-                      : `远征路线 ${entry.level + 1}`} · 最高{" "}
+                      : `远征路线 ${entry.level + 1}`}{" "}
+                  · 最高{" "}
                   {FRUITS[Math.min(entry.fruitTier, FRUITS.length - 1)].emoji} ·{" "}
                   {entry.maxCombo} 连击
                 </small>
@@ -237,8 +306,41 @@ export default function App() {
   const [relics, setRelics] = useState<RelicId[]>([]);
   const [carryScore, setCarryScore] = useState(0);
   const [rewardOptions, setRewardOptions] = useState<RelicDefinition[]>([]);
+  const [coins, setCoins] = useState(readCoins);
+  const [upgrades, setUpgrades] = useState<UpgradeLevels>(readUpgrades);
+  const [shopOpen, setShopOpen] = useState(false);
+  const [lastCoinReward, setLastCoinReward] = useState(0);
   const controlsRef = useRef<GameControls | null>(null);
   const toastTimer = useRef<number | null>(null);
+  // 传给游戏内核的成长加成(对象引用保持稳定,避免重建游戏)
+  const gameUpgrades = useRef<GameUpgrades>({
+    pack: upgrades.pack,
+    fever: upgrades.fever,
+    danger: upgrades.danger,
+  });
+
+  const persistCoins = useCallback((next: number) => {
+    localStorage.setItem("fruit-king-coins", String(next));
+    setCoins(next);
+  }, []);
+
+  const buyUpgrade = (id: UpgradeId) => {
+    const definition = UPGRADES.find((item) => item.id === id);
+    if (!definition) return;
+    const currentLevel = upgrades[id];
+    if (currentLevel >= definition.maxLevel) return;
+    const cost = definition.costs[currentLevel];
+    if (coins < cost) return;
+    const nextUpgrades = { ...upgrades, [id]: currentLevel + 1 };
+    localStorage.setItem("fruit-king-upgrades", JSON.stringify(nextUpgrades));
+    setUpgrades(nextUpgrades);
+    persistCoins(coins - cost);
+    gameUpgrades.current = {
+      pack: nextUpgrades.pack,
+      fever: nextUpgrades.fever,
+      danger: nextUpgrades.danger,
+    };
+  };
 
   const handleReady = useCallback((controls: GameControls | null) => {
     controlsRef.current = controls;
@@ -258,13 +360,16 @@ export default function App() {
   const handleFinish = useCallback(
     (next: GameResult) => {
       setResult(next);
+      const reward = computeCoinReward(next, readUpgrades());
+      setLastCoinReward(reward);
+      persistCoins(readCoins() + reward);
       if (next.status === "won") {
         if (mode === "story") persistUnlocked(level + 1);
-        if (mode === "expedition" && relics.length < 7)
+        if (mode === "expedition" && next.wave < 8)
           setRewardOptions(pickRelics(relics));
       }
     },
-    [level, mode, persistUnlocked, relics],
+    [level, mode, persistCoins, persistUnlocked, relics],
   );
   const handleToast = useCallback(
     (message: string, tone: "gold" | "pink" | "cyan" = "pink") => {
@@ -298,7 +403,10 @@ export default function App() {
       setRunId(null);
       setScreen("game");
       setSession((value) => value + 1);
-      void startRun(targetMode, targetMode === "endless" ? nextWave : targetLevel)
+      void startRun(
+        targetMode,
+        targetMode === "endless" ? nextWave : targetLevel,
+      )
         .then(({ runId: id }) => setRunId(id))
         .catch(() => setRunId(null));
     },
@@ -306,8 +414,16 @@ export default function App() {
   );
 
   const startSelectedMode = () => {
-    if (mode === "story") beginGame(level, "story");
-    else beginGame(0, mode, { wave: 1, relics: [], score: 0 });
+    if (mode === "story") {
+      beginGame(level, "story");
+      return;
+    }
+    // 远征福袋:远征开局自带 1 件随机奇物
+    const startingRelics =
+      mode === "expedition" && upgrades.relic_start >= 1
+        ? pickRelics([], 1).map((relic) => relic.id)
+        : [];
+    beginGame(0, mode, { wave: 1, relics: startingRelics, score: 0 });
   };
 
   const backHome = () => {
@@ -328,7 +444,11 @@ export default function App() {
       beginGame(nextLevel, "story");
       return;
     }
-    beginGame(0, mode, { wave: 1, relics: [], score: 0 });
+    const startingRelics =
+      mode === "expedition" && upgrades.relic_start >= 1
+        ? pickRelics([], 1).map((relic) => relic.id)
+        : [];
+    beginGame(0, mode, { wave: 1, relics: startingRelics, score: 0 });
   };
 
   const chooseRelic = (relic: RelicId) => {
@@ -342,17 +462,20 @@ export default function App() {
     });
   };
 
-  const loadLeaderboard = useCallback((selectedMode = leaderboardMode) => {
-    setLeaderboardLoading(true);
-    setLeaderboardOffline(false);
-    void getLeaderboard(selectedMode)
-      .then((data) => {
-        setLeaderboard(data.scores);
-        setLeaderboardOffline(Boolean(data.offline));
-      })
-      .catch(() => setLeaderboardOffline(true))
-      .finally(() => setLeaderboardLoading(false));
-  }, [leaderboardMode]);
+  const loadLeaderboard = useCallback(
+    (selectedMode = leaderboardMode) => {
+      setLeaderboardLoading(true);
+      setLeaderboardOffline(false);
+      void getLeaderboard(selectedMode)
+        .then((data) => {
+          setLeaderboard(data.scores);
+          setLeaderboardOffline(Boolean(data.offline));
+        })
+        .catch(() => setLeaderboardOffline(true))
+        .finally(() => setLeaderboardLoading(false));
+    },
+    [leaderboardMode],
+  );
 
   const openLeaderboard = () => {
     setLeaderboardMode(mode);
@@ -433,7 +556,11 @@ export default function App() {
             <div className="mode-topline">
               <span>{MODE_INFO[mode].name}</span>
               <b>
-                {mode === "story" ? unlocked + 1 : mode === "endless" ? "∞" : "ROGUE"}
+                {mode === "story"
+                  ? unlocked + 1
+                  : mode === "endless"
+                    ? "∞"
+                    : "ROGUE"}
                 {mode === "story" ? <small> / {LEVELS.length}</small> : null}
               </b>
             </div>
@@ -460,25 +587,45 @@ export default function App() {
               </span>
               <span>
                 <small>
-                  {mode === "story" ? `第 ${level + 1} 关` : mode === "endless" ? "无限波次" : "随机远征"}
+                  {mode === "story"
+                    ? `第 ${level + 1} 关`
+                    : mode === "endless"
+                      ? "无限波次"
+                      : "随机远征"}
                 </small>
                 <strong>
                   {mode === "story"
                     ? LEVELS[level].name
                     : mode === "endless"
                       ? "双果王 · 彩虹清场"
-                      : "每关三选一奇物"}
+                      : "每段三选一奇物"}
                 </strong>
               </span>
               <span className="mission-target">
-                {mode === "story" ? "目标" : mode === "endless" ? "生存" : "构筑"}
+                {mode === "story"
+                  ? "目标"
+                  : mode === "endless"
+                    ? "生存"
+                    : "构筑"}
                 <br />
-                <b>{mode === "story" ? target.name : mode === "endless" ? "最高分" : "8 种奇物"}</b>
+                <b>
+                  {mode === "story"
+                    ? target.name
+                    : mode === "endless"
+                      ? "最高分"
+                      : "16 种奇物"}
+                </b>
               </span>
             </div>
           </div>
           <button className="button button-play" onClick={startSelectedMode}>
-            <span>{mode === "story" ? "开始挑战" : mode === "endless" ? "进入无尽" : "开始远征"}</span>
+            <span>
+              {mode === "story"
+                ? "开始挑战"
+                : mode === "endless"
+                  ? "进入无尽"
+                  : "开始远征"}
+            </span>
             <i>▶</i>
           </button>
           <div className="special-legend">
@@ -486,9 +633,17 @@ export default function App() {
             <span>💣 爆炸连取</span>
             <span>🌿 点击剪藤</span>
           </div>
-          <button className="leaderboard-link" onClick={openLeaderboard}>
-            <span>🏆</span> 全球排行榜
-          </button>
+          <div className="home-links">
+            <button className="leaderboard-link" onClick={openLeaderboard}>
+              <span>🏆</span> 全球排行榜
+            </button>
+            <button
+              className="leaderboard-link"
+              onClick={() => setShopOpen(true)}
+            >
+              <span>🏡</span> 果园温室 · 🪙{formatScore(coins)}
+            </button>
+          </div>
           <div className="how-to">
             <div>
               <b>01</b>
@@ -547,6 +702,7 @@ export default function App() {
               wave={wave}
               relics={relics}
               startingScore={carryScore}
+              upgrades={gameUpgrades.current}
               session={session}
               onReady={handleReady}
               onSnapshot={handleSnapshot}
@@ -563,9 +719,15 @@ export default function App() {
               </button>
               <div className="level-chip">
                 <small>
-                  {mode === "story" ? `LEVEL ${level + 1}` : mode === "endless" ? `WAVE ${snapshot.wave}` : `ROUTE ${wave}`}
+                  {mode === "story"
+                    ? `LEVEL ${level + 1}`
+                    : mode === "endless"
+                      ? `WAVE ${snapshot.wave}`
+                      : `ROUTE ${wave}`}
                 </small>
-                <strong>{mode === "story" ? LEVELS[level].name : MODE_INFO[mode].name}</strong>
+                <strong>
+                  {mode === "story" ? LEVELS[level].name : MODE_INFO[mode].name}
+                </strong>
               </div>
               <div className="score-chip">
                 <small>SCORE</small>
@@ -575,7 +737,8 @@ export default function App() {
                 <small>{mode === "endless" ? "最大" : "目标"}</small>
                 <b>
                   {mode === "endless"
-                    ? FRUITS[Math.min(snapshot.maxFruitTier, FRUITS.length - 1)].emoji
+                    ? FRUITS[Math.min(snapshot.maxFruitTier, FRUITS.length - 1)]
+                        .emoji
                     : target.emoji}
                 </b>
               </div>
@@ -584,7 +747,11 @@ export default function App() {
               <div className="relic-strip">
                 {relics.map((id) => {
                   const relic = RELICS.find((item) => item.id === id);
-                  return relic ? <span key={id} title={relic.name}>{relic.icon}</span> : null;
+                  return relic ? (
+                    <span key={id} title={relic.name}>
+                      {relic.icon}
+                    </span>
+                  ) : null;
                 })}
               </div>
             ) : null}
@@ -629,7 +796,19 @@ export default function App() {
                 <span>合并</span>
                 <em>{snapshot.magnetLeft}</em>
               </button>
-              <button onClick={() => beginGame(level, mode, { wave, relics, score: carryScore })}>
+              <button
+                disabled={!snapshot.wildLeft}
+                onClick={() => controlsRef.current?.wild()}
+              >
+                <i>🍀</i>
+                <span>万能</span>
+                <em>{snapshot.wildLeft}</em>
+              </button>
+              <button
+                onClick={() =>
+                  beginGame(level, mode, { wave, relics, score: carryScore })
+                }
+              >
                 <i>↻</i>
                 <span>重开</span>
               </button>
@@ -650,29 +829,33 @@ export default function App() {
                 <div className={`result-card result-${result.status}`}>
                   <div className="result-rays" />
                   <div className="result-emoji">
-                    {result.status === "won" ? target.emoji : mode === "endless" ? "∞" : "🍹"}
+                    {result.status === "won"
+                      ? target.emoji
+                      : mode === "endless"
+                        ? "∞"
+                        : "🍹"}
                   </div>
                   <div className="result-kicker">
                     {isRelicReward
                       ? "ROUTE CLEAR"
                       : mode === "expedition" && result.status === "won"
                         ? "EXPEDITION CLEAR"
-                      : mode === "endless"
-                        ? `ENDLESS WAVE ${result.wave}`
-                        : result.status === "won"
-                          ? "LEVEL CLEAR"
-                          : "JUICE BREAK"}
+                        : mode === "endless"
+                          ? `ENDLESS WAVE ${result.wave}`
+                          : result.status === "won"
+                            ? "LEVEL CLEAR"
+                            : "JUICE BREAK"}
                   </div>
                   <h2>
                     {isRelicReward
                       ? "选择一件奇物"
                       : mode === "expedition" && result.status === "won"
                         ? "远征完成！"
-                      : mode === "endless"
-                        ? "无尽狂欢结算"
-                        : result.status === "won"
-                          ? "甜度通关！"
-                          : "差一点就合成了"}
+                        : mode === "endless"
+                          ? "无尽狂欢结算"
+                          : result.status === "won"
+                            ? "甜度通关！"
+                            : "差一点就合成了"}
                   </h2>
                   <p>{result.reason}</p>
                   <div className="score-total">
@@ -701,6 +884,9 @@ export default function App() {
                       </b>
                     </span>
                   </div>
+                  <div className="coin-reward">
+                    🪙 +{formatScore(lastCoinReward)} 果币已存入温室
+                  </div>
                   {isRelicReward ? (
                     <div className="relic-choices">
                       {rewardOptions.map((relic) => (
@@ -710,80 +896,91 @@ export default function App() {
                           onClick={() => chooseRelic(relic.id)}
                         >
                           <i>{relic.icon}</i>
-                          <span><b>{relic.name}</b><small>{relic.description}</small></span>
+                          <span>
+                            <b>{relic.name}</b>
+                            <small>{relic.description}</small>
+                          </span>
                         </button>
                       ))}
                     </div>
                   ) : (
-                  <div className="save-box">
-                    {saveState === "saved" ? (
-                      <div className="saved-message">
-                        ✓ 战绩已进入全球排行榜
-                      </div>
-                    ) : (
-                      <>
-                        <label htmlFor="username">
-                          留下果王名号，保存本局分数
-                        </label>
-                        <div className="name-row">
-                          <input
-                            id="username"
-                            value={username}
-                            maxLength={20}
-                            placeholder="输入用户名"
-                            autoComplete="nickname"
-                            onChange={(event) =>
-                              setUsername(event.target.value)
-                            }
-                            onKeyDown={(event) => {
-                              if (event.key === "Enter") void submitScore();
-                            }}
-                          />
-                          <button
-                            disabled={
-                              !username.trim() ||
-                              saveState === "saving" ||
-                              !runId
-                            }
-                            onClick={() => void submitScore()}
-                          >
-                            {saveState === "saving" ? "保存中" : "保存"}
-                          </button>
+                    <div className="save-box">
+                      {saveState === "saved" ? (
+                        <div className="saved-message">
+                          ✓ 战绩已进入全球排行榜
                         </div>
-                        {!runId ? (
-                          <small className="save-note">
-                            排行榜连接中断，本局仍可继续挑战。
-                          </small>
-                        ) : null}
-                        {saveError ? (
-                          <small className="save-error">{saveError}</small>
-                        ) : null}
-                      </>
-                    )}
-                  </div>
+                      ) : (
+                        <>
+                          <label htmlFor="username">
+                            留下果王名号，保存本局分数
+                          </label>
+                          <div className="name-row">
+                            <input
+                              id="username"
+                              value={username}
+                              maxLength={20}
+                              placeholder="输入用户名"
+                              autoComplete="nickname"
+                              onChange={(event) =>
+                                setUsername(event.target.value)
+                              }
+                              onKeyDown={(event) => {
+                                if (event.key === "Enter") void submitScore();
+                              }}
+                            />
+                            <button
+                              disabled={
+                                !username.trim() ||
+                                saveState === "saving" ||
+                                !runId
+                              }
+                              onClick={() => void submitScore()}
+                            >
+                              {saveState === "saving" ? "保存中" : "保存"}
+                            </button>
+                          </div>
+                          {!runId ? (
+                            <small className="save-note">
+                              排行榜连接中断，本局仍可继续挑战。
+                            </small>
+                          ) : null}
+                          {saveError ? (
+                            <small className="save-error">{saveError}</small>
+                          ) : null}
+                        </>
+                      )}
+                    </div>
                   )}
                   {isRelicReward ? (
-                    <button className="button button-ghost result-home" onClick={backHome}>
+                    <button
+                      className="button button-ghost result-home"
+                      onClick={backHome}
+                    >
                       暂停远征并返回
                     </button>
                   ) : (
-                  <div className="result-actions">
-                    <button className="button button-ghost" onClick={backHome}>
-                      返回果园
-                    </button>
-                    <button
-                      className="button button-primary"
-                      onClick={continueGame}
-                    >
-                      {mode === "story" && result.status === "won" && level < LEVELS.length - 1
-                        ? "下一关"
-                        : mode === "expedition"
-                          ? "重新远征"
-                          : mode === "endless"
-                            ? "再战无尽"
-                            : "再来一局"}
-                    </button>
-                  </div>
+                    <div className="result-actions">
+                      <button
+                        className="button button-ghost"
+                        onClick={backHome}
+                      >
+                        返回果园
+                      </button>
+                      <button
+                        className="button button-primary"
+                        onClick={continueGame}
+                      >
+                        {mode === "story" &&
+                        result.status === "won" &&
+                        level < LEVELS.length - 1
+                          ? "下一关"
+                          : mode === "expedition"
+                            ? "重新远征"
+                            : mode === "endless"
+                              ? "再战无尽"
+                              : "再来一局"}
+                      </button>
+                    </div>
                   )}
                 </div>
               </div>
@@ -791,6 +988,63 @@ export default function App() {
           </div>
         </section>
       )}
+      {shopOpen ? (
+        <div
+          className="modal-backdrop"
+          role="dialog"
+          aria-modal="true"
+          aria-label="果园温室"
+        >
+          <section className="modal-card shop-card">
+            <div className="modal-kicker">ORCHARD GREENHOUSE</div>
+            <h2>果园温室</h2>
+            <p className="modal-copy">
+              每局结算都会攒下果币，在这里兑换跨局永久成长。
+            </p>
+            <div className="coin-balance">🪙 {formatScore(coins)}</div>
+            <div className="upgrade-list">
+              {UPGRADES.map((item) => {
+                const levelNow = upgrades[item.id];
+                const maxed = levelNow >= item.maxLevel;
+                const cost = maxed ? 0 : item.costs[levelNow];
+                return (
+                  <div className="upgrade-row" key={item.id}>
+                    <i>{item.icon}</i>
+                    <span className="upgrade-info">
+                      <b>
+                        {item.name}
+                        <small>
+                          {"●".repeat(levelNow)}
+                          {"○".repeat(item.maxLevel - levelNow)}
+                        </small>
+                      </b>
+                      <small>
+                        {maxed
+                          ? item.describe(levelNow)
+                          : `下一级：${item.describe(levelNow + 1)}`}
+                      </small>
+                    </span>
+                    <button
+                      disabled={maxed || coins < cost}
+                      onClick={() => buyUpgrade(item.id)}
+                    >
+                      {maxed ? "已满级" : `🪙 ${cost}`}
+                    </button>
+                  </div>
+                );
+              })}
+            </div>
+            <div className="modal-actions split-actions">
+              <button
+                className="button button-primary"
+                onClick={() => setShopOpen(false)}
+              >
+                返回果园
+              </button>
+            </div>
+          </section>
+        </div>
+      ) : null}
       {leaderboardOpen ? (
         <Leaderboard
           entries={leaderboard}

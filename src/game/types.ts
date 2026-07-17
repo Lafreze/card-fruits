@@ -16,9 +16,13 @@ export type GameSnapshot = {
   juiceLeft: number;
   hammerLeft: number;
   magnetLeft: number;
+  wildLeft: number;
   wave: number;
   mode: GameMode;
   relics: RelicId[];
+  feverEnergy: number;
+  feverActive: boolean;
+  mutator: string;
 };
 
 export type GameResult = GameSnapshot & {
@@ -32,12 +36,19 @@ export type GameCallbacks = {
   onToast: (message: string, tone?: "gold" | "pink" | "cyan") => void;
 };
 
+export type GameUpgrades = {
+  pack?: number;
+  fever?: number;
+  danger?: number;
+};
+
 export type GameOptions = {
   level: number;
   mode: GameMode;
   wave?: number;
   relics?: RelicId[];
   startingScore?: number;
+  upgrades?: GameUpgrades;
 };
 
 export type GameControls = {
@@ -46,6 +57,7 @@ export type GameControls = {
   juice: () => void;
   hammer: () => void;
   magnet: () => void;
+  wild: () => void;
   pause: () => void;
   resume: () => void;
   destroy: () => void;

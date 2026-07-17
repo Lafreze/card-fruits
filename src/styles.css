@@ -230,11 +230,18 @@ input:focus-visible {
   font-size: 10px;
   font-weight: 850;
 }
-.mode-switch button i { font-size: 16px; font-style: normal; }
+.mode-switch button i {
+  font-size: 16px;
+  font-style: normal;
+}
 .mode-switch button.active {
   color: #fff;
   border-color: rgba(255, 216, 94, 0.55);
-  background: linear-gradient(135deg, rgba(129, 73, 226, 0.75), rgba(255, 58, 137, 0.56));
+  background: linear-gradient(
+    135deg,
+    rgba(129, 73, 226, 0.75),
+    rgba(255, 58, 137, 0.56)
+  );
   box-shadow: 0 7px 22px rgba(106, 46, 204, 0.25);
 }
 .mode-description {
@@ -408,6 +415,11 @@ input:focus-visible {
   font-size: 10px;
   font-style: normal;
   background: rgba(255, 255, 255, 0.2);
+}
+.home-links {
+  display: flex;
+  align-items: center;
+  gap: 22px;
 }
 .leaderboard-link {
   margin: 15px 0 12px;
@@ -618,13 +630,15 @@ input:focus-visible {
   flex: 1;
   min-width: 0;
   padding: 0;
+  position: relative;
   display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 2px;
-  gap: 0.45cqw;
+  gap: 0;
   border: 1px solid rgba(195, 159, 255, 0.25);
-  border-radius: 999px;
+  border-radius: 12px;
+  border-radius: 2.8cqw;
   color: #f8f1ff;
   background: rgba(35, 20, 66, 0.9);
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.22);
@@ -639,15 +653,22 @@ input:focus-visible {
 }
 .power-dock i {
   font-style: normal;
-  font-size: 14px;
-  font-size: 3.3cqw;
+  font-size: 13px;
+  font-size: 3cqw;
+  line-height: 1.15;
 }
 .power-dock span {
   font-size: 8px;
-  font-size: 1.86cqw;
+  font-size: 1.75cqw;
   font-weight: 800;
+  line-height: 1.1;
 }
 .power-dock em {
+  position: absolute;
+  top: -4px;
+  top: -0.95cqw;
+  right: -3px;
+  right: -0.7cqw;
   min-width: 12px;
   min-width: 2.8cqw;
   height: 12px;
@@ -675,7 +696,9 @@ input:focus-visible {
   border-radius: 999px;
   background: rgba(20, 10, 43, 0.78);
 }
-.relic-strip span { font-size: 11px; }
+.relic-strip span {
+  font-size: 11px;
+}
 /* 连击标签悬在卡区(y402)与卡槽(y414)的接缝上,居中锚定不压格子 */
 .combo-pill {
   position: absolute;
@@ -962,15 +985,44 @@ input:focus-visible {
   text-align: left;
   cursor: pointer;
 }
-.relic-choice > i { width: 35px; font-size: 25px; font-style: normal; text-align: center; }
-.relic-choice span { display: flex; flex-direction: column; }
-.relic-choice b { font-size: 11px; }
-.relic-choice small { margin-top: 2px; color: #a99abc; font-size: 8px; line-height: 1.4; }
-.relic-choice:hover { transform: translateY(-1px); border-color: rgba(255, 216, 94, 0.45); }
-.relic-gold { box-shadow: inset 3px 0 #ffd85e; }
-.relic-pink { box-shadow: inset 3px 0 #ff4f9a; }
-.relic-cyan { box-shadow: inset 3px 0 #45dcff; }
-.result-home { width: 100%; min-height: 40px; border-radius: 12px; font-size: 11px; }
+.relic-choice > i {
+  width: 35px;
+  font-size: 25px;
+  font-style: normal;
+  text-align: center;
+}
+.relic-choice span {
+  display: flex;
+  flex-direction: column;
+}
+.relic-choice b {
+  font-size: 11px;
+}
+.relic-choice small {
+  margin-top: 2px;
+  color: #a99abc;
+  font-size: 8px;
+  line-height: 1.4;
+}
+.relic-choice:hover {
+  transform: translateY(-1px);
+  border-color: rgba(255, 216, 94, 0.45);
+}
+.relic-gold {
+  box-shadow: inset 3px 0 #ffd85e;
+}
+.relic-pink {
+  box-shadow: inset 3px 0 #ff4f9a;
+}
+.relic-cyan {
+  box-shadow: inset 3px 0 #45dcff;
+}
+.result-home {
+  width: 100%;
+  min-height: 40px;
+  border-radius: 12px;
+  font-size: 11px;
+}
 
 .leaderboard-tabs {
   display: grid;
@@ -980,10 +1032,10 @@ input:focus-visible {
 }
 .leaderboard-tabs button {
   padding: 8px 5px;
-  border: 1px solid rgba(255,255,255,.1);
+  border: 1px solid rgba(255, 255, 255, 0.1);
   border-radius: 11px;
   color: #9687aa;
-  background: rgba(255,255,255,.035);
+  background: rgba(255, 255, 255, 0.035);
   font-size: 9px;
   cursor: pointer;
 }
@@ -1085,6 +1137,82 @@ input:focus-visible {
 .split-actions {
   max-width: 330px;
   margin-left: auto;
+}
+
+/* 果园温室(永久成长商店) */
+.shop-card {
+  width: min(94vw, 470px);
+}
+.coin-balance {
+  margin: 4px 0 12px;
+  color: var(--gold);
+  font-size: 22px;
+  font-weight: 900;
+  font-variant-numeric: tabular-nums;
+}
+.upgrade-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 18px;
+}
+.upgrade-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+  border: 1px solid rgba(196, 156, 255, 0.14);
+  border-radius: 15px;
+  background: rgba(12, 8, 30, 0.5);
+}
+.upgrade-row > i {
+  font-size: 24px;
+  font-style: normal;
+}
+.upgrade-info {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.upgrade-info b {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+}
+.upgrade-info b small {
+  color: #ffd85e;
+  font-size: 9px;
+  letter-spacing: 2px;
+}
+.upgrade-info > small {
+  color: #9d8eba;
+  font-size: 10px;
+  line-height: 1.45;
+}
+.upgrade-row > button {
+  flex: 0 0 auto;
+  min-width: 74px;
+  padding: 8px 10px;
+  border: 0;
+  border-radius: 11px;
+  color: #2d1230;
+  background: linear-gradient(100deg, #ffdc69, #ff8d4b);
+  font-size: 11px;
+  font-weight: 900;
+  cursor: pointer;
+}
+.upgrade-row > button:disabled {
+  opacity: 0.38;
+  cursor: default;
+}
+.coin-reward {
+  margin: 9px 0 0;
+  color: #ffd85e;
+  font-size: 11px;
+  font-weight: 800;
 }
 
 @media (max-width: 800px) {

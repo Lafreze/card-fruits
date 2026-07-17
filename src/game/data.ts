@@ -25,18 +25,21 @@ export type LevelDefinition = {
   layout: LayoutBlock[];
 };
 
+// 15 级合成链:蓝莓→葡萄→樱桃→草莓→柠檬→猕猴桃→橙子→苹果→桃子→芒果→椰子→菠萝→哈密瓜→西瓜→黄金果王
 export const FRUITS: FruitDefinition[] = [
+  { name: "蓝莓", emoji: "🫐", radius: 8, color: 0x5c7cfa, glow: 0xa5b4ff },
   { name: "葡萄", emoji: "🍇", radius: 10, color: 0x9b5de5, glow: 0xd8b4fe },
   { name: "樱桃", emoji: "🍒", radius: 12, color: 0xef476f, glow: 0xff9bb1 },
   { name: "草莓", emoji: "🍓", radius: 15, color: 0xff4d6d, glow: 0xffb3c1 },
   { name: "柠檬", emoji: "🍋", radius: 18, color: 0xffd166, glow: 0xffef9f },
   { name: "猕猴桃", emoji: "🥝", radius: 21, color: 0x8ac926, glow: 0xc5f277 },
-  { name: "橙子", emoji: "🍊", radius: 25, color: 0xff9f1c, glow: 0xffc971 },
-  { name: "苹果", emoji: "🍎", radius: 29, color: 0xff595e, glow: 0xff9c9f },
-  { name: "桃子", emoji: "🍑", radius: 33, color: 0xff8fab, glow: 0xffc2d1 },
-  { name: "芒果", emoji: "🥭", radius: 38, color: 0xffb703, glow: 0xffd166 },
-  { name: "菠萝", emoji: "🍍", radius: 42, color: 0xf7c948, glow: 0xffe69a },
-  { name: "哈密瓜", emoji: "🍈", radius: 47, color: 0x90be6d, glow: 0xc7f9b5 },
+  { name: "橙子", emoji: "🍊", radius: 24, color: 0xff9f1c, glow: 0xffc971 },
+  { name: "苹果", emoji: "🍎", radius: 28, color: 0xff595e, glow: 0xff9c9f },
+  { name: "桃子", emoji: "🍑", radius: 32, color: 0xff8fab, glow: 0xffc2d1 },
+  { name: "芒果", emoji: "🥭", radius: 36, color: 0xffb703, glow: 0xffd166 },
+  { name: "椰子", emoji: "🥥", radius: 40, color: 0xa9805b, glow: 0xe6cfb0 },
+  { name: "菠萝", emoji: "🍍", radius: 44, color: 0xf7c948, glow: 0xffe69a },
+  { name: "哈密瓜", emoji: "🍈", radius: 48, color: 0x90be6d, glow: 0xc7f9b5 },
   { name: "西瓜", emoji: "🍉", radius: 53, color: 0x43aa8b, glow: 0x9bf6cf },
   {
     name: "黄金果王",
@@ -136,7 +139,7 @@ const HEAVY_BRICKS = [
   B(3, 215, 244, 3, 3, 84),
 ];
 
-// 第 9 关 · 36 张:深双塔 + 中央四层吊桥
+// 第 9 关 · 39 张:深双塔 + 中央四层吊桥 + 顶层三连
 const DEEP_TOWERS = [
   B(0, 120, 244, 2, 3),
   B(1, 120, 244, 1, 3),
@@ -152,9 +155,10 @@ const DEEP_TOWERS = [
   B(2, 215, 206, 1, 1),
   B(2, 215, 282, 1, 1),
   B(3, 215, 244, 1, 1),
+  B(4, 215, 244, 3, 1),
 ];
 
-// 第 10 关 · 36 张:十字圣坛 + 四角三叠哨塔 + 中心五层
+// 第 10 关 · 42 张:十字圣坛 + 四角三叠哨塔 + 中心六层
 const CROSS_ALTAR = [
   B(0, 215, 244, 5, 1),
   B(0, 215, 168, 1, 1),
@@ -179,9 +183,10 @@ const CROSS_ALTAR = [
   B(2, 311, 308, 1, 1),
   B(3, 215, 244, 2, 2),
   B(4, 215, 244, 1, 2),
+  B(5, 215, 244, 3, 2, 72, 66),
 ];
 
-// 第 11 关 · 36 张:六层横向瀑布,整板逐层向右半错位压叠
+// 第 11 关 · 45 张:六层横向瀑布 + 顶层九宫
 const CASCADE = [
   B(0, 143, 244, 2, 3, 72, 74),
   B(1, 179, 244, 2, 3, 72, 74),
@@ -189,9 +194,10 @@ const CASCADE = [
   B(3, 251, 244, 2, 3, 72, 74),
   B(4, 287, 244, 2, 3, 72, 74),
   B(5, 323, 244, 2, 3, 72, 74),
+  B(6, 215, 244, 3, 3, 72, 66),
 ];
 
-// 第 12 关 · 27 张:王冠——三座尖塔、两颗宝石、四层冠底
+// 第 12 关 · 48 张:王冠——三座尖塔、两颗宝石、四层冠底 + 双层冠心
 const CROWN = [
   B(0, 107, 196, 1, 1),
   B(1, 112, 190, 1, 1),
@@ -210,146 +216,109 @@ const CROWN = [
   B(2, 215, 308, 3, 1),
   B(3, 215, 289, 2, 1),
   B(4, 215, 299, 1, 1),
+  B(5, 215, 244, 5, 3, 72, 66),
+  B(6, 215, 244, 3, 2, 72, 66),
 ];
+
+// 每关都从蓝莓开始，并包含从 0 到目标前一级的完整合成阶梯。
+// 蓝莓至少提供两颗，其余每级至少一颗；多余卡位继续补蓝莓，确保逐级碰撞必达目标。
+function ladderCards(target: number, totalCards: number) {
+  const minimum = 3 * (target + 1);
+  const extra = totalCards - minimum;
+  if (extra < 0 || extra % 3 !== 0)
+    throw new Error(`关卡卡位 ${totalCards} 无法构成目标 ${target} 的完整阶梯`);
+  const cards = Array.from({ length: target }, (_, tier) => ({
+    tier,
+    count: tier === 0 ? 6 : 3,
+  }));
+  // 冗余三消组轮流分配到各级，避免满屏同一种水果；蓝莓仍至少两组，保证阶梯起步。
+  for (let group = 0; group < extra / 3; group += 1)
+    cards[group % target].count += 3;
+  return cards;
+}
 
 export const LEVELS: LevelDefinition[] = [
   {
     name: "晨露初甜",
-    target: 2,
-    cards: [
-      { tier: 0, count: 12 },
-      { tier: 1, count: 6 },
-    ],
+    target: 3,
+    cards: ladderCards(3, 18),
     specialRate: 0,
     layout: OPEN_MEADOW,
   },
   {
-    name: "莓好时光",
-    target: 3,
-    cards: [
-      { tier: 0, count: 9 },
-      { tier: 1, count: 9 },
-      { tier: 2, count: 6 },
-    ],
-    specialRate: 0,
+    name: "青柠电波",
+    target: 4,
+    cards: ladderCards(4, 24),
+    specialRate: 0.04,
     layout: BRICK_WALL,
   },
   {
-    name: "青柠电波",
-    target: 4,
-    cards: [
-      { tier: 0, count: 9 },
-      { tier: 1, count: 9 },
-      { tier: 2, count: 9 },
-      { tier: 3, count: 6 },
-    ],
+    name: "奇异风暴",
+    target: 5,
+    cards: ladderCards(5, 33),
     specialRate: 0.06,
     layout: PYRAMID,
   },
   {
     name: "橙光派对",
-    target: 5,
-    cards: [
-      { tier: 1, count: 9 },
-      { tier: 2, count: 9 },
-      { tier: 3, count: 9 },
-      { tier: 4, count: 6 },
-    ],
+    target: 6,
+    cards: ladderCards(6, 33),
     specialRate: 0.08,
     layout: TWIN_TOWERS,
   },
   {
     name: "苹果心跳",
-    target: 6,
-    cards: [
-      { tier: 2, count: 12 },
-      { tier: 3, count: 9 },
-      { tier: 4, count: 9 },
-      { tier: 5, count: 6 },
-    ],
+    target: 7,
+    cards: ladderCards(7, 36),
     specialRate: 0.1,
     layout: DIAMOND,
   },
   {
     name: "蜜桃星云",
-    target: 7,
-    cards: [
-      { tier: 3, count: 12 },
-      { tier: 4, count: 9 },
-      { tier: 5, count: 9 },
-      { tier: 6, count: 6 },
-    ],
+    target: 8,
+    cards: ladderCards(8, 36),
     specialRate: 0.12,
     layout: RING_WELL,
   },
   {
     name: "热带引力",
-    target: 8,
-    cards: [
-      { tier: 4, count: 12 },
-      { tier: 5, count: 9 },
-      { tier: 6, count: 9 },
-      { tier: 7, count: 6 },
-    ],
+    target: 9,
+    cards: ladderCards(9, 36),
     specialRate: 0.14,
     layout: GRAND_PYRAMID,
   },
   {
-    name: "菠萝脉冲",
-    target: 9,
-    cards: [
-      { tier: 5, count: 12 },
-      { tier: 6, count: 9 },
-      { tier: 7, count: 9 },
-      { tier: 8, count: 6 },
-    ],
+    name: "椰风海岸",
+    target: 10,
+    cards: ladderCards(10, 36),
     specialRate: 0.16,
     layout: HEAVY_BRICKS,
   },
   {
-    name: "瓜田月色",
-    target: 10,
-    cards: [
-      { tier: 6, count: 12 },
-      { tier: 7, count: 9 },
-      { tier: 8, count: 9 },
-      { tier: 9, count: 6 },
-    ],
+    name: "菠萝脉冲",
+    target: 11,
+    cards: ladderCards(11, 39),
     specialRate: 0.18,
     layout: DEEP_TOWERS,
   },
   {
-    name: "西瓜音浪",
-    target: 11,
-    cards: [
-      { tier: 7, count: 12 },
-      { tier: 8, count: 9 },
-      { tier: 9, count: 9 },
-      { tier: 10, count: 6 },
-    ],
+    name: "瓜田月色",
+    target: 12,
+    cards: ladderCards(12, 42),
     specialRate: 0.2,
     layout: CROSS_ALTAR,
   },
   {
-    name: "王冠前夜",
-    target: 12,
-    cards: [
-      { tier: 8, count: 12 },
-      { tier: 9, count: 9 },
-      { tier: 10, count: 9 },
-      { tier: 11, count: 6 },
-    ],
+    name: "西瓜音浪",
+    target: 13,
+    cards: ladderCards(13, 45),
     specialRate: 0.22,
     layout: CASCADE,
   },
   {
     name: "果王降临",
-    target: 12,
-    cards: [
-      { tier: 9, count: 12 },
-      { tier: 10, count: 9 },
-      { tier: 11, count: 6 },
-    ],
+    target: 14,
+    cards: ladderCards(14, 48),
     specialRate: 0.25,
     layout: CROWN,
   },
