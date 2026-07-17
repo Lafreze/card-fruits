@@ -79,6 +79,10 @@ function readUpgrades(): UpgradeLevels {
     danger: 0,
     coin: 0,
     sun: 0,
+    magnet: 0,
+    score: 0,
+    combo: 0,
+    sweet_start: 0,
     relic_start: 0,
   };
   try {
@@ -325,6 +329,10 @@ export default function App() {
     fever: upgrades.fever,
     danger: upgrades.danger,
     sun: upgrades.sun,
+    magnet: upgrades.magnet,
+    score: upgrades.score,
+    combo: upgrades.combo,
+    sweetStart: upgrades.sweet_start,
   });
 
   const persistCoins = useCallback((next: number) => {
@@ -349,6 +357,10 @@ export default function App() {
       fever: nextUpgrades.fever,
       danger: nextUpgrades.danger,
       sun: nextUpgrades.sun,
+      magnet: nextUpgrades.magnet,
+      score: nextUpgrades.score,
+      combo: nextUpgrades.combo,
+      sweetStart: nextUpgrades.sweet_start,
     };
   };
 
@@ -806,7 +818,9 @@ export default function App() {
                           disabled={!snapshot.undoLeft}
                           onClick={() => useTool((controls) => controls.undo())}
                         >
-                          <i>↶</i><span>撤回</span><em>×{snapshot.undoLeft}</em>
+                          <i>↶</i>
+                          <span>撤回</span>
+                          <em>×{snapshot.undoLeft}</em>
                         </button>
                         <button
                           disabled={!snapshot.shuffleLeft}
@@ -814,13 +828,19 @@ export default function App() {
                             useTool((controls) => controls.shuffle())
                           }
                         >
-                          <i>⤨</i><span>洗牌</span><em>×{snapshot.shuffleLeft}</em>
+                          <i>⤨</i>
+                          <span>洗牌</span>
+                          <em>×{snapshot.shuffleLeft}</em>
                         </button>
                         <button
                           disabled={!snapshot.juiceLeft}
-                          onClick={() => useTool((controls) => controls.juice())}
+                          onClick={() =>
+                            useTool((controls) => controls.juice())
+                          }
                         >
-                          <i>🥤</i><span>榨汁</span><em>×{snapshot.juiceLeft}</em>
+                          <i>🥤</i>
+                          <span>榨汁</span>
+                          <em>×{snapshot.juiceLeft}</em>
                         </button>
                         <button
                           disabled={!snapshot.hammerLeft}
@@ -828,7 +848,9 @@ export default function App() {
                             useTool((controls) => controls.hammer())
                           }
                         >
-                          <i>🔨</i><span>清顶</span><em>×{snapshot.hammerLeft}</em>
+                          <i>🔨</i>
+                          <span>清顶</span>
+                          <em>×{snapshot.hammerLeft}</em>
                         </button>
                         <button
                           disabled={!snapshot.magnetLeft}
@@ -836,13 +858,17 @@ export default function App() {
                             useTool((controls) => controls.magnet())
                           }
                         >
-                          <i>🧲</i><span>合并</span><em>×{snapshot.magnetLeft}</em>
+                          <i>🧲</i>
+                          <span>合并</span>
+                          <em>×{snapshot.magnetLeft}</em>
                         </button>
                         <button
                           disabled={!snapshot.wildLeft}
                           onClick={() => useTool((controls) => controls.wild())}
                         >
-                          <i>🍀</i><span>万能</span><em>×{snapshot.wildLeft}</em>
+                          <i>🍀</i>
+                          <span>万能</span>
+                          <em>×{snapshot.wildLeft}</em>
                         </button>
                         <button
                           disabled={!snapshot.bubbleLeft}
@@ -850,7 +876,9 @@ export default function App() {
                             useTool((controls) => controls.bubble())
                           }
                         >
-                          <i>🫧</i><span>清槽</span><em>×{snapshot.bubbleLeft}</em>
+                          <i>🫧</i>
+                          <span>清槽</span>
+                          <em>×{snapshot.bubbleLeft}</em>
                         </button>
                         <button
                           disabled={!snapshot.sunLeft}
@@ -858,7 +886,9 @@ export default function App() {
                             useTool((controls) => controls.sunshine())
                           }
                         >
-                          <i>☀️</i><span>净化</span><em>×{snapshot.sunLeft}</em>
+                          <i>☀️</i>
+                          <span>净化</span>
+                          <em>×{snapshot.sunLeft}</em>
                         </button>
                       </div>
                     </>
@@ -868,8 +898,13 @@ export default function App() {
                       <small>HOW TO PLAY</small>
                       <h2>玩法说明</h2>
                       <div className="help-flow" aria-label="玩法流程">
-                        <span>点亮卡</span><i>›</i><span>三张入槽</span><i>›</i>
-                        <span>水果掉落</span><i>›</i><span>同果合成</span>
+                        <span>点亮卡</span>
+                        <i>›</i>
+                        <span>三张入槽</span>
+                        <i>›</i>
+                        <span>水果掉落</span>
+                        <i>›</i>
+                        <span>同果合成</span>
                       </div>
                       <div className="help-rules">
                         <span>被压住的卡片不能选</span>
@@ -891,7 +926,10 @@ export default function App() {
                     <>
                       <small>MENU</small>
                       <h2>游戏菜单</h2>
-                      <button className="panel-primary" onClick={closeGamePanel}>
+                      <button
+                        className="panel-primary"
+                        onClick={closeGamePanel}
+                      >
                         继续游戏
                       </button>
                       <div className="panel-actions">

@@ -40,17 +40,11 @@ function isCovered(
 test("a lower card is locked by even a slight upper overlap", () => {
   const lower = { layer: 0, x: 100, y: 100 };
   assert.equal(
-    isCovered(lower, [
-      lower,
-      { layer: 1, x: 100 + CARD_WIDTH - 1, y: 100 },
-    ]),
+    isCovered(lower, [lower, { layer: 1, x: 100 + CARD_WIDTH - 1, y: 100 }]),
     true,
   );
   assert.equal(
-    isCovered(lower, [
-      lower,
-      { layer: 1, x: 100 + CARD_WIDTH, y: 100 },
-    ]),
+    isCovered(lower, [lower, { layer: 1, x: 100 + CARD_WIDTH, y: 100 }]),
     false,
   );
 });
@@ -72,12 +66,23 @@ test("all story levels have valid, playable layouts", () => {
     for (let tier = 0; tier < level.target; tier += 1)
       synthesis[tier + 1] += Math.floor(synthesis[tier] / 2);
 
-    assert.equal(slots.length, cardCount, `第 ${index + 1} 关卡位数必须等于卡片数`);
+    assert.equal(
+      slots.length,
+      cardCount,
+      `第 ${index + 1} 关卡位数必须等于卡片数`,
+    );
     assert.ok(exposedCount >= 3, `第 ${index + 1} 关开局至少需要三张可点卡`);
     assert.ok(layerCount >= 3, `第 ${index + 1} 关必须有明显堆叠`);
     assert.equal(level.target, index + 3, `第 ${index + 1} 关目标必须逐级 +1`);
-    assert.equal(level.target, maxCardTier + 1, `第 ${index + 1} 关必须通过碰撞合成目标`);
-    assert.ok(synthesis[level.target] >= 1, `第 ${index + 1} 关水果阶梯不足以合成目标`);
+    assert.equal(
+      level.target,
+      maxCardTier + 1,
+      `第 ${index + 1} 关必须通过碰撞合成目标`,
+    );
+    assert.ok(
+      synthesis[level.target] >= 1,
+      `第 ${index + 1} 关水果阶梯不足以合成目标`,
+    );
     assert.deepEqual(
       level.cards.map((card) => card.tier),
       Array.from({ length: level.target }, (_, tier) => tier),
@@ -85,15 +90,31 @@ test("all story levels have valid, playable layouts", () => {
     );
 
     level.cards.forEach((card) => {
-      assert.equal(card.count % 3, 0, `第 ${index + 1} 关每种卡片数量必须是 3 的倍数`);
+      assert.equal(
+        card.count % 3,
+        0,
+        `第 ${index + 1} 关每种卡片数量必须是 3 的倍数`,
+      );
       assert.ok(card.tier >= 0 && card.tier < FRUITS.length);
     });
 
     slots.forEach((slot) => {
-      assert.ok(slot.x - CARD_WIDTH / 2 >= WORLD.stack.x, `第 ${index + 1} 关卡片超出左边界`);
-      assert.ok(slot.x + CARD_WIDTH / 2 <= WORLD.stack.x + WORLD.stack.width, `第 ${index + 1} 关卡片超出右边界`);
-      assert.ok(slot.y - CARD_HEIGHT / 2 >= WORLD.stack.y, `第 ${index + 1} 关卡片超出上边界`);
-      assert.ok(slot.y + CARD_HEIGHT / 2 <= WORLD.stack.y + WORLD.stack.height, `第 ${index + 1} 关卡片超出下边界`);
+      assert.ok(
+        slot.x - CARD_WIDTH / 2 >= WORLD.stack.x,
+        `第 ${index + 1} 关卡片超出左边界`,
+      );
+      assert.ok(
+        slot.x + CARD_WIDTH / 2 <= WORLD.stack.x + WORLD.stack.width,
+        `第 ${index + 1} 关卡片超出右边界`,
+      );
+      assert.ok(
+        slot.y - CARD_HEIGHT / 2 >= WORLD.stack.y,
+        `第 ${index + 1} 关卡片超出上边界`,
+      );
+      assert.ok(
+        slot.y + CARD_HEIGHT / 2 <= WORLD.stack.y + WORLD.stack.height,
+        `第 ${index + 1} 关卡片超出下边界`,
+      );
     });
   });
 });
@@ -107,9 +128,17 @@ test("fruit scale and roguelike catalog stay balanced", () => {
   assert.equal(new Set(RELICS.map((relic) => relic.id)).size, RELICS.length);
   assert.equal(RELICS.length, 16);
   assert.equal(MUTATORS.length, 7);
-  assert.equal(UPGRADES.length, 6);
-  assert.ok(Array.from({ length: 40 }, () => rollMutator(2)).every((item) => item.id !== "calm"));
-  assert.deepEqual(Object.keys(MODE_INFO).sort(), ["endless", "expedition", "story"]);
+  assert.equal(UPGRADES.length, 10);
+  assert.ok(
+    Array.from({ length: 40 }, () => rollMutator(2)).every(
+      (item) => item.id !== "calm",
+    ),
+  );
+  assert.deepEqual(Object.keys(MODE_INFO).sort(), [
+    "endless",
+    "expedition",
+    "story",
+  ]);
   assert.equal(new Set(pickRelics([], 3).map((relic) => relic.id)).size, 3);
   assert.equal(
     pickRelics(

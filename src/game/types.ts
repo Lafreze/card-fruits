@@ -43,6 +43,10 @@ export type GameUpgrades = {
   fever?: number;
   danger?: number;
   sun?: number;
+  magnet?: number;
+  score?: number;
+  combo?: number;
+  sweetStart?: number;
 };
 
 export type GameOptions = {

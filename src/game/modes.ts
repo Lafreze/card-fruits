@@ -202,6 +202,10 @@ export type UpgradeId =
   | "danger"
   | "coin"
   | "sun"
+  | "magnet"
+  | "score"
+  | "combo"
+  | "sweet_start"
   | "relic_start";
 
 export type UpgradeDefinition = {
@@ -219,7 +223,7 @@ export const UPGRADES: UpgradeDefinition[] = [
     icon: "🧰",
     name: "道具背包",
     maxLevel: 3,
-    costs: [80, 220, 480],
+    costs: [150, 420, 900],
     describe: (level) =>
       [
         "未装备",
@@ -233,7 +237,7 @@ export const UPGRADES: UpgradeDefinition[] = [
     icon: "🍬",
     name: "甜度储备",
     maxLevel: 3,
-    costs: [100, 260, 520],
+    costs: [200, 520, 1100],
     describe: (level) =>
       level ? `开局自带 ${[0, 20, 35, 50][level]} 点狂热能量` : "未装备",
   },
@@ -242,16 +246,51 @@ export const UPGRADES: UpgradeDefinition[] = [
     icon: "🛡️",
     name: "警戒缓冲",
     maxLevel: 3,
-    costs: [90, 240, 500],
+    costs: [180, 480, 1000],
     describe: (level) =>
       level ? `警戒线容错 +${(level * 0.3).toFixed(1)} 秒` : "未装备",
+  },
+  {
+    id: "magnet",
+    icon: "🧲",
+    name: "磁力温床",
+    maxLevel: 3,
+    costs: [220, 560, 1200],
+    describe: (level) =>
+      level ? `同级水果磁吸永久 +${level * 12}%` : "未装备",
+  },
+  {
+    id: "score",
+    icon: "💎",
+    name: "分数水晶",
+    maxLevel: 3,
+    costs: [280, 700, 1500],
+    describe: (level) => (level ? `全部得分永久 +${level * 6}%` : "未装备"),
+  },
+  {
+    id: "combo",
+    icon: "🎀",
+    name: "连击丝带",
+    maxLevel: 3,
+    costs: [240, 600, 1250],
+    describe: (level) =>
+      level ? `连击窗口 +${(level * 0.2).toFixed(1)} 秒` : "未装备",
+  },
+  {
+    id: "sweet_start",
+    icon: "🍯",
+    name: "甜蜜开局",
+    maxLevel: 3,
+    costs: [300, 750, 1600],
+    describe: (level) =>
+      level ? `每关开局自动掉落 ${level} 颗低阶水果` : "未装备",
   },
   {
     id: "coin",
     icon: "💰",
     name: "果币磁铁",
     maxLevel: 3,
-    costs: [120, 300, 620],
+    costs: [260, 640, 1350],
     describe: (level) => (level ? `结算果币 +${level * 20}%` : "未装备"),
   },
   {
@@ -259,7 +298,7 @@ export const UPGRADES: UpgradeDefinition[] = [
     icon: "☀️",
     name: "暖棚日光",
     maxLevel: 2,
-    costs: [180, 460],
+    costs: [320, 800],
     describe: (level) => (level ? `开局阳光净化 +${level}` : "未装备"),
   },
   {
@@ -267,7 +306,7 @@ export const UPGRADES: UpgradeDefinition[] = [
     icon: "🎁",
     name: "远征福袋",
     maxLevel: 1,
-    costs: [750],
+    costs: [1400],
     describe: (level) => (level ? "远征开局自带 1 件随机奇物" : "未装备"),
   },
 ];
