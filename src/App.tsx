@@ -316,6 +316,7 @@ export default function App() {
   const [shopOpen, setShopOpen] = useState(false);
   const [shopPulse, setShopPulse] = useState(0);
   const [lastCoinReward, setLastCoinReward] = useState(0);
+  const [pauseOpen, setPauseOpen] = useState(false);
   const controlsRef = useRef<GameControls | null>(null);
   const toastTimer = useRef<number | null>(null);
   // 传给游戏内核的成长加成(对象引用保持稳定,避免重建游戏)
@@ -368,6 +369,7 @@ export default function App() {
   );
   const handleFinish = useCallback(
     (next: GameResult) => {
+      setPauseOpen(false);
       setResult(next);
       const reward = computeCoinReward(next, readUpgrades());
       setLastCoinReward(reward);
@@ -415,6 +417,7 @@ export default function App() {
       setSaveError("");
       setUsername("");
       setRunId(null);
+      setPauseOpen(false);
       setScreen("game");
       setSession((value) => value + 1);
       void startRun(
@@ -443,8 +446,28 @@ export default function App() {
   const backHome = () => {
     controlsRef.current?.destroy();
     controlsRef.current = null;
+    setPauseOpen(false);
     setResult(null);
     setScreen("home");
+  };
+
+  const openPause = () => {
+    if (!controlsRef.current) return;
+    controlsRef.current.pause();
+    setPauseOpen(true);
+  };
+
+  const closePause = () => {
+    controlsRef.current?.resume();
+    setPauseOpen(false);
+  };
+
+  const usePausedTool = (action: (controls: GameControls) => void) => {
+    const controls = controlsRef.current;
+    if (!controls) return;
+    controls.resume();
+    setPauseOpen(false);
+    action(controls);
   };
 
   const continueGame = () => {
@@ -700,24 +723,6 @@ export default function App() {
               onToast={handleToast}
             />
             <header className="game-hud">
-              <div className="hud-buttons">
-                <button
-                  className="icon-button"
-                  onClick={backHome}
-                  aria-label="返回主菜单"
-                >
-                  ‹
-                </button>
-                <button
-                  className="icon-button restart-button"
-                  onClick={() =>
-                    beginGame(level, mode, { wave, relics, score: carryScore })
-                  }
-                  aria-label="重新开始"
-                >
-                  ↻
-                </button>
-              </div>
               <div className="level-chip">
                 <small>
                   {mode === "story"
@@ -735,14 +740,31 @@ export default function App() {
                 <b>{formatScore(snapshot.score)}</b>
               </div>
               <div className="target-chip">
-                <small>{mode === "endless" ? "最大" : "目标"}</small>
-                <b>
+                <small>{mode === "endless" ? "当前最高" : "本关目标"}</small>
+                <strong>
                   {mode === "endless"
                     ? FRUITS[Math.min(snapshot.maxFruitTier, FRUITS.length - 1)]
                         .emoji
-                    : target.emoji}
-                </b>
+                    : `${target.emoji} ×1`}
+                </strong>
+                {mode !== "endless" ? (
+                  <span>
+                    当前最高：
+                    {
+                      FRUITS[
+                        Math.min(snapshot.maxFruitTier, FRUITS.length - 1)
+                      ].emoji
+                    }
+                  </span>
+                ) : null}
               </div>
+              <button
+                className="icon-button pause-button"
+                onClick={openPause}
+                aria-label="暂停游戏"
+              >
+                Ⅱ
+              </button>
             </header>
             {relics.length > 0 ? (
               <div className="relic-strip">
@@ -774,14 +796,6 @@ export default function App() {
                 <em>{snapshot.shuffleLeft}</em>
               </button>
               <button
-                disabled={!snapshot.juiceLeft}
-                onClick={() => controlsRef.current?.juice()}
-              >
-                <i>🥤</i>
-                <span>榨汁</span>
-                <em>{snapshot.juiceLeft}</em>
-              </button>
-              <button
                 disabled={!snapshot.hammerLeft}
                 onClick={() => controlsRef.current?.hammer()}
               >
@@ -790,36 +804,12 @@ export default function App() {
                 <em>{snapshot.hammerLeft}</em>
               </button>
               <button
-                disabled={!snapshot.magnetLeft}
-                onClick={() => controlsRef.current?.magnet()}
-              >
-                <i>🧲</i>
-                <span>合并</span>
-                <em>{snapshot.magnetLeft}</em>
-              </button>
-              <button
                 disabled={!snapshot.wildLeft}
                 onClick={() => controlsRef.current?.wild()}
               >
                 <i>🍀</i>
                 <span>万能</span>
                 <em>{snapshot.wildLeft}</em>
-              </button>
-              <button
-                disabled={!snapshot.bubbleLeft}
-                onClick={() => controlsRef.current?.bubble()}
-              >
-                <i>🫧</i>
-                <span>清槽</span>
-                <em>{snapshot.bubbleLeft}</em>
-              </button>
-              <button
-                disabled={!snapshot.sunLeft}
-                onClick={() => controlsRef.current?.sunshine()}
-              >
-                <i>☀️</i>
-                <span>净化</span>
-                <em>{snapshot.sunLeft}</em>
               </button>
             </div>
             <div
@@ -838,6 +828,67 @@ export default function App() {
               >
                 {toast.message}
               </button>
+            ) : null}
+            {pauseOpen && !result ? (
+              <div className="pause-layer" role="dialog" aria-modal="true">
+                <section className="pause-card">
+                  <small>ORCHARD BREAK</small>
+                  <h2>游戏暂停</h2>
+                  <p>进度已停住。高级道具收在这里，避免首屏误触。</p>
+                  <div className="pause-tools" aria-label="更多道具">
+                    <button
+                      disabled={!snapshot.juiceLeft}
+                      onClick={() =>
+                        usePausedTool((controls) => controls.juice())
+                      }
+                    >
+                      <i>🥤</i><span>榨汁</span><em>×{snapshot.juiceLeft}</em>
+                    </button>
+                    <button
+                      disabled={!snapshot.magnetLeft}
+                      onClick={() =>
+                        usePausedTool((controls) => controls.magnet())
+                      }
+                    >
+                      <i>🧲</i><span>合并</span><em>×{snapshot.magnetLeft}</em>
+                    </button>
+                    <button
+                      disabled={!snapshot.bubbleLeft}
+                      onClick={() =>
+                        usePausedTool((controls) => controls.bubble())
+                      }
+                    >
+                      <i>🫧</i><span>清槽</span><em>×{snapshot.bubbleLeft}</em>
+                    </button>
+                    <button
+                      disabled={!snapshot.sunLeft}
+                      onClick={() =>
+                        usePausedTool((controls) => controls.sunshine())
+                      }
+                    >
+                      <i>☀️</i><span>净化</span><em>×{snapshot.sunLeft}</em>
+                    </button>
+                  </div>
+                  <button className="pause-resume" onClick={closePause}>
+                    继续游戏
+                  </button>
+                  <div className="pause-actions">
+                    <button
+                      onClick={() => {
+                        setPauseOpen(false);
+                        beginGame(level, mode, {
+                          wave,
+                          relics,
+                          score: carryScore,
+                        });
+                      }}
+                    >
+                      ↻ 重新开始
+                    </button>
+                    <button onClick={backHome}>⌂ 返回首页</button>
+                  </div>
+                </section>
+              </div>
             ) : null}
             {result ? (
               <div className="result-layer" role="dialog" aria-modal="true">
