@@ -17,6 +17,7 @@ export type GameSnapshot = {
   hammerLeft: number;
   magnetLeft: number;
   wildLeft: number;
+  bubbleLeft: number;
   wave: number;
   mode: GameMode;
   relics: RelicId[];
@@ -58,6 +59,7 @@ export type GameControls = {
   hammer: () => void;
   magnet: () => void;
   wild: () => void;
+  bubble: () => void;
   pause: () => void;
   resume: () => void;
   destroy: () => void;

@@ -46,6 +46,7 @@ const EMPTY_SNAPSHOT: GameSnapshot = {
   hammerLeft: 1,
   magnetLeft: 1,
   wildLeft: 1,
+  bubbleLeft: 1,
   wave: 1,
   mode: "story",
   relics: [],
@@ -375,10 +376,15 @@ export default function App() {
     (message: string, tone: "gold" | "pink" | "cyan" = "pink") => {
       if (toastTimer.current) window.clearTimeout(toastTimer.current);
       setToast({ id: Date.now(), message, tone });
-      toastTimer.current = window.setTimeout(() => setToast(null), 1_750);
+      toastTimer.current = window.setTimeout(() => setToast(null), 1_200);
     },
     [],
   );
+  const dismissToast = useCallback(() => {
+    if (toastTimer.current) window.clearTimeout(toastTimer.current);
+    toastTimer.current = null;
+    setToast(null);
+  }, []);
 
   const beginGame = useCallback(
     (
@@ -590,30 +596,30 @@ export default function App() {
                   {mode === "story"
                     ? `第 ${level + 1} 关`
                     : mode === "endless"
-                      ? "无限波次"
-                      : "随机远征"}
+                      ? "一直玩"
+                      : "8 关"}
                 </small>
                 <strong>
                   {mode === "story"
                     ? LEVELS[level].name
                     : mode === "endless"
-                      ? "双果王 · 彩虹清场"
-                      : "每段三选一奇物"}
+                      ? "冲最高分"
+                      : "过关选奇物"}
                 </strong>
               </span>
               <span className="mission-target">
                 {mode === "story"
                   ? "目标"
                   : mode === "endless"
-                    ? "生存"
-                    : "构筑"}
+                    ? "记录"
+                    : "奇物"}
                 <br />
                 <b>
                   {mode === "story"
                     ? target.name
                     : mode === "endless"
                       ? "最高分"
-                      : "16 种奇物"}
+                      : "16 种"}
                 </b>
               </span>
             </div>
@@ -623,16 +629,11 @@ export default function App() {
               {mode === "story"
                 ? "开始挑战"
                 : mode === "endless"
-                  ? "进入无尽"
-                  : "开始远征"}
+                  ? "开始无尽"
+                  : "开始 Rogue"}
             </span>
             <i>▶</i>
           </button>
-          <div className="special-legend">
-            <span>❄ 邻卡解冻</span>
-            <span>💣 爆炸连取</span>
-            <span>🌿 点击剪藤</span>
-          </div>
           <div className="home-links">
             <button className="leaderboard-link" onClick={openLeaderboard}>
               <span>🏆</span> 全球排行榜
@@ -644,34 +645,6 @@ export default function App() {
               <span>🏡</span> 果园温室 · 🪙{formatScore(coins)}
             </button>
           </div>
-          <div className="how-to">
-            <div>
-              <b>01</b>
-              <span>
-                挑出三张
-                <br />
-                同类果卡
-              </span>
-            </div>
-            <i>›</i>
-            <div>
-              <b>02</b>
-              <span>
-                水果落入
-                <br />
-                物理果箱
-              </span>
-            </div>
-            <i>›</i>
-            <div>
-              <b>03</b>
-              <span>
-                同级碰撞
-                <br />
-                华丽升级
-              </span>
-            </div>
-          </div>
         </section>
       ) : (
         <section className="play-layout">
@@ -679,7 +652,7 @@ export default function App() {
             <button className="brand-button" onClick={backHome}>
               叠个<span>果王</span>
             </button>
-            <p>在卡槽爆满之前完成三消，让同级水果在果箱中相撞升级。</p>
+            <p>三张消除，两颗合成。</p>
             <div className="brief-chain">
               {FRUITS.slice(
                 Math.max(0, LEVELS[level].target - 3),
@@ -695,7 +668,12 @@ export default function App() {
               🏆 查看排行榜
             </button>
           </aside>
-          <div className="game-phone">
+          <div
+            className="game-phone"
+            onPointerDown={() => {
+              if (toast) dismissToast();
+            }}
+          >
             <GameCanvas
               level={level}
               mode={mode}
@@ -720,10 +698,10 @@ export default function App() {
               <div className="level-chip">
                 <small>
                   {mode === "story"
-                    ? `LEVEL ${level + 1}`
+                    ? `第 ${level + 1} 关`
                     : mode === "endless"
-                      ? `WAVE ${snapshot.wave}`
-                      : `ROUTE ${wave}`}
+                      ? `第 ${snapshot.wave} 波`
+                      : `Rogue 第 ${wave} 关`}
                 </small>
                 <strong>
                   {mode === "story" ? LEVELS[level].name : MODE_INFO[mode].name}
@@ -805,6 +783,14 @@ export default function App() {
                 <em>{snapshot.wildLeft}</em>
               </button>
               <button
+                disabled={!snapshot.bubbleLeft}
+                onClick={() => controlsRef.current?.bubble()}
+              >
+                <i>🫧</i>
+                <span>清槽</span>
+                <em>{snapshot.bubbleLeft}</em>
+              </button>
+              <button
                 onClick={() =>
                   beginGame(level, mode, { wave, relics, score: carryScore })
                 }
@@ -820,9 +806,15 @@ export default function App() {
               COMBO <b>×{snapshot.combo}</b>
             </div>
             {toast ? (
-              <div key={toast.id} className={`game-toast toast-${toast.tone}`}>
+              <button
+                type="button"
+                key={toast.id}
+                className={`game-toast toast-${toast.tone}`}
+                onClick={dismissToast}
+                aria-label="关闭提示"
+              >
                 {toast.message}
-              </div>
+              </button>
             ) : null}
             {result ? (
               <div className="result-layer" role="dialog" aria-modal="true">
@@ -837,22 +829,22 @@ export default function App() {
                   </div>
                   <div className="result-kicker">
                     {isRelicReward
-                      ? "ROUTE CLEAR"
+                      ? `Rogue 第 ${result.wave} 关`
                       : mode === "expedition" && result.status === "won"
-                        ? "EXPEDITION CLEAR"
+                        ? "Rogue 完成"
                         : mode === "endless"
-                          ? `ENDLESS WAVE ${result.wave}`
+                          ? `无尽第 ${result.wave} 波`
                           : result.status === "won"
-                            ? "LEVEL CLEAR"
-                            : "JUICE BREAK"}
+                            ? `第 ${level + 1} 关完成`
+                            : "本局结束"}
                   </div>
                   <h2>
                     {isRelicReward
                       ? "选择一件奇物"
                       : mode === "expedition" && result.status === "won"
-                        ? "远征完成！"
+                        ? "Rogue 通关！"
                         : mode === "endless"
-                          ? "无尽狂欢结算"
+                          ? "无尽模式结算"
                           : result.status === "won"
                             ? "甜度通关！"
                             : "差一点就合成了"}

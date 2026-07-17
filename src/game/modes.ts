@@ -59,7 +59,7 @@ export const RELICS: RelicDefinition[] = [
     id: "tool_belt",
     icon: "🎒",
     name: "园丁腰包",
-    description: "每关额外获得洗牌、锤子各 1 次。",
+    description: "每关额外获得洗牌、锤子、泡泡袋各 1 次。",
     tone: "gold",
   },
   {
@@ -147,18 +147,18 @@ export const MODE_INFO: Record<
 > = {
   story: {
     icon: "🗺️",
-    name: "主线果园",
-    tagline: "12 关手工叠层 · 逐级合成果王",
+    name: "闯关模式",
+    tagline: "14 关，逐关合成果王",
   },
   endless: {
     icon: "∞",
-    name: "无尽狂欢",
-    tagline: "无限补牌 · 双果王触发彩虹清场",
+    name: "无尽模式",
+    tagline: "一直玩，冲最高分",
   },
   expedition: {
     icon: "🧭",
-    name: "果园远征",
-    tagline: "16 件随机奇物构筑 · 8 段变异远征",
+    name: "Rogue 模式",
+    tagline: "过关选奇物，失败重来",
   },
 };
 

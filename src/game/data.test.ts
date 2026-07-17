@@ -38,13 +38,14 @@ function isCovered(
 }
 
 test("all story levels have valid, playable layouts", () => {
-  assert.equal(LEVELS.length, 12);
+  assert.equal(LEVELS.length, 14);
 
   LEVELS.forEach((level, index) => {
     const slots = expandLayout(level.layout);
     const cardCount = level.cards.reduce((sum, card) => sum + card.count, 0);
     const exposedCount = slots.filter((slot) => !isCovered(slot, slots)).length;
     const maxCardTier = Math.max(...level.cards.map((card) => card.tier));
+    const layerCount = new Set(slots.map((slot) => slot.layer)).size;
     const synthesis = new Array(FRUITS.length).fill(0);
     level.cards.forEach((card) => {
       synthesis[card.tier] += card.count / 3;
@@ -55,6 +56,7 @@ test("all story levels have valid, playable layouts", () => {
 
     assert.equal(slots.length, cardCount, `第 ${index + 1} 关卡位数必须等于卡片数`);
     assert.ok(exposedCount >= 3, `第 ${index + 1} 关开局至少需要三张可点卡`);
+    assert.ok(layerCount >= 3, `第 ${index + 1} 关必须有明显堆叠`);
     assert.equal(level.target, index + 3, `第 ${index + 1} 关目标必须逐级 +1`);
     assert.equal(level.target, maxCardTier + 1, `第 ${index + 1} 关必须通过碰撞合成目标`);
     assert.ok(synthesis[level.target] >= 1, `第 ${index + 1} 关水果阶梯不足以合成目标`);
@@ -79,6 +81,7 @@ test("all story levels have valid, playable layouts", () => {
 });
 
 test("fruit scale and roguelike catalog stay balanced", () => {
+  assert.equal(FRUITS.length, 17);
   FRUITS.forEach((fruit, index) => {
     assert.ok(fruit.radius <= 60, `${fruit.name} 不应重新撑满果箱`);
     if (index > 0) assert.ok(fruit.radius > FRUITS[index - 1].radius);

@@ -25,7 +25,7 @@ export type LevelDefinition = {
   layout: LayoutBlock[];
 };
 
-// 15 级合成链:蓝莓→葡萄→樱桃→草莓→柠檬→猕猴桃→橙子→苹果→桃子→芒果→椰子→菠萝→哈密瓜→西瓜→黄金果王
+// 17 级合成链:新增牛油果和梨,让中段合成更有变化。
 export const FRUITS: FruitDefinition[] = [
   { name: "蓝莓", emoji: "🫐", radius: 8, color: 0x5c7cfa, glow: 0xa5b4ff },
   { name: "葡萄", emoji: "🍇", radius: 10, color: 0x9b5de5, glow: 0xd8b4fe },
@@ -33,14 +33,16 @@ export const FRUITS: FruitDefinition[] = [
   { name: "草莓", emoji: "🍓", radius: 15, color: 0xff4d6d, glow: 0xffb3c1 },
   { name: "柠檬", emoji: "🍋", radius: 18, color: 0xffd166, glow: 0xffef9f },
   { name: "猕猴桃", emoji: "🥝", radius: 21, color: 0x8ac926, glow: 0xc5f277 },
-  { name: "橙子", emoji: "🍊", radius: 24, color: 0xff9f1c, glow: 0xffc971 },
-  { name: "苹果", emoji: "🍎", radius: 28, color: 0xff595e, glow: 0xff9c9f },
-  { name: "桃子", emoji: "🍑", radius: 32, color: 0xff8fab, glow: 0xffc2d1 },
-  { name: "芒果", emoji: "🥭", radius: 36, color: 0xffb703, glow: 0xffd166 },
-  { name: "椰子", emoji: "🥥", radius: 40, color: 0xa9805b, glow: 0xe6cfb0 },
-  { name: "菠萝", emoji: "🍍", radius: 44, color: 0xf7c948, glow: 0xffe69a },
-  { name: "哈密瓜", emoji: "🍈", radius: 48, color: 0x90be6d, glow: 0xc7f9b5 },
-  { name: "西瓜", emoji: "🍉", radius: 53, color: 0x43aa8b, glow: 0x9bf6cf },
+  { name: "牛油果", emoji: "🥑", radius: 24, color: 0x6f9f3d, glow: 0xc6f68d },
+  { name: "橙子", emoji: "🍊", radius: 27, color: 0xff9f1c, glow: 0xffc971 },
+  { name: "苹果", emoji: "🍎", radius: 30, color: 0xff595e, glow: 0xff9c9f },
+  { name: "梨", emoji: "🍐", radius: 33, color: 0xb8d64f, glow: 0xe9f99c },
+  { name: "桃子", emoji: "🍑", radius: 36, color: 0xff8fab, glow: 0xffc2d1 },
+  { name: "芒果", emoji: "🥭", radius: 39, color: 0xffb703, glow: 0xffd166 },
+  { name: "椰子", emoji: "🥥", radius: 42, color: 0xa9805b, glow: 0xe6cfb0 },
+  { name: "菠萝", emoji: "🍍", radius: 45, color: 0xf7c948, glow: 0xffe69a },
+  { name: "哈密瓜", emoji: "🍈", radius: 49, color: 0x90be6d, glow: 0xc7f9b5 },
+  { name: "西瓜", emoji: "🍉", radius: 54, color: 0x43aa8b, glow: 0x9bf6cf },
   {
     name: "黄金果王",
     emoji: "👑",
@@ -64,8 +66,12 @@ const B = (
 // 上层压下层用半错位 dx=36 或 dy=38(或双向),遮盖面积 ≥616 才算真正盖住。
 // 每个布局的卡位总数必须等于该关 cards 数量之和。
 
-// 第 1 关 · 18 张:双层缓坡,教学关,全部露脸只有轻遮
-const OPEN_MEADOW = [B(0, 215, 238, 5, 2), B(1, 215, 276, 4, 2)];
+// 第 1 关 · 18 张:三层小塔,教学关也从真正的叠层开始
+const OPEN_MEADOW = [
+  B(0, 215, 242, 3, 3),
+  B(1, 215, 242, 3, 2),
+  B(2, 215, 242, 3, 1),
+];
 
 // 第 2 关 · 24 张:三层砖墙,上层横向半错位压住下层
 const BRICK_WALL = [
@@ -220,6 +226,24 @@ const CROWN = [
   B(6, 215, 244, 3, 2, 72, 66),
 ];
 
+// 第 13 关 · 51 张:五层旋涡,高层会在每局随机偏向一侧
+const SPIRAL = [
+  B(0, 215, 244, 5, 3),
+  B(1, 215, 244, 5, 3),
+  B(2, 215, 244, 4, 3),
+  B(3, 215, 244, 3, 2),
+  B(4, 215, 244, 3, 1),
+];
+
+// 第 14 关 · 54 张:五层王座,三张塔尖保证开局可点
+const FRUIT_THRONE = [
+  B(0, 215, 244, 5, 3),
+  B(1, 215, 244, 5, 3),
+  B(2, 215, 244, 4, 3),
+  B(3, 215, 244, 3, 3),
+  B(4, 215, 244, 3, 1),
+];
+
 // 每关都从蓝莓开始，并包含从 0 到目标前一级的完整合成阶梯。
 // 蓝莓至少提供两颗，其余每级至少一颗；多余卡位继续补蓝莓，确保逐级碰撞必达目标。
 function ladderCards(target: number, totalCards: number) {
@@ -260,67 +284,81 @@ export const LEVELS: LevelDefinition[] = [
     layout: PYRAMID,
   },
   {
-    name: "橙光派对",
+    name: "牛油果湾",
     target: 6,
     cards: ladderCards(6, 33),
     specialRate: 0.08,
     layout: TWIN_TOWERS,
   },
   {
-    name: "苹果心跳",
+    name: "橙光派对",
     target: 7,
     cards: ladderCards(7, 36),
     specialRate: 0.1,
     layout: DIAMOND,
   },
   {
-    name: "蜜桃星云",
+    name: "苹果心跳",
     target: 8,
     cards: ladderCards(8, 36),
     specialRate: 0.12,
     layout: RING_WELL,
   },
   {
-    name: "热带引力",
+    name: "香梨花园",
     target: 9,
     cards: ladderCards(9, 36),
     specialRate: 0.14,
     layout: GRAND_PYRAMID,
   },
   {
-    name: "椰风海岸",
+    name: "蜜桃星云",
     target: 10,
     cards: ladderCards(10, 36),
     specialRate: 0.16,
     layout: HEAVY_BRICKS,
   },
   {
-    name: "菠萝脉冲",
+    name: "热带引力",
     target: 11,
     cards: ladderCards(11, 39),
     specialRate: 0.18,
     layout: DEEP_TOWERS,
   },
   {
-    name: "瓜田月色",
+    name: "椰风海岸",
     target: 12,
     cards: ladderCards(12, 42),
     specialRate: 0.2,
     layout: CROSS_ALTAR,
   },
   {
-    name: "西瓜音浪",
+    name: "菠萝脉冲",
     target: 13,
     cards: ladderCards(13, 45),
     specialRate: 0.22,
     layout: CASCADE,
   },
   {
-    name: "果王降临",
+    name: "瓜田月色",
     target: 14,
     cards: ladderCards(14, 48),
     specialRate: 0.25,
     layout: CROWN,
+  },
+  {
+    name: "西瓜音浪",
+    target: 15,
+    cards: ladderCards(15, 51),
+    specialRate: 0.27,
+    layout: SPIRAL,
+  },
+  {
+    name: "果王降临",
+    target: 16,
+    cards: ladderCards(16, 54),
+    specialRate: 0.29,
+    layout: FRUIT_THRONE,
   },
 ];
 

@@ -25,7 +25,7 @@ import type {
   GameStatus,
 } from "./types";
 
-type CardSpecial = "normal" | "frozen" | "bomb" | "vine";
+type CardSpecial = "normal" | "frozen" | "bomb" | "vine" | "sugar";
 
 type CardNode = {
   id: number;
@@ -131,6 +131,7 @@ export class FruitGame implements GameControls {
   private hammerLeft = 1;
   private magnetLeft = 1;
   private wildLeft = 1;
+  private bubbleLeft = 1;
   private aimX: number | null = null;
   private chainLayer = new Container();
   private mutator: WaveMutator = rollMutator(1);
@@ -164,6 +165,7 @@ export class FruitGame implements GameControls {
     if (this.hasRelic("tool_belt")) {
       this.shuffleLeft += 1;
       this.hammerLeft += 1;
+      this.bubbleLeft += 1;
     }
     if (this.hasRelic("crystal_seed")) {
       this.wildLeft += 1;
@@ -656,12 +658,17 @@ export class FruitGame implements GameControls {
   }
 
   private createCards(definition = LEVELS[this.levelIndex]) {
-    // 以三张一组洗入随机层位：每局图案都不同，同时避免完全散洗制造无解残局。
+    // 先保留可解的三张小组，再做跨层换位；比整组三连更随机，也不会彻底打散到纯碰运气。
     const tiers = shuffle(
       definition.cards.flatMap(({ tier, count }) =>
         Array.from({ length: count / 3 }, () => tier),
       ),
     ).flatMap((tier) => [tier, tier, tier]);
+    for (let swap = 0; swap < Math.floor(tiers.length * 0.55); swap += 1) {
+      const first = Math.floor(Math.random() * tiers.length);
+      const second = Math.floor(Math.random() * tiers.length);
+      [tiers[first], tiers[second]] = [tiers[second], tiers[first]];
+    }
     // 布局块展开成卡位,按层从低到高排序;设计上卡位数 = 卡片数,不足时向上叠补
     const slots = definition.layout
       .flatMap((block) =>
@@ -729,7 +736,14 @@ export class FruitGame implements GameControls {
       let special: CardSpecial = "normal";
       if (!protectedOpening && specialRoll < specialRate) {
         const kindRoll = Math.random();
-        special = kindRoll < 0.46 ? "frozen" : kindRoll < 0.76 ? "bomb" : "vine";
+        special =
+          kindRoll < 0.38
+            ? "frozen"
+            : kindRoll < 0.68
+              ? "bomb"
+              : kindRoll < 0.86
+                ? "vine"
+                : "sugar";
         // 变异波次偏置：对应特殊牌约占变异牌的 72%。
         if (this.mutator.frozen && Math.random() < 0.72) special = "frozen";
         if (this.mutator.bomb && Math.random() < 0.72) special = "bomb";
@@ -768,27 +782,45 @@ export class FruitGame implements GameControls {
     this.updateCardAccess();
   }
 
-  // 把工整的设计卡位揉乱:随机镜像、整层漂移、单卡抖动;遮盖判定基于最终坐标,逻辑始终自洽
+  // 把设计卡位揉成不同牌阵:整组旋转、镜像、层间扭转和单卡抖动每局都会重抽。
   private scatterSlots(slots: Array<{ layer: number; x: number; y: number }>) {
     const mirrorX = Math.random() < 0.5;
     const mirrorY = Math.random() < 0.35;
-    const shear = (Math.random() - 0.5) * 0.18;
-    const wave = (Math.random() - 0.5) * 12;
+    const variant = Math.floor(Math.random() * 4);
+    const maxLayer = Math.max(...slots.map((slot) => slot.layer));
+    const centerX = WORLD.width / 2;
+    const centerY = WORLD.stack.y + WORLD.stack.height / 2;
+    const rotation = (Math.random() - 0.5) * 0.2;
+    const twist = (Math.random() - 0.5) * 0.035;
+    const shear = (Math.random() - 0.5) * 0.22;
+    const wave = (Math.random() - 0.5) * 15;
+    const globalDx = (Math.random() - 0.5) * 22;
+    const globalDy = (Math.random() - 0.5) * 12;
     const drift = new Map<number, { dx: number; dy: number }>();
     slots.forEach((slot) => {
       if (mirrorX) slot.x = WORLD.width - slot.x;
       if (mirrorY)
         slot.y = WORLD.stack.y + WORLD.stack.height - (slot.y - WORLD.stack.y);
+      const angle = rotation + (slot.layer - maxLayer / 2) * twist;
+      const dx = slot.x - centerX;
+      const dy = slot.y - centerY;
+      slot.x = centerX + dx * Math.cos(angle) - dy * Math.sin(angle);
+      slot.y = centerY + dx * Math.sin(angle) + dy * Math.cos(angle);
       slot.x += (slot.y - (WORLD.stack.y + WORLD.stack.height / 2)) * shear;
       slot.y += Math.sin(slot.x / 48 + slot.layer * 0.9) * wave;
+      if (variant === 1) slot.x += Math.sin(slot.layer * 1.45) * 17;
+      if (variant === 2)
+        slot.y += Math.cos(slot.layer * 1.2 + slot.x / 95) * 12;
+      if (variant === 3)
+        slot.x += (slot.layer % 2 ? 1 : -1) * (7 + slot.layer * 2.3);
       if (!drift.has(slot.layer))
         drift.set(slot.layer, {
-          dx: (Math.random() - 0.5) * 28,
-          dy: (Math.random() - 0.5) * 20,
+          dx: (Math.random() - 0.5) * 34,
+          dy: (Math.random() - 0.5) * 24,
         });
       const layerDrift = drift.get(slot.layer)!;
-      slot.x += layerDrift.dx + (Math.random() - 0.5) * 20;
-      slot.y += layerDrift.dy + (Math.random() - 0.5) * 18;
+      slot.x += globalDx + layerDrift.dx + (Math.random() - 0.5) * 22;
+      slot.y += globalDy + layerDrift.dy + (Math.random() - 0.5) * 20;
     });
     // 同层挤在一起的卡位沿重叠较小的轴推开,保证同层卡牌彼此可辨认
     for (let pass = 0; pass < 4; pass += 1) {
@@ -873,6 +905,12 @@ export class FruitGame implements GameControls {
       vine.position.set(19, -24);
       vine.label = "special-icon";
       view.addChild(vine);
+    } else if (special === "sugar") {
+      const sugar = new Text({ text: "⚡", style: { fontSize: 14 } });
+      sugar.anchor.set(0.5);
+      sugar.position.set(19, -24);
+      sugar.label = "special-icon";
+      view.addChild(sugar);
     }
     return view;
   }
@@ -934,10 +972,16 @@ export class FruitGame implements GameControls {
     sounds.tap();
     haptic();
     const detonates = card.special === "bomb";
+    const chargesFever = card.special === "sugar";
     card.active = false;
     card.view.visible = false;
     card.special = "normal";
     this.lastPick = detonates ? null : card;
+    if (chargesFever) {
+      this.gainFever(10);
+      this.burst(card.x, card.y, 0xffd75e, 18);
+      this.callbacks.onToast("⚡ 甜度 +10", "gold");
+    }
     this.collectTier(card.tier);
     if (detonates) this.detonate(card);
     this.unlockNearby(card);
@@ -1082,6 +1126,7 @@ export class FruitGame implements GameControls {
       this.magnetLeft += 1;
     }
     if (this.wave % 4 === 0) this.wildLeft += 1;
+    if (this.wave % 5 === 0) this.bubbleLeft += 1;
     this.callbacks.onToast(
       `∞ 第 ${this.wave} 波 · ${this.mutator.icon} ${this.mutator.name}`,
       "gold",
@@ -1751,6 +1796,7 @@ export class FruitGame implements GameControls {
       hammerLeft: this.hammerLeft,
       magnetLeft: this.magnetLeft,
       wildLeft: this.wildLeft,
+      bubbleLeft: this.bubbleLeft,
       wave: this.wave,
       mode: this.mode,
       relics: [...this.relics],
@@ -1919,6 +1965,31 @@ export class FruitGame implements GameControls {
       this.collectTier(tier);
     this.lastPick = null;
     this.drawTray();
+    this.emitSnapshot();
+  };
+
+  // 泡泡袋:从卡槽弹出两张最难凑成三消的牌,给残局留一次转身空间。
+  bubble = () => {
+    if (this.paused || this.status !== "playing" || this.bubbleLeft <= 0)
+      return;
+    if (this.tray.length === 0) {
+      this.callbacks.onToast("卡槽还是空的", "cyan");
+      return;
+    }
+    const counts = new Map<number, number>();
+    this.tray.forEach((tier) => counts.set(tier, (counts.get(tier) || 0) + 1));
+    const ordered = [...this.tray]
+      .map((tier, index) => ({ index, count: counts.get(tier) || 0 }))
+      .sort((a, b) => a.count - b.count || b.index - a.index)
+      .slice(0, Math.min(2, this.tray.length))
+      .sort((a, b) => b.index - a.index);
+    ordered.forEach(({ index }) => this.tray.splice(index, 1));
+    this.bubbleLeft -= 1;
+    this.lastPick = null;
+    this.drawTray();
+    this.burst(WORLD.width / 2, WORLD.tray.y + 30, 0x8be9fd, 30);
+    this.callbacks.onToast(`🫧 弹出 ${ordered.length} 张`, "cyan");
+    haptic([12, 25, 12]);
     this.emitSnapshot();
   };
 

@@ -251,16 +251,6 @@ input:focus-visible {
   font-size: 10px;
   line-height: 1.5;
 }
-.special-legend {
-  width: 100%;
-  margin-top: 9px;
-  display: flex;
-  justify-content: center;
-  gap: 12px;
-  color: #9585ac;
-  font-size: 9px;
-}
-
 .mode-card {
   width: 100%;
   padding: 18px;
@@ -434,31 +424,6 @@ input:focus-visible {
 .leaderboard-link span {
   margin-right: 7px;
 }
-.how-to {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 14px;
-  color: #8e80ab;
-  font-size: 9px;
-  line-height: 1.5;
-  text-align: center;
-}
-.how-to div {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-}
-.how-to b {
-  color: #5c4c79;
-  font-size: 15px;
-}
-.how-to i {
-  font-size: 22px;
-  color: #584a72;
-  font-style: normal;
-}
-
 .play-layout {
   min-height: 100dvh;
   display: flex;
@@ -624,7 +589,7 @@ input:focus-visible {
   height: 5.1%;
   display: flex;
   justify-content: center;
-  gap: 1.1%;
+  gap: 0.8%;
 }
 .power-dock button {
   flex: 1;
@@ -659,7 +624,7 @@ input:focus-visible {
 }
 .power-dock span {
   font-size: 8px;
-  font-size: 1.75cqw;
+  font-size: 1.65cqw;
   font-weight: 800;
   line-height: 1.1;
 }
@@ -706,17 +671,11 @@ input:focus-visible {
   left: 50%;
   top: 47.3%;
   transform: translate(-50%, -50%) scale(0);
-  padding: 5px 13px;
-  padding: 1.2cqw 3cqw;
-  border: 1px solid rgba(255, 255, 255, 0.3);
-  border-radius: 999px;
+  padding: 0;
+  border: 0;
   color: #fff;
-  background: linear-gradient(
-    100deg,
-    rgba(128, 68, 238, 0.92),
-    rgba(255, 55, 139, 0.92)
-  );
-  box-shadow: 0 0 22px rgba(255, 52, 136, 0.45);
+  background: transparent;
+  text-shadow: 0 2px 5px #2b0b41, 0 0 13px rgba(255, 73, 161, 0.9);
   font-size: 9px;
   font-size: 2.1cqw;
   font-weight: 800;
@@ -727,8 +686,8 @@ input:focus-visible {
   transform: translate(-50%, -50%) scale(1);
 }
 .combo-pill.hot {
-  background: linear-gradient(100deg, #ff7c2f, #ff2f85);
-  box-shadow: 0 0 30px rgba(255, 159, 55, 0.62);
+  color: #ffd45e;
+  text-shadow: 0 2px 5px #5a1b21, 0 0 18px rgba(255, 159, 55, 0.95);
 }
 .combo-pill b {
   margin-left: 4px;
@@ -742,27 +701,32 @@ input:focus-visible {
   left: 50%;
   top: 33%;
   transform: translateX(-50%);
-  padding: 9px 17px;
-  padding: 2.1cqw 4cqw;
-  border-radius: 999px;
+  margin: 0;
+  padding: 2px 4px;
+  border: 0;
+  border-radius: 0;
   color: white;
-  background: rgba(38, 18, 69, 0.9);
+  background: transparent;
+  appearance: none;
+  font-family: inherit;
   font-size: 12px;
   font-size: 2.8cqw;
   font-weight: 950;
   white-space: nowrap;
-  animation: toastPop 1.75s ease both;
-  box-shadow: 0 7px 25px rgba(0, 0, 0, 0.35);
+  cursor: pointer;
+  text-shadow: 0 2px 5px #18072d, 0 0 14px rgba(255, 67, 158, 0.95);
+  animation: toastPop 1.2s ease both;
 }
 .toast-gold {
-  color: #3c1c27;
-  background: linear-gradient(100deg, #fff07d, #ff9c44);
+  color: #ffe874;
+  text-shadow: 0 2px 5px #542216, 0 0 16px rgba(255, 185, 67, 0.98);
 }
 .toast-cyan {
-  background: linear-gradient(100deg, #1778b9, #17c8ca);
+  color: #8ffcff;
+  text-shadow: 0 2px 5px #092f4d, 0 0 16px rgba(23, 200, 202, 0.95);
 }
 .toast-pink {
-  background: linear-gradient(100deg, #7c3aed, #ff3e91);
+  color: #ff9dd2;
 }
 @keyframes toastPop {
   0% {
@@ -1254,9 +1218,6 @@ input:focus-visible {
   }
   .mode-card {
     padding: 14px;
-  }
-  .how-to {
-    display: none;
   }
 }
 
