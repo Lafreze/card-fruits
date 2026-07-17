@@ -9,7 +9,6 @@ import { FRUITS, LEVELS } from "./game/data";
 import type { FruitGame } from "./game/FruitGame";
 import {
   MODE_INFO,
-  RELICS,
   UPGRADES,
   pickRelics,
   type GameMode,
@@ -25,6 +24,7 @@ import type {
 } from "./game/types";
 
 type Screen = "home" | "game";
+type GamePanel = "tools" | "help" | "menu" | null;
 type ToastState = {
   id: number;
   message: string;
@@ -316,7 +316,7 @@ export default function App() {
   const [shopOpen, setShopOpen] = useState(false);
   const [shopPulse, setShopPulse] = useState(0);
   const [lastCoinReward, setLastCoinReward] = useState(0);
-  const [pauseOpen, setPauseOpen] = useState(false);
+  const [gamePanel, setGamePanel] = useState<GamePanel>(null);
   const controlsRef = useRef<GameControls | null>(null);
   const toastTimer = useRef<number | null>(null);
   // 传给游戏内核的成长加成(对象引用保持稳定,避免重建游戏)
@@ -369,7 +369,7 @@ export default function App() {
   );
   const handleFinish = useCallback(
     (next: GameResult) => {
-      setPauseOpen(false);
+      setGamePanel(null);
       setResult(next);
       const reward = computeCoinReward(next, readUpgrades());
       setLastCoinReward(reward);
@@ -417,7 +417,7 @@ export default function App() {
       setSaveError("");
       setUsername("");
       setRunId(null);
-      setPauseOpen(false);
+      setGamePanel(null);
       setScreen("game");
       setSession((value) => value + 1);
       void startRun(
@@ -446,27 +446,27 @@ export default function App() {
   const backHome = () => {
     controlsRef.current?.destroy();
     controlsRef.current = null;
-    setPauseOpen(false);
+    setGamePanel(null);
     setResult(null);
     setScreen("home");
   };
 
-  const openPause = () => {
+  const openGamePanel = (panel: Exclude<GamePanel, null>) => {
     if (!controlsRef.current) return;
     controlsRef.current.pause();
-    setPauseOpen(true);
+    setGamePanel(panel);
   };
 
-  const closePause = () => {
+  const closeGamePanel = () => {
     controlsRef.current?.resume();
-    setPauseOpen(false);
+    setGamePanel(null);
   };
 
-  const usePausedTool = (action: (controls: GameControls) => void) => {
+  const useTool = (action: (controls: GameControls) => void) => {
     const controls = controlsRef.current;
     if (!controls) return;
     controls.resume();
-    setPauseOpen(false);
+    setGamePanel(null);
     action(controls);
   };
 
@@ -553,6 +553,15 @@ export default function App() {
   );
 
   const target = FRUITS[LEVELS[level].target];
+  const helpChainStart =
+    mode === "endless"
+      ? Math.max(0, snapshot.maxFruitTier - 1)
+      : Math.min(...LEVELS[level].cards.map((card) => card.tier));
+  const helpChainEnd =
+    mode === "endless"
+      ? Math.min(FRUITS.length - 1, snapshot.maxFruitTier + 5)
+      : LEVELS[level].target;
+  const helpChain = FRUITS.slice(helpChainStart, helpChainEnd + 1);
   const greenhouseGrowth = Object.values(upgrades).reduce(
     (total, value) => total + value,
     0,
@@ -723,95 +732,44 @@ export default function App() {
               onToast={handleToast}
             />
             <header className="game-hud">
-              <div className="level-chip">
-                <small>
-                  {mode === "story"
-                    ? `第 ${level + 1} 关`
-                    : mode === "endless"
-                      ? `第 ${snapshot.wave} 波`
-                      : `Rogue 第 ${wave} 关`}
-                </small>
-                <strong>
-                  {mode === "story" ? LEVELS[level].name : MODE_INFO[mode].name}
-                </strong>
-              </div>
               <div className="score-chip">
-                <small>SCORE</small>
+                <small>分数</small>
                 <b>{formatScore(snapshot.score)}</b>
               </div>
               <div className="target-chip">
-                <small>{mode === "endless" ? "当前最高" : "本关目标"}</small>
+                <small>{mode === "endless" ? "最高" : "目标"}</small>
                 <strong>
                   {mode === "endless"
                     ? FRUITS[Math.min(snapshot.maxFruitTier, FRUITS.length - 1)]
                         .emoji
                     : `${target.emoji} ×1`}
                 </strong>
-                {mode !== "endless" ? (
-                  <span>
-                    当前最高：
-                    {
-                      FRUITS[
-                        Math.min(snapshot.maxFruitTier, FRUITS.length - 1)
-                      ].emoji
-                    }
-                  </span>
-                ) : null}
               </div>
               <button
-                className="icon-button pause-button"
-                onClick={openPause}
-                aria-label="暂停游戏"
+                className="top-action"
+                onClick={() => openGamePanel("tools")}
+                aria-label="打开道具箱"
               >
-                Ⅱ
+                <i>🧰</i>
+                <span>道具</span>
+              </button>
+              <button
+                className="top-action"
+                onClick={() => openGamePanel("help")}
+                aria-label="打开玩法说明"
+              >
+                <i>?</i>
+                <span>说明</span>
+              </button>
+              <button
+                className="top-action"
+                onClick={() => openGamePanel("menu")}
+                aria-label="打开游戏菜单"
+              >
+                <i>≡</i>
+                <span>菜单</span>
               </button>
             </header>
-            {relics.length > 0 ? (
-              <div className="relic-strip">
-                {relics.map((id) => {
-                  const relic = RELICS.find((item) => item.id === id);
-                  return relic ? (
-                    <span key={id} title={relic.name}>
-                      {relic.icon}
-                    </span>
-                  ) : null;
-                })}
-              </div>
-            ) : null}
-            <div className="power-dock">
-              <button
-                disabled={!snapshot.undoLeft}
-                onClick={() => controlsRef.current?.undo()}
-              >
-                <i>↶</i>
-                <span>撤回</span>
-                <em>{snapshot.undoLeft}</em>
-              </button>
-              <button
-                disabled={!snapshot.shuffleLeft}
-                onClick={() => controlsRef.current?.shuffle()}
-              >
-                <i>⤨</i>
-                <span>洗牌</span>
-                <em>{snapshot.shuffleLeft}</em>
-              </button>
-              <button
-                disabled={!snapshot.hammerLeft}
-                onClick={() => controlsRef.current?.hammer()}
-              >
-                <i>🔨</i>
-                <span>清顶</span>
-                <em>{snapshot.hammerLeft}</em>
-              </button>
-              <button
-                disabled={!snapshot.wildLeft}
-                onClick={() => controlsRef.current?.wild()}
-              >
-                <i>🍀</i>
-                <span>万能</span>
-                <em>{snapshot.wildLeft}</em>
-              </button>
-            </div>
             <div
               className={`combo-pill ${snapshot.combo >= 3 ? "hot" : ""}`}
               aria-hidden={snapshot.combo < 2}
@@ -829,64 +787,130 @@ export default function App() {
                 {toast.message}
               </button>
             ) : null}
-            {pauseOpen && !result ? (
-              <div className="pause-layer" role="dialog" aria-modal="true">
-                <section className="pause-card">
-                  <small>ORCHARD BREAK</small>
-                  <h2>游戏暂停</h2>
-                  <p>进度已停住。高级道具收在这里，避免首屏误触。</p>
-                  <div className="pause-tools" aria-label="更多道具">
-                    <button
-                      disabled={!snapshot.juiceLeft}
-                      onClick={() =>
-                        usePausedTool((controls) => controls.juice())
-                      }
-                    >
-                      <i>🥤</i><span>榨汁</span><em>×{snapshot.juiceLeft}</em>
-                    </button>
-                    <button
-                      disabled={!snapshot.magnetLeft}
-                      onClick={() =>
-                        usePausedTool((controls) => controls.magnet())
-                      }
-                    >
-                      <i>🧲</i><span>合并</span><em>×{snapshot.magnetLeft}</em>
-                    </button>
-                    <button
-                      disabled={!snapshot.bubbleLeft}
-                      onClick={() =>
-                        usePausedTool((controls) => controls.bubble())
-                      }
-                    >
-                      <i>🫧</i><span>清槽</span><em>×{snapshot.bubbleLeft}</em>
-                    </button>
-                    <button
-                      disabled={!snapshot.sunLeft}
-                      onClick={() =>
-                        usePausedTool((controls) => controls.sunshine())
-                      }
-                    >
-                      <i>☀️</i><span>净化</span><em>×{snapshot.sunLeft}</em>
-                    </button>
-                  </div>
-                  <button className="pause-resume" onClick={closePause}>
-                    继续游戏
+            {gamePanel && !result ? (
+              <div className="game-panel-layer" role="dialog" aria-modal="true">
+                <section className={`game-panel-card panel-${gamePanel}`}>
+                  <button
+                    className="panel-close"
+                    onClick={closeGamePanel}
+                    aria-label="关闭"
+                  >
+                    ×
                   </button>
-                  <div className="pause-actions">
-                    <button
-                      onClick={() => {
-                        setPauseOpen(false);
-                        beginGame(level, mode, {
-                          wave,
-                          relics,
-                          score: carryScore,
-                        });
-                      }}
-                    >
-                      ↻ 重新开始
-                    </button>
-                    <button onClick={backHome}>⌂ 返回首页</button>
-                  </div>
+                  {gamePanel === "tools" ? (
+                    <>
+                      <small>TOOL BOX</small>
+                      <h2>道具箱</h2>
+                      <div className="toolbox-grid" aria-label="所有道具">
+                        <button
+                          disabled={!snapshot.undoLeft}
+                          onClick={() => useTool((controls) => controls.undo())}
+                        >
+                          <i>↶</i><span>撤回</span><em>×{snapshot.undoLeft}</em>
+                        </button>
+                        <button
+                          disabled={!snapshot.shuffleLeft}
+                          onClick={() =>
+                            useTool((controls) => controls.shuffle())
+                          }
+                        >
+                          <i>⤨</i><span>洗牌</span><em>×{snapshot.shuffleLeft}</em>
+                        </button>
+                        <button
+                          disabled={!snapshot.juiceLeft}
+                          onClick={() => useTool((controls) => controls.juice())}
+                        >
+                          <i>🥤</i><span>榨汁</span><em>×{snapshot.juiceLeft}</em>
+                        </button>
+                        <button
+                          disabled={!snapshot.hammerLeft}
+                          onClick={() =>
+                            useTool((controls) => controls.hammer())
+                          }
+                        >
+                          <i>🔨</i><span>清顶</span><em>×{snapshot.hammerLeft}</em>
+                        </button>
+                        <button
+                          disabled={!snapshot.magnetLeft}
+                          onClick={() =>
+                            useTool((controls) => controls.magnet())
+                          }
+                        >
+                          <i>🧲</i><span>合并</span><em>×{snapshot.magnetLeft}</em>
+                        </button>
+                        <button
+                          disabled={!snapshot.wildLeft}
+                          onClick={() => useTool((controls) => controls.wild())}
+                        >
+                          <i>🍀</i><span>万能</span><em>×{snapshot.wildLeft}</em>
+                        </button>
+                        <button
+                          disabled={!snapshot.bubbleLeft}
+                          onClick={() =>
+                            useTool((controls) => controls.bubble())
+                          }
+                        >
+                          <i>🫧</i><span>清槽</span><em>×{snapshot.bubbleLeft}</em>
+                        </button>
+                        <button
+                          disabled={!snapshot.sunLeft}
+                          onClick={() =>
+                            useTool((controls) => controls.sunshine())
+                          }
+                        >
+                          <i>☀️</i><span>净化</span><em>×{snapshot.sunLeft}</em>
+                        </button>
+                      </div>
+                    </>
+                  ) : null}
+                  {gamePanel === "help" ? (
+                    <>
+                      <small>HOW TO PLAY</small>
+                      <h2>玩法说明</h2>
+                      <div className="help-flow" aria-label="玩法流程">
+                        <span>点亮卡</span><i>›</i><span>三张入槽</span><i>›</i>
+                        <span>水果掉落</span><i>›</i><span>同果合成</span>
+                      </div>
+                      <div className="help-rules">
+                        <span>被压住的卡片不能选</span>
+                        <span>拖动可选择水果落点</span>
+                      </div>
+                      <h3>合成路径</h3>
+                      <div className="help-chain">
+                        {helpChain.map((fruit, index) => (
+                          <span key={fruit.name}>
+                            <b>{fruit.emoji}</b>
+                            <small>{fruit.name}</small>
+                            {index < helpChain.length - 1 ? <i>›</i> : null}
+                          </span>
+                        ))}
+                      </div>
+                    </>
+                  ) : null}
+                  {gamePanel === "menu" ? (
+                    <>
+                      <small>MENU</small>
+                      <h2>游戏菜单</h2>
+                      <button className="panel-primary" onClick={closeGamePanel}>
+                        继续游戏
+                      </button>
+                      <div className="panel-actions">
+                        <button
+                          onClick={() => {
+                            setGamePanel(null);
+                            beginGame(level, mode, {
+                              wave,
+                              relics,
+                              score: carryScore,
+                            });
+                          }}
+                        >
+                          ↻ 重新开始
+                        </button>
+                        <button onClick={backHome}>⌂ 返回首页</button>
+                      </div>
+                    </>
+                  ) : null}
                 </section>
               </div>
             ) : null}

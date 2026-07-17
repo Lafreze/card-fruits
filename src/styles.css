@@ -497,220 +497,107 @@ input:focus-visible {
 .game-hud {
   position: absolute;
   z-index: 2;
-  top: 12px;
-  top: 2.8cqw;
+  top: 11px;
+  top: 2.55cqw;
   left: 14px;
   left: 3.3cqw;
   right: 14px;
   right: 3.3cqw;
-  height: 60px;
-  height: 14cqw;
-  display: flex;
-  gap: 6px;
-  gap: 1.35cqw;
-  align-items: center;
+  height: 54px;
+  height: 12.6cqw;
+  display: grid;
+  grid-template-columns: 1.15fr 1.15fr repeat(3, 0.82fr);
+  gap: 5px;
+  gap: 1.16cqw;
   pointer-events: none;
 }
 .game-hud > * {
   pointer-events: auto;
 }
-.icon-button {
-  width: 34px;
-  width: 7.9cqw;
-  height: 34px;
-  height: 7.9cqw;
-  border: 1px solid rgba(255, 255, 255, 0.28);
-  border-radius: 12px;
-  border-radius: 2.8cqw;
-  color: #fff;
-  background: linear-gradient(145deg, rgba(91, 61, 142, 0.96), rgba(49, 38, 93, 0.94));
-  font-size: 28px;
-  font-size: 6.5cqw;
-  line-height: 1;
-  cursor: pointer;
-}
-.level-chip {
-  flex: 1;
-  min-width: 0;
-}
-.level-chip small,
 .score-chip small,
 .target-chip small {
   display: block;
-  color: #9d8bbf;
+  color: #aaa2c9;
   font-size: 8px;
   font-size: 1.9cqw;
-  letter-spacing: 0.14em;
+  letter-spacing: 0.08em;
   font-weight: 800;
 }
-.level-chip strong {
-  display: block;
-  margin-top: 2px;
-  font-size: 13px;
-  font-size: 3cqw;
-  overflow: hidden;
-  white-space: nowrap;
-  text-overflow: ellipsis;
-}
-.score-chip {
-  min-width: 78px;
-  min-width: 18.1cqw;
-  padding: 8px 10px;
-  padding: 1.9cqw 2.3cqw;
-  border: 1px solid rgba(255, 226, 129, 0.35);
+.score-chip,
+.target-chip,
+.top-action {
+  min-width: 0;
+  border: 1px solid rgba(174, 157, 225, 0.34);
   border-radius: 13px;
   border-radius: 3cqw;
-  background: rgba(76, 51, 123, 0.9);
+  background: linear-gradient(
+    145deg,
+    rgba(70, 54, 119, 0.92),
+    rgba(39, 37, 87, 0.94)
+  );
+  box-shadow: inset 0 1px rgba(255, 255, 255, 0.08);
+}
+.score-chip,
+.target-chip {
+  padding: 7px 9px;
+  padding: 1.6cqw 2.1cqw;
 }
 .score-chip b {
   display: block;
   margin-top: 2px;
-  color: var(--gold);
+  color: #f5f1ff;
   font-size: 14px;
   font-size: 3.3cqw;
   font-variant-numeric: tabular-nums;
 }
 .target-chip {
-  min-width: 88px;
-  min-width: 20.5cqw;
-  padding: 6px 8px;
-  padding: 1.4cqw 1.9cqw;
-  border: 1px solid rgba(69, 220, 255, 0.28);
-  border-radius: 13px;
-  border-radius: 3cqw;
-  background: rgba(30, 40, 88, 0.88);
   text-align: left;
 }
 .target-chip strong {
   display: block;
-  margin-top: 1px;
-  color: #fff8c8;
+  margin-top: 2px;
+  color: #f5f1ff;
   font-size: 13px;
   font-size: 3cqw;
   line-height: 1.05;
 }
-.target-chip span {
-  display: block;
-  margin-top: 2px;
-  color: #83eaff;
-  font-size: 8px;
-  font-size: 1.85cqw;
-  font-weight: 800;
-  white-space: nowrap;
-}
-.pause-button {
-  flex: 0 0 auto;
-  width: 31px;
-  width: 7.2cqw;
-  height: 34px;
-  height: 7.9cqw;
+.top-action {
   padding: 0;
-  color: #fff3a5;
-  font-size: 13px;
-  font-size: 3cqw;
-  font-weight: 950;
-}
-
-/* 四个核心道具分列转换口两侧，中央留出三消转果的视觉通道。 */
-.power-dock {
-  position: absolute;
-  z-index: 3;
-  left: 4.2%;
-  right: 4.2%;
-  top: 57.2%;
-  height: 5.6%;
-  display: grid;
-  grid-template-columns:
-    repeat(2, minmax(0, 1fr)) 1.22fr repeat(2, minmax(0, 1fr));
-  gap: 1.1%;
-}
-.power-dock button:nth-child(3) {
-  grid-column: 4;
-}
-.power-dock button {
-  min-width: 0;
-  padding: 0;
-  position: relative;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 0;
-  border: 1px solid rgba(221, 202, 255, 0.4);
-  border-radius: 12px;
-  border-radius: 2.8cqw;
-  color: #f8f1ff;
-  background: linear-gradient(155deg, rgba(87, 58, 135, 0.98), rgba(44, 35, 91, 0.98));
-  box-shadow: inset 0 1px rgba(255, 255, 255, 0.12), 0 5px 14px rgba(8, 5, 36, 0.28);
+  gap: 2px;
+  color: #e9e4f7;
   cursor: pointer;
 }
-.power-dock button:active {
-  transform: translateY(1px) scale(0.95);
+.top-action:active {
+  transform: scale(0.96);
 }
-.power-dock button:disabled {
-  opacity: 0.28;
-  cursor: default;
-}
-.power-dock i {
+.top-action i {
   font-style: normal;
-  font-size: 16px;
-  font-size: 3.7cqw;
-  line-height: 1.15;
-}
-.power-dock span {
-  font-size: 9px;
-  font-size: 1.9cqw;
-  font-weight: 800;
-  line-height: 1.1;
-}
-.power-dock em {
-  position: absolute;
-  top: -4px;
-  top: -0.95cqw;
-  right: -3px;
-  right: -0.7cqw;
-  min-width: 12px;
-  min-width: 2.8cqw;
-  height: 12px;
-  height: 2.8cqw;
-  display: grid;
-  place-items: center;
-  border-radius: 50%;
-  color: #2c1538;
-  background: #ffd55f;
-  font-size: 8px;
-  font-size: 1.9cqw;
-  font-style: normal;
+  font-size: 15px;
+  font-size: 3.5cqw;
   font-weight: 900;
+  line-height: 1;
 }
-.relic-strip {
-  position: absolute;
-  z-index: 4;
-  top: 10.2%;
-  left: 50%;
-  transform: translateX(-50%);
-  display: flex;
-  gap: 3px;
-  padding: 3px 7px;
-  border: 1px solid rgba(255, 216, 94, 0.16);
-  border-radius: 999px;
-  background: rgba(20, 10, 43, 0.78);
+.top-action span {
+  font-size: 9px;
+  font-size: 2.1cqw;
+  font-weight: 850;
 }
-.relic-strip span {
-  font-size: 11px;
-}
-/* 连击标签悬在卡区(y402)与卡槽(y414)的接缝上,居中锚定不压格子 */
+/* 连击标签只在连击时短暂出现，不占用常驻信息层。 */
 .combo-pill {
   position: absolute;
   z-index: 4;
   left: 50%;
-  top: 47.3%;
+  top: 49.1%;
   transform: translate(-50%, -50%) scale(0);
   padding: 0;
   border: 0;
   color: #fff;
   background: transparent;
-  text-shadow: 0 2px 5px #2b0b41, 0 0 13px rgba(255, 73, 161, 0.9);
+  text-shadow: 0 2px 5px #211838, 0 0 13px rgba(161, 139, 230, 0.85);
   font-size: 9px;
   font-size: 2.1cqw;
   font-weight: 800;
@@ -721,12 +608,12 @@ input:focus-visible {
   transform: translate(-50%, -50%) scale(1);
 }
 .combo-pill.hot {
-  color: #ffd45e;
-  text-shadow: 0 2px 5px #5a1b21, 0 0 18px rgba(255, 159, 55, 0.95);
+  color: #d8cff8;
+  text-shadow: 0 2px 5px #211838, 0 0 18px rgba(184, 166, 239, 0.95);
 }
 .combo-pill b {
   margin-left: 4px;
-  color: #fff199;
+  color: #f1edff;
   font-size: 14px;
   font-size: 3.3cqw;
 }
@@ -753,7 +640,7 @@ input:focus-visible {
   animation: toastPop 1.2s ease both;
 }
 
-.pause-layer {
+.game-panel-layer {
   position: absolute;
   z-index: 12;
   inset: 0;
@@ -763,51 +650,60 @@ input:focus-visible {
   padding: 5.6cqw;
   background: rgba(10, 6, 28, 0.72);
   backdrop-filter: blur(9px);
-  animation: pauseFade 0.18s ease both;
+  animation: panelFade 0.18s ease both;
 }
-.pause-card {
+.game-panel-card {
+  position: relative;
   width: 100%;
   padding: 24px 20px 19px;
   padding: 5.6cqw 4.7cqw 4.4cqw;
-  border: 1px solid rgba(205, 178, 255, 0.48);
+  border: 1px solid rgba(179, 163, 226, 0.46);
   border-radius: 27px;
   border-radius: 6.3cqw;
   background: linear-gradient(
     150deg,
-    rgba(74, 46, 123, 0.98),
-    rgba(26, 27, 72, 0.98)
+    rgba(61, 47, 105, 0.98),
+    rgba(27, 27, 67, 0.98)
   );
   box-shadow:
     0 24px 70px rgba(7, 3, 25, 0.58),
     inset 0 1px rgba(255, 255, 255, 0.13);
   text-align: center;
 }
-.pause-card > small {
-  color: #8cecff;
+.game-panel-card > small {
+  color: #aaa2dc;
   font-size: 9px;
   font-size: 2.1cqw;
   font-weight: 900;
   letter-spacing: 0.22em;
 }
-.pause-card h2 {
-  margin: 6px 0 3px;
+.game-panel-card h2 {
+  margin: 6px 0 16px;
   font-size: 26px;
   font-size: 6cqw;
 }
-.pause-card > p {
-  margin: 0 auto 16px;
-  color: #b8a9d1;
-  font-size: 10px;
-  font-size: 2.3cqw;
+.panel-close {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  border: 1px solid rgba(184, 170, 220, 0.22);
+  border-radius: 10px;
+  color: #c9c0df;
+  background: rgba(20, 17, 51, 0.52);
+  font-size: 20px;
+  line-height: 1;
+  cursor: pointer;
 }
-.pause-tools {
+.toolbox-grid {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
   gap: 7px;
   gap: 1.6cqw;
-  margin-bottom: 15px;
 }
-.pause-tools button {
+.toolbox-grid button {
   min-width: 0;
   padding: 10px 3px 8px;
   padding: 2.3cqw 0.7cqw 1.9cqw;
@@ -820,48 +716,129 @@ input:focus-visible {
   background: rgba(21, 17, 58, 0.72);
   cursor: pointer;
 }
-.pause-tools button:disabled {
+.toolbox-grid button:disabled {
   opacity: 0.28;
   cursor: default;
 }
-.pause-tools i {
+.toolbox-grid i {
   font-size: 20px;
   font-size: 4.7cqw;
   font-style: normal;
 }
-.pause-tools span {
+.toolbox-grid span {
   font-size: 9px;
   font-size: 2.1cqw;
   font-weight: 850;
 }
-.pause-tools em {
-  color: #ffd85e;
+.toolbox-grid em {
+  color: #c8bcff;
   font-size: 8px;
   font-size: 1.85cqw;
   font-style: normal;
   font-weight: 900;
 }
-.pause-resume {
+.help-flow {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  margin-bottom: 12px;
+}
+.help-flow span {
+  padding: 7px 8px;
+  border: 1px solid rgba(178, 161, 225, 0.2);
+  border-radius: 10px;
+  color: #eeeafd;
+  background: rgba(25, 21, 59, 0.58);
+  font-size: 9px;
+  font-size: 2.1cqw;
+  font-weight: 850;
+  white-space: nowrap;
+}
+.help-flow i {
+  color: #80769c;
+  font-style: normal;
+}
+.help-rules {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 7px;
+}
+.help-rules span {
+  padding: 8px 5px;
+  border-radius: 10px;
+  color: #aca4c4;
+  background: rgba(18, 16, 47, 0.42);
+  font-size: 9px;
+  font-size: 2.1cqw;
+}
+.game-panel-card h3 {
+  margin: 18px 0 8px;
+  color: #c8c1de;
+  font-size: 10px;
+  font-size: 2.35cqw;
+  letter-spacing: 0.12em;
+}
+.help-chain {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 12px 10px;
+  overflow-x: auto;
+  border: 1px solid rgba(178, 161, 225, 0.18);
+  border-radius: 14px;
+  background: rgba(18, 16, 47, 0.5);
+  scrollbar-width: none;
+}
+.help-chain::-webkit-scrollbar {
+  display: none;
+}
+.help-chain span {
+  flex: 0 0 auto;
+  display: grid;
+  grid-template-columns: auto auto;
+  grid-template-rows: auto auto;
+  align-items: center;
+  column-gap: 5px;
+}
+.help-chain b {
+  grid-row: 1;
+  font-size: 23px;
+  font-size: 5.35cqw;
+}
+.help-chain small {
+  grid-row: 2;
+  color: #8f87a5;
+  font-size: 7px;
+  font-size: 1.65cqw;
+}
+.help-chain i {
+  grid-column: 2;
+  grid-row: 1 / span 2;
+  color: #6e6684;
+  font-style: normal;
+}
+.panel-primary {
   width: 100%;
   padding: 12px;
   padding: 2.8cqw;
   border: 0;
   border-radius: 14px;
-  color: #301437;
-  background: linear-gradient(100deg, #ffdc69, #ff8d4b 62%, #ff5b98);
-  box-shadow: 0 9px 22px rgba(255, 88, 144, 0.24);
+  color: #17132f;
+  background: #b9a9f4;
+  box-shadow: 0 9px 22px rgba(118, 98, 194, 0.24);
   font-size: 13px;
   font-size: 3cqw;
   font-weight: 950;
   cursor: pointer;
 }
-.pause-actions {
+.panel-actions {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 7px;
   margin-top: 8px;
 }
-.pause-actions button {
+.panel-actions button {
   padding: 9px 4px;
   border: 1px solid rgba(205, 179, 246, 0.22);
   border-radius: 12px;
@@ -872,7 +849,7 @@ input:focus-visible {
   font-weight: 800;
   cursor: pointer;
 }
-@keyframes pauseFade {
+@keyframes panelFade {
   from {
     opacity: 0;
   }

@@ -398,13 +398,12 @@ export const LEVELS: LevelDefinition[] = [
   },
 ];
 
-// 竖屏分带:HUD 0-76 / 卡区 82-408 / 卡槽 416-478 / 转换口+道具 490-544 / 果箱 552-842
+// 竖屏分带:顶部 0-68 / 卡片区 76-418 / 卡槽 426-490 / 合成区 500-842
 export const WORLD = {
   width: 430,
   height: 860,
-  stack: { x: 15, y: 82, width: 400, height: 326 },
-  tray: { x: 18, y: 416, width: 394, height: 62 },
-  converter: { x: 215, y: 516 },
-  box: { x: 17, y: 552, width: 396, height: 290 },
-  dangerY: 602,
+  stack: { x: 15, y: 76, width: 400, height: 342 },
+  tray: { x: 18, y: 426, width: 394, height: 64 },
+  box: { x: 17, y: 500, width: 396, height: 342 },
+  dangerY: 550,
 };
