@@ -9,6 +9,7 @@ import {
 import "pixi.js/unsafe-eval";
 import Matter from "matter-js";
 import { FRUITS, LEVELS, WORLD } from "./data";
+import { buildPlayableDeal } from "./logic";
 import { haptic, sounds } from "./audio";
 import {
   rollMutator,
@@ -74,6 +75,18 @@ type CardFlight = {
   life: number;
   maxLife: number;
 };
+type FusionEcho = {
+  first: Text;
+  second: Text;
+  result: Text;
+  fromA: { x: number; y: number };
+  fromB: { x: number; y: number };
+  center: { x: number; y: number };
+  sourceIds: [number, number];
+  tier: number;
+  velocityX: number;
+  elapsed: number;
+};
 
 const { Engine, Bodies, Body, Composite, Events } = Matter;
 const CARD_W = 58;
@@ -119,6 +132,7 @@ export class FruitGame implements GameControls {
   private labels: FloatLabel[] = [];
   private conversions: ConversionSequence[] = [];
   private cardFlights: CardFlight[] = [];
+  private fusionEchoes: FusionEcho[] = [];
   private tray: number[] = [];
   private pendingDrops: number[] = [];
   private dropToken = 0;
@@ -163,6 +177,8 @@ export class FruitGame implements GameControls {
   private feverUntil = -1;
   private feverFill: Graphics | null = null;
   private feverLabel: Text | null = null;
+  private dangerLabel: Text | null = null;
+  private dangerGlow: Graphics | null = null;
   private mutatorTag: Text | null = null;
   private secondWindUsed = false;
   private lastPick: CardNode | null = null;
@@ -354,31 +370,31 @@ export class FruitGame implements GameControls {
   }
 
   private drawScene() {
-    // 奶白底 + 三团柔和粉彩光晕,无描边无线条
+    // 暖象牙底 + 低饱和紫金光场；高饱和色只留给水果与关键反馈。
     const background = new Graphics()
       .rect(0, 0, WORLD.width, WORLD.height)
-      .fill({ color: 0xf6f2ec });
+      .fill({ color: 0xf4f0ea });
     this.ambientLayer.addChild(background);
 
     const haloA = new Graphics()
       .circle(70, 175, 125)
-      .fill({ color: 0xffd9c4, alpha: 0.4 });
+      .fill({ color: 0xe8d8ca, alpha: 0.34 });
     const haloB = new Graphics()
       .circle(380, 610, 150)
-      .fill({ color: 0xd8d0f8, alpha: 0.38 });
+      .fill({ color: 0xd9d1ed, alpha: 0.38 });
     const haloC = new Graphics()
       .circle(215, 830, 130)
-      .fill({ color: 0xc4ead6, alpha: 0.34 });
+      .fill({ color: 0xd9e1d8, alpha: 0.28 });
     haloA.filters = [new BlurFilter({ strength: 52 })];
     haloB.filters = [new BlurFilter({ strength: 60 })];
     haloC.filters = [new BlurFilter({ strength: 55 })];
     this.ambientLayer.addChild(haloA, haloB, haloC);
 
-    const dotPalette = [0xffbfa3, 0xc3b6f2, 0xa9dec2, 0xf7cdd9];
-    for (let index = 0; index < 30; index += 1) {
-      const star = new Graphics().circle(0, 0, 1 + Math.random() * 1.6).fill({
+    const dotPalette = [0xc4b8d8, 0xd2c3b4, 0xb9c8bd];
+    for (let index = 0; index < 18; index += 1) {
+      const star = new Graphics().circle(0, 0, 0.8 + Math.random() * 1.2).fill({
         color: dotPalette[index % dotPalette.length],
-        alpha: 0.2 + Math.random() * 0.3,
+        alpha: 0.16 + Math.random() * 0.22,
       });
       star.position.set(
         Math.random() * WORLD.width,
@@ -388,7 +404,7 @@ export class FruitGame implements GameControls {
       this.ambientLayer.addChild(star);
     }
 
-    // 白色卡片面板:用一层柔影 + 一层纯白模拟悬浮卡片,不用描边
+    // 三块悬浮面板共用同一纸张、细边和阴影体系。
     const panel = (
       x: number,
       y: number,
@@ -398,12 +414,16 @@ export class FruitGame implements GameControls {
       tint = 0xffffff,
     ) => {
       const shadow = new Graphics()
-        .roundRect(x + 3, y + 7, width - 6, height, radius + 2)
-        .fill({ color: 0x9186ad, alpha: 0.16 });
+        .roundRect(x + 2, y + 7, width - 4, height, radius + 2)
+        .fill({ color: 0x44394f, alpha: 0.13 });
       const face = new Graphics()
         .roundRect(x, y, width, height, radius)
-        .fill({ color: tint, alpha: 0.94 });
-      this.ambientLayer.addChild(shadow, face);
+        .fill({ color: tint, alpha: 0.96 })
+        .stroke({ color: 0xe5dfe7, alpha: 0.9, width: 1 });
+      const highlight = new Graphics()
+        .roundRect(x + 13, y + 10, width - 26, 2, 1)
+        .fill({ color: 0xffffff, alpha: 0.92 });
+      this.ambientLayer.addChild(shadow, face, highlight);
     };
     panel(
       WORLD.stack.x,
@@ -422,7 +442,17 @@ export class FruitGame implements GameControls {
       0xfffdf8,
     );
 
-    // 甜度警戒:柔和红晕横带代替硬线条
+    // 甜度警戒在安全时近乎隐形，真正超线后再逐级显现。
+    this.dangerGlow = new Graphics()
+      .roundRect(
+        WORLD.box.x + 8,
+        WORLD.dangerY - 18,
+        WORLD.box.width - 16,
+        36,
+        18,
+      )
+      .fill({ color: 0xe67d72, alpha: 1 });
+    this.dangerGlow.alpha = 0;
     const danger = new Graphics()
       .roundRect(
         WORLD.box.x + 16,
@@ -431,9 +461,9 @@ export class FruitGame implements GameControls {
         4,
         2,
       )
-      .fill({ color: 0xff8f84, alpha: 0.4 });
+      .fill({ color: 0xd99186, alpha: 0.28 });
     danger.label = "danger-line";
-    this.ambientLayer.addChild(danger);
+    this.ambientLayer.addChild(this.dangerGlow, danger);
 
     const zoneLabel = (text: string, x: number, y: number, anchorX = 0) => {
       const label = new Text({
@@ -458,18 +488,18 @@ export class FruitGame implements GameControls {
       1,
     );
 
-    const dangerLabel = new Text({
+    this.dangerLabel = new Text({
       text: "甜度线",
       style: {
         fontFamily: "system-ui",
         fontSize: 9,
         fontWeight: "800",
-        fill: 0xe3968f,
+        fill: 0xb98b84,
         letterSpacing: 1,
       },
     });
-    dangerLabel.position.set(33, WORLD.dangerY - 17);
-    this.ambientLayer.addChild(dangerLabel);
+    this.dangerLabel.position.set(33, WORLD.dangerY - 17);
+    this.ambientLayer.addChild(this.dangerLabel);
 
     // 狂热能量条:贴在卡槽面板底边,充满触发 9 秒狂热
     const feverBack = new Graphics()
@@ -657,18 +687,8 @@ export class FruitGame implements GameControls {
   }
 
   private createCards(definition = LEVELS[this.levelIndex]) {
-    // 先保留可解的三张小组，再做跨层换位；比整组三连更随机，也不会彻底打散到纯碰运气。
-    const tiers = shuffle(
-      definition.cards.flatMap(({ tier, count }) =>
-        Array.from({ length: count / 3 }, () => tier),
-      ),
-    ).flatMap((tier) => [tier, tier, tier]);
-    for (let swap = 0; swap < Math.floor(tiers.length * 0.55); swap += 1) {
-      const first = Math.floor(Math.random() * tiers.length);
-      const second = Math.floor(Math.random() * tiers.length);
-      [tiers[first], tiers[second]] = [tiers[second], tiers[first]];
-    }
     // 布局块展开成卡位,按层从低到高排序;设计上卡位数 = 卡片数,不足时向上叠补
+    const cardCount = definition.cards.reduce((sum, card) => sum + card.count, 0);
     const slots = definition.layout
       .flatMap((block) =>
         Array.from({ length: block.cols * block.rows }, (_, cell) => ({
@@ -680,49 +700,21 @@ export class FruitGame implements GameControls {
         })),
       )
       .sort((a, b) => a.layer - b.layer);
-    while (slots.length < tiers.length) {
+    while (slots.length < cardCount) {
       const top = slots[slots.length - 1];
       slots.push({ layer: top.layer + 1, x: top.x + 5, y: top.y - 6 });
     }
     this.scatterSlots(slots);
     const maxLayer = slots[slots.length - 1].layer;
-    const exposedSlotIndexes = slots
-      .map((slot, index) => ({ slot, index }))
-      .filter(
-        ({ slot }) =>
-          !slots.some((other) => {
-            if (other.layer <= slot.layer) return false;
-            const overlapX = Math.max(
-              0,
-              CARD_COVER_W - Math.abs(other.x - slot.x),
-            );
-            const overlapY = Math.max(
-              0,
-              CARD_COVER_H - Math.abs(other.y - slot.y),
-            );
-            return overlapX > COVER_EPSILON && overlapY > COVER_EPSILON;
-          }),
-      )
-      .map(({ index }) => index);
-
-    // 每关开局至少亮出同类三张,避免随机洗牌后顶部卡片无法组成第一组三消。
-    const openingTier = definition.cards.find(({ count }) => count >= 3)?.tier;
-    const protectedOpeningSlots = new Set(exposedSlotIndexes.slice(0, 3));
-    if (openingTier !== undefined && protectedOpeningSlots.size === 3) {
-      [...protectedOpeningSlots].forEach((targetIndex, openingIndex) => {
-        const earlierTargets = exposedSlotIndexes.slice(0, openingIndex);
-        const sourceIndex = tiers.findIndex(
-          (tier, index) =>
-            tier === openingTier && !earlierTargets.includes(index),
-        );
-        if (sourceIndex >= 0 && sourceIndex !== targetIndex) {
-          [tiers[targetIndex], tiers[sourceIndex]] = [
-            tiers[sourceIndex],
-            tiers[targetIndex],
-          ];
-        }
-      });
-    }
+    // 生成一条经过牌阵遮挡验证的安全路线。牌面仍有多条可选分支，
+    // 但不再出现“开局能消、后续只能靠洗牌”的纯随机死局。
+    const deal = buildPlayableDeal(
+      definition.cards.flatMap(({ tier, count }) =>
+        Array.from({ length: count / 3 }, () => tier),
+      ),
+      slots,
+    );
+    const { tiers, openingSlots: protectedOpeningSlots } = deal;
 
     tiers.forEach((tier, index) => {
       const slot = slots[index];
@@ -769,12 +761,12 @@ export class FruitGame implements GameControls {
         active: true,
         x,
         y,
-        view: this.makeCard(tier, special),
+        view: this.makeCard(tier, special, slot.layer),
         locked,
         special,
       };
       card.view.position.set(x, y);
-      card.view.rotation = (Math.random() - 0.5) * 0.14;
+      card.view.rotation = (Math.random() - 0.5) * 0.075;
       card.view.zIndex = slot.layer * 100 + index;
       card.view.on("pointertap", (event: FederatedPointerEvent) => {
         event.stopPropagation();
@@ -787,7 +779,7 @@ export class FruitGame implements GameControls {
     this.updateCardAccess();
   }
 
-  // 把设计卡位揉成不同牌阵:整组旋转、镜像、层间扭转和单卡抖动每局都会重抽。
+  // 同一牌阵保留镜像和层间轻微错位；限制旋转与剪切，让堆叠更像精心摆放的实体卡。
   private scatterSlots(slots: Array<{ layer: number; x: number; y: number }>) {
     const mirrorX = Math.random() < 0.5;
     const mirrorY = Math.random() < 0.35;
@@ -795,12 +787,12 @@ export class FruitGame implements GameControls {
     const maxLayer = Math.max(...slots.map((slot) => slot.layer));
     const centerX = WORLD.width / 2;
     const centerY = WORLD.stack.y + WORLD.stack.height / 2;
-    const rotation = (Math.random() - 0.5) * 0.2;
-    const twist = (Math.random() - 0.5) * 0.035;
-    const shear = (Math.random() - 0.5) * 0.22;
-    const wave = (Math.random() - 0.5) * 15;
-    const globalDx = (Math.random() - 0.5) * 22;
-    const globalDy = (Math.random() - 0.5) * 12;
+    const rotation = (Math.random() - 0.5) * 0.075;
+    const twist = (Math.random() - 0.5) * 0.012;
+    const shear = (Math.random() - 0.5) * 0.07;
+    const wave = (Math.random() - 0.5) * 6;
+    const globalDx = (Math.random() - 0.5) * 12;
+    const globalDy = (Math.random() - 0.5) * 8;
     const drift = new Map<number, { dx: number; dy: number }>();
     slots.forEach((slot) => {
       if (mirrorX) slot.x = WORLD.width - slot.x;
@@ -813,19 +805,19 @@ export class FruitGame implements GameControls {
       slot.y = centerY + dx * Math.sin(angle) + dy * Math.cos(angle);
       slot.x += (slot.y - (WORLD.stack.y + WORLD.stack.height / 2)) * shear;
       slot.y += Math.sin(slot.x / 48 + slot.layer * 0.9) * wave;
-      if (variant === 1) slot.x += Math.sin(slot.layer * 1.45) * 17;
+      if (variant === 1) slot.x += Math.sin(slot.layer * 1.45) * 9;
       if (variant === 2)
-        slot.y += Math.cos(slot.layer * 1.2 + slot.x / 95) * 12;
+        slot.y += Math.cos(slot.layer * 1.2 + slot.x / 95) * 7;
       if (variant === 3)
-        slot.x += (slot.layer % 2 ? 1 : -1) * (7 + slot.layer * 2.3);
+        slot.x += (slot.layer % 2 ? 1 : -1) * (4 + slot.layer * 1.2);
       if (!drift.has(slot.layer))
         drift.set(slot.layer, {
-          dx: (Math.random() - 0.5) * 34,
-          dy: (Math.random() - 0.5) * 24,
+          dx: (Math.random() - 0.5) * 18,
+          dy: (Math.random() - 0.5) * 12,
         });
       const layerDrift = drift.get(slot.layer)!;
-      slot.x += globalDx + layerDrift.dx + (Math.random() - 0.5) * 22;
-      slot.y += globalDy + layerDrift.dy + (Math.random() - 0.5) * 20;
+      slot.x += globalDx + layerDrift.dx + (Math.random() - 0.5) * 10;
+      slot.y += globalDy + layerDrift.dy + (Math.random() - 0.5) * 8;
     });
     // 同层牌不允许互相压住；真正的遮挡只来自更高层。
     for (let pass = 0; pass < 6; pass += 1) {
@@ -860,18 +852,24 @@ export class FruitGame implements GameControls {
     });
   }
 
-  private makeCard(tier: number, special: CardSpecial) {
+  private makeCard(tier: number, special: CardSpecial, layer = 0) {
     const fruit = FRUITS[tier];
     const view = new Container();
-    // 精致白卡:柔影 + 双层渐弱光圈(可点时亮起) + 纯白牌面。
+    // 暖白卡面只用中性的层级阴影与统一紫罗兰选中光，水果是唯一高饱和色。
     const shadow = new Graphics()
-      .roundRect(-CARD_W / 2 + 1.5, -CARD_H / 2 + 5, CARD_W, CARD_H, 16)
-      .fill({ color: 0x9186ad, alpha: 0.2 });
+      .roundRect(
+        -CARD_W / 2 + 1.5,
+        -CARD_H / 2 + 4 + Math.min(2.5, layer * 0.35),
+        CARD_W,
+        CARD_H,
+        15,
+      )
+      .fill({ color: 0x40384e, alpha: 0.13 + Math.min(0.07, layer * 0.01) });
     const glow = new Container();
     glow.label = "access-glow";
     const glowOuter = new Graphics()
       .roundRect(-CARD_W / 2 - 5, -CARD_H / 2 - 5, CARD_W + 10, CARD_H + 10, 20)
-      .fill({ color: fruit.glow, alpha: 0.38 });
+      .fill({ color: 0xb9ade9, alpha: 0.26 });
     const glowInner = new Graphics()
       .roundRect(
         -CARD_W / 2 - 2.5,
@@ -880,11 +878,12 @@ export class FruitGame implements GameControls {
         CARD_H + 5,
         18,
       )
-      .fill({ color: fruit.glow, alpha: 0.66 });
+      .fill({ color: 0x9c8bdd, alpha: 0.42 });
     glow.addChild(glowOuter, glowInner);
     const face = new Graphics()
-      .roundRect(-CARD_W / 2, -CARD_H / 2, CARD_W, CARD_H, 16)
-      .fill({ color: 0xffffff });
+      .roundRect(-CARD_W / 2, -CARD_H / 2, CARD_W, CARD_H, 15)
+      .fill({ color: 0xfffefa })
+      .stroke({ color: 0xe9e4ec, alpha: 0.9, width: 1 });
     const emoji = new Text({
       text: fruit.emoji,
       style: {
@@ -896,8 +895,8 @@ export class FruitGame implements GameControls {
     emoji.anchor.set(0.5);
     emoji.position.set(0, -4);
     const shade = new Graphics()
-      .roundRect(-CARD_W / 2, -CARD_H / 2, CARD_W, CARD_H, 16)
-      .fill({ color: 0xefebf2 });
+      .roundRect(-CARD_W / 2, -CARD_H / 2, CARD_W, CARD_H, 15)
+      .fill({ color: 0xded9e2, alpha: 0.8 });
     shade.label = "shade";
     shade.visible = false;
     view.addChild(shadow, glow, face, emoji, shade);
@@ -1022,7 +1021,8 @@ export class FruitGame implements GameControls {
     card.active = false;
     card.view.visible = false;
     card.special = "normal";
-    this.lastPick = detonates ? null : card;
+    // 炸弹与甜度牌已经产生不可逆效果，不允许撤回造成状态错账。
+    this.lastPick = detonates || chargesFever ? null : card;
     if (chargesFever) {
       this.gainFever(10);
       this.burst(card.x, card.y, 0xffd75e, 18);
@@ -1156,6 +1156,7 @@ export class FruitGame implements GameControls {
       this.tray.length > 0 ||
       this.cardFlights.length > 0 ||
       this.conversions.length > 0 ||
+      this.fusionEchoes.length > 0 ||
       this.pendingDrops.length > 0
     )
       return;
@@ -1247,15 +1248,24 @@ export class FruitGame implements GameControls {
       const x = WORLD.tray.x + 10 + slotWidth / 2 + index * (slotWidth + gap);
       const tier = this.tray[index];
       const pairReady = tier !== undefined && counts.get(tier) === 2;
+      const pressure = this.tray.length >= this.trayLimit - 2;
+      const lastOpen = tier === undefined && index === this.tray.length;
       const slot = new Graphics()
         .roundRect(-slotWidth / 2, -25, slotWidth, 50, 12)
         .fill({
           color: pairReady
-            ? 0xe8e1ff
+            ? 0xe8e3f2
             : index < this.tray.length
-              ? 0xfff1e2
-              : 0xf0ecf5,
+              ? 0xf4f0e9
+              : pressure && lastOpen
+                ? 0xf3dfdc
+                : 0xefebef,
           alpha: 1,
+        })
+        .stroke({
+          color: pairReady ? 0xa999d0 : pressure && lastOpen ? 0xd49b92 : 0xe3dde5,
+          alpha: pairReady || (pressure && lastOpen) ? 0.78 : 0.5,
+          width: 1,
         });
       if (pairReady) slot.label = "tray-pair-ready";
       slot.position.set(x, WORLD.tray.y + WORLD.tray.height / 2);
@@ -1446,16 +1456,11 @@ export class FruitGame implements GameControls {
         this.aimX ?? this.preferredDropX(tier),
       ),
     );
-    const guide = new Graphics()
-      .moveTo(0, 0)
-      .lineTo(0, WORLD.box.height - 44)
-      .stroke({
-        color: FRUITS[tier].glow,
-        alpha: 0.42,
-        width: 2,
-      });
-    guide.position.set(x, WORLD.box.y + 22);
-    guide.visible = aiming;
+    const landing = new Graphics()
+      .circle(0, 0, radius + 5)
+      .fill({ color: FRUITS[tier].glow, alpha: aiming ? 0.1 : 0.06 })
+      .stroke({ color: FRUITS[tier].glow, alpha: aiming ? 0.48 : 0.26, width: 1.5 });
+    landing.position.set(x, WORLD.box.y + 28);
     const emoji = new Text({
       text: FRUITS[tier].emoji,
       style: {
@@ -1472,10 +1477,10 @@ export class FruitGame implements GameControls {
     emoji.position.set(x, WORLD.box.y + 27);
     const hint = new Text({
       text: aiming
-        ? "松手"
+        ? "松手投放"
         : this.pendingDrops.length > 1
           ? `待投 ×${this.pendingDrops.length}`
-          : "拖动投放",
+          : "可拖动落点",
       style: {
         fontFamily: "system-ui",
         fontSize: 10,
@@ -1486,7 +1491,20 @@ export class FruitGame implements GameControls {
     });
     hint.anchor.set(0.5);
     hint.position.set(WORLD.width / 2, WORLD.box.y + 82);
-    this.dropPreviewLayer.addChild(guide, emoji, hint);
+    this.dropPreviewLayer.addChild(landing, emoji, hint);
+    const partner = [...this.fruits.values()]
+      .filter(
+        (fruit) => fruit.tier === tier && !this.merging.has(fruit.body.id),
+      )
+      .sort((a, b) => b.body.position.y - a.body.position.y)[0];
+    if (partner) {
+      const target = new Graphics()
+        .circle(0, 0, this.fruitRadius(tier) + 7)
+        .stroke({ color: FRUITS[tier].glow, alpha: 0.38, width: 2 });
+      target.position.copyFrom(partner.body.position);
+      target.label = "merge-target";
+      this.dropPreviewLayer.addChildAt(target, 0);
+    }
     // 排队中的后续水果缩略显示
     this.pendingDrops.slice(1, 5).forEach((queuedTier, index) => {
       const mini = new Text({
@@ -1508,7 +1526,7 @@ export class FruitGame implements GameControls {
     this.setTimer(() => {
       if (token === this.dropToken && this.pendingDrops.length > 0)
         this.dropPending();
-    }, 2_800);
+    }, 2_400);
   }
 
   private dropPending(chosenX?: number) {
@@ -1607,6 +1625,8 @@ export class FruitGame implements GameControls {
     const tier = first.tier + 1;
     const x = (first.body.position.x + second.body.position.x) / 2;
     const y = (first.body.position.y + second.body.position.y) / 2;
+    const fromA = { x: first.body.position.x, y: first.body.position.y };
+    const fromB = { x: second.body.position.x, y: second.body.position.y };
     const velocityX = (first.body.velocity.x + second.body.velocity.x) * 0.22;
     this.removeFruit(first);
     this.removeFruit(second);
@@ -1619,8 +1639,7 @@ export class FruitGame implements GameControls {
         this.effectiveScoreMultiplier(),
     );
     this.addScore(points, x, y);
-    this.burst(x, y, FRUITS[tier].color, 16 + tier);
-    this.ring(x, y, FRUITS[tier].glow);
+    this.burst(x, y, FRUITS[tier].glow, 8 + Math.floor(tier / 2));
     if (tier >= 8) this.ring(x, y, 0xffcf5e, 1.4);
     this.shake = Math.min(14, 4 + tier * 0.58 + this.combo * 0.65);
     sounds.merge(tier);
@@ -1629,13 +1648,81 @@ export class FruitGame implements GameControls {
       tier >= 11 ? "大果合成 · 果汁风暴！" : this.comboMessage(),
       tier >= 8 ? "gold" : "cyan",
     );
-    this.setTimer(() => {
-      this.merging.delete(first.body.id);
-      this.merging.delete(second.body.id);
-      this.spawnFruit(tier, x, y - 5);
+    const fusionIcon = (fruitTier: number, fontScale = 1) => {
+      const icon = new Text({
+        text: FRUITS[fruitTier].emoji,
+        style: {
+          fontSize: Math.max(18, this.fruitRadius(fruitTier) * 1.72 * fontScale),
+          dropShadow: {
+            color: FRUITS[fruitTier].glow,
+            alpha: 0.55,
+            blur: 8,
+            distance: 0,
+          },
+        },
+      });
+      icon.anchor.set(0.5);
+      this.fxLayer.addChild(icon);
+      return icon;
+    };
+    const echoA = fusionIcon(first.tier);
+    const echoB = fusionIcon(second.tier);
+    const result = fusionIcon(tier, 1.04);
+    echoA.position.set(fromA.x, fromA.y);
+    echoB.position.set(fromB.x, fromB.y);
+    result.position.set(x, y - 4);
+    result.visible = false;
+    this.fusionEchoes.push({
+      first: echoA,
+      second: echoB,
+      result,
+      fromA,
+      fromB,
+      center: { x, y },
+      sourceIds: [first.body.id, second.body.id],
+      tier,
+      velocityX,
+      elapsed: 0,
+    });
+  }
+
+  private updateFusionEchoes(seconds: number) {
+    this.fusionEchoes = this.fusionEchoes.filter((echo) => {
+      echo.elapsed += seconds;
+      const gather = Math.min(1, echo.elapsed / 0.16);
+      const eased = 1 - (1 - gather) ** 3;
+      for (const [icon, start, direction] of [
+        [echo.first, echo.fromA, -1],
+        [echo.second, echo.fromB, 1],
+      ] as const) {
+        icon.position.set(
+          start.x + (echo.center.x - start.x) * eased,
+          start.y + (echo.center.y - start.y) * eased - Math.sin(gather * Math.PI) * 6,
+        );
+        icon.rotation = direction * eased * 0.18;
+        icon.scale.set(1 - eased * 0.68);
+        icon.alpha = 1 - Math.max(0, gather - 0.72) / 0.28;
+      }
+      if (echo.elapsed >= 0.13) {
+        const reveal = Math.min(1, (echo.elapsed - 0.13) / 0.18);
+        echo.result.visible = true;
+        echo.result.alpha = Math.min(1, reveal * 2.2);
+        echo.result.scale.set(0.32 + Math.sin(reveal * Math.PI) * 0.88 + reveal * 0.68);
+        echo.result.rotation = (1 - reveal) * -0.12;
+      }
+      if (echo.elapsed < 0.32) return true;
+      echo.first.destroy();
+      echo.second.destroy();
+      echo.result.destroy();
+      echo.sourceIds.forEach((id) => this.merging.delete(id));
+      this.burst(echo.center.x, echo.center.y, FRUITS[echo.tier].color, 18 + echo.tier);
+      this.ring(echo.center.x, echo.center.y, FRUITS[echo.tier].glow, 0.9);
+      this.spawnFruit(echo.tier, echo.center.x, echo.center.y - 5);
       const newest = [...this.fruits.values()].at(-1);
-      if (newest) Body.setVelocity(newest.body, { x: velocityX, y: -2.2 });
-    }, 55);
+      if (newest)
+        Body.setVelocity(newest.body, { x: echo.velocityX, y: -2.45 });
+      return false;
+    });
   }
 
   private rainbowClear(first: FruitNode, second: FruitNode) {
@@ -1789,6 +1876,7 @@ export class FruitGame implements GameControls {
     this.updateFever();
     this.updateCardFlights(deltaMs / 1000);
     this.updateConversions(deltaMs / 1000);
+    this.updateFusionEchoes(deltaMs / 1000);
     this.updateParticles(delta, deltaMs / 1000);
     this.updateDanger();
     this.checkExhausted();
@@ -1956,12 +2044,28 @@ export class FruitGame implements GameControls {
           Math.max(1, this.dangerLimit + (this.mutator.danger || 0)),
       );
       const line = this.ambientLayer.getChildByLabel("danger-line");
-      if (line) line.alpha = 0.45 + Math.sin(this.elapsed * 13) * 0.4;
+      if (line)
+        line.alpha =
+          0.34 + this.dangerProgress * 0.4 + Math.sin(this.elapsed * 13) * 0.12;
+      if (this.dangerGlow)
+        this.dangerGlow.alpha =
+          this.dangerProgress * (0.08 + Math.sin(this.elapsed * 9) * 0.025);
+      if (this.dangerLabel) {
+        this.dangerLabel.text = `甜度警戒 ${Math.round(this.dangerProgress * 100)}%`;
+        this.dangerLabel.style.fill = 0xc6685f;
+      }
       if (this.dangerProgress >= 1)
         this.finish("lost", "甜度冲破警戒线，果箱爆满了");
     } else {
       this.dangerSince = -1;
       this.dangerProgress = Math.max(0, this.dangerProgress - 0.035);
+      const line = this.ambientLayer.getChildByLabel("danger-line");
+      if (line) line.alpha = 0.28;
+      if (this.dangerGlow) this.dangerGlow.alpha = this.dangerProgress * 0.06;
+      if (this.dangerLabel) {
+        this.dangerLabel.text = "甜度线";
+        this.dangerLabel.style.fill = 0xb98b84;
+      }
     }
   }
 
@@ -1990,6 +2094,7 @@ export class FruitGame implements GameControls {
         this.cards.some((card) => card.active) ||
         this.cardFlights.length > 0 ||
         this.conversions.length > 0 ||
+        this.fusionEchoes.length > 0 ||
         this.pendingDrops.length > 0 ||
         this.merging.size > 0 ||
         this.wavePending
@@ -2014,6 +2119,7 @@ export class FruitGame implements GameControls {
       this.tray.length > 0 ||
       this.cardFlights.length > 0 ||
       this.conversions.length > 0 ||
+      this.fusionEchoes.length > 0 ||
       this.pendingDrops.length > 0 ||
       this.merging.size > 0 ||
       this.canReachTarget()
@@ -2056,6 +2162,10 @@ export class FruitGame implements GameControls {
       mutator:
         this.mode !== "story" && this.mutator.id !== "calm"
           ? `${this.mutator.icon} ${this.mutator.name}`
+          : "",
+      mutatorHint:
+        this.mode !== "story" && this.mutator.id !== "calm"
+          ? this.mutator.description
           : "",
     };
   }
@@ -2130,8 +2240,62 @@ export class FruitGame implements GameControls {
       card.layer = positions[index].layer;
       card.view.zIndex = card.layer * 100 + index;
       card.view.position.set(card.x, card.y);
-      card.view.rotation = (Math.random() - 0.5) * 0.14;
+      card.view.rotation = (Math.random() - 0.5) * 0.075;
     });
+    // 洗牌是救场资源：把卡槽中最接近三消的一组放到可选层，
+    // 避免消耗道具后仍然只得到一副没有即时决策价值的牌面。
+    const trayCounts = new Map<number, number>();
+    this.tray.forEach((tier) =>
+      trayCounts.set(tier, (trayCounts.get(tier) || 0) + 1),
+    );
+    const activeCounts = new Map<number, number>();
+    active.forEach((card) =>
+      activeCounts.set(card.tier, (activeCounts.get(card.tier) || 0) + 1),
+    );
+    const preferredTier = [...new Set([...trayCounts.keys(), ...activeCounts.keys()])]
+      .map((tier) => ({
+        tier,
+        held: trayCounts.get(tier) || 0,
+        available: activeCounts.get(tier) || 0,
+      }))
+      .filter(({ held, available }) => available >= Math.max(1, 3 - held))
+      .sort((a, b) => b.held - a.held || b.available - a.available)[0]?.tier;
+    if (preferredTier !== undefined) {
+      const exposed = active.filter((card) => !this.isCovered(card));
+      const alreadyReady = exposed.filter(
+        (card) => card.tier === preferredTier && !card.locked,
+      ).length;
+      const needed = Math.max(
+        0,
+        3 - (trayCounts.get(preferredTier) || 0) - alreadyReady,
+      );
+      const sources = active.filter(
+        (card) =>
+          card.tier === preferredTier &&
+          !card.locked &&
+          !exposed.includes(card),
+      );
+      const targets = exposed.filter((card) => card.tier !== preferredTier);
+      for (
+        let index = 0;
+        index < Math.min(needed, sources.length, targets.length);
+        index += 1
+      ) {
+        const source = sources[index];
+        const target = targets[index];
+        const sourcePosition = { x: source.x, y: source.y, layer: source.layer };
+        source.x = target.x;
+        source.y = target.y;
+        source.layer = target.layer;
+        target.x = sourcePosition.x;
+        target.y = sourcePosition.y;
+        target.layer = sourcePosition.layer;
+        source.view.position.set(source.x, source.y);
+        target.view.position.set(target.x, target.y);
+        source.view.zIndex = source.layer * 100 + source.id;
+        target.view.zIndex = target.layer * 100 + target.id;
+      }
+    }
     this.shuffleLeft -= 1;
     this.lastPick = null;
     this.updateCardAccess();

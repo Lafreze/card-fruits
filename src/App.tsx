@@ -9,6 +9,7 @@ import { FRUITS, LEVELS } from "./game/data";
 import type { FruitGame } from "./game/FruitGame";
 import {
   MODE_INFO,
+  RELICS,
   UPGRADES,
   pickRelics,
   type GameMode,
@@ -54,9 +55,15 @@ const EMPTY_SNAPSHOT: GameSnapshot = {
   feverEnergy: 0,
   feverActive: false,
   mutator: "",
+  mutatorHint: "",
 };
 
 const GREENHOUSE_PLANTS = ["🌱", "🌿", "🌸", "🍓"];
+const RELIC_RARITY_LABEL = {
+  common: "普通",
+  uncommon: "罕见",
+  rare: "稀有",
+} as const;
 
 function readProgress() {
   const stored = Number(localStorage.getItem("fruit-king-unlocked") || 0);
@@ -389,7 +396,7 @@ export default function App() {
       if (next.status === "won") {
         if (mode === "story") persistUnlocked(level + 1);
         if (mode === "expedition" && next.wave < 8)
-          setRewardOptions(pickRelics(relics));
+          setRewardOptions(pickRelics(relics, 3, next.wave));
       }
     },
     [level, mode, persistCoins, persistUnlocked, relics],
@@ -565,6 +572,11 @@ export default function App() {
   );
 
   const target = FRUITS[LEVELS[level].target];
+  const currentFruit =
+    FRUITS[Math.min(snapshot.maxFruitTier, FRUITS.length - 1)];
+  const activeRelics = relics
+    .map((id) => RELICS.find((relic) => relic.id === id))
+    .filter((relic): relic is RelicDefinition => Boolean(relic));
   const helpChainStart =
     mode === "endless"
       ? Math.max(0, snapshot.maxFruitTier - 1)
@@ -749,11 +761,16 @@ export default function App() {
                 <b>{formatScore(snapshot.score)}</b>
               </div>
               <div className="target-chip">
-                <small>{mode === "endless" ? "最高" : "目标"}</small>
+                <small>
+                  {mode === "endless"
+                    ? "最高水果"
+                    : mode === "expedition"
+                      ? `远征 ${wave}/8`
+                      : `目标 · 当前 ${currentFruit.emoji}`}
+                </small>
                 <strong>
                   {mode === "endless"
-                    ? FRUITS[Math.min(snapshot.maxFruitTier, FRUITS.length - 1)]
-                        .emoji
+                    ? `${currentFruit.emoji} ${currentFruit.name}`
                     : `${target.emoji} ×1`}
                 </strong>
               </div>
@@ -926,6 +943,32 @@ export default function App() {
                     <>
                       <small>MENU</small>
                       <h2>游戏菜单</h2>
+                      {mode === "expedition" ? (
+                        <div className="run-build">
+                          <div className="run-build-head">
+                            <b>当前构筑</b>
+                            <span>{activeRelics.length} 件奇物</span>
+                          </div>
+                          {snapshot.mutator ? (
+                            <div className="run-mutator">
+                              <small>本关变异 · {snapshot.mutator}</small>
+                              <span>{snapshot.mutatorHint}</span>
+                            </div>
+                          ) : null}
+                          <div className="run-relics">
+                            {activeRelics.length ? (
+                              activeRelics.map((relic) => (
+                                <span key={relic.id} title={relic.description}>
+                                  <i>{relic.icon}</i>
+                                  <small>{relic.name}</small>
+                                </span>
+                              ))
+                            ) : (
+                              <em>完成本关后选择第一件奇物</em>
+                            )}
+                          </div>
+                        </div>
+                      ) : null}
                       <button
                         className="panel-primary"
                         onClick={closeGamePanel}
@@ -1020,11 +1063,15 @@ export default function App() {
                       {rewardOptions.map((relic) => (
                         <button
                           key={relic.id}
-                          className={`relic-choice relic-${relic.tone}`}
+                          className={`relic-choice relic-${relic.tone} rarity-${relic.rarity}`}
                           onClick={() => chooseRelic(relic.id)}
                         >
                           <i>{relic.icon}</i>
-                          <span>
+                          <span className="relic-copy">
+                            <span className="relic-meta">
+                              <em>{RELIC_RARITY_LABEL[relic.rarity]}</em>
+                              <small>{relic.archetype}</small>
+                            </span>
                             <b>{relic.name}</b>
                             <small>{relic.description}</small>
                           </span>

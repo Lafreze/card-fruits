@@ -24,6 +24,8 @@ export type RelicDefinition = {
   name: string;
   description: string;
   tone: "gold" | "pink" | "cyan";
+  rarity: "common" | "uncommon" | "rare";
+  archetype: string;
 };
 
 export const RELICS: RelicDefinition[] = [
@@ -33,6 +35,8 @@ export const RELICS: RelicDefinition[] = [
     name: "迷你果园",
     description: "物理水果缩小 14%，果箱更耐装。",
     tone: "cyan",
+    rarity: "common",
+    archetype: "果箱",
   },
   {
     id: "golden_touch",
@@ -40,6 +44,8 @@ export const RELICS: RelicDefinition[] = [
     name: "黄金触感",
     description: "所有三消与合成得分提高 35%。",
     tone: "gold",
+    rarity: "rare",
+    archetype: "得分",
   },
   {
     id: "deep_tray",
@@ -47,6 +53,8 @@ export const RELICS: RelicDefinition[] = [
     name: "深口果篮",
     description: "卡槽容量增加 1 格。",
     tone: "pink",
+    rarity: "uncommon",
+    archetype: "卡槽",
   },
   {
     id: "slow_sugar",
@@ -54,6 +62,8 @@ export const RELICS: RelicDefinition[] = [
     name: "慢糖结界",
     description: "警戒线容错时间延长 1.2 秒。",
     tone: "cyan",
+    rarity: "common",
+    archetype: "生存",
   },
   {
     id: "tool_belt",
@@ -61,6 +71,8 @@ export const RELICS: RelicDefinition[] = [
     name: "园丁腰包",
     description: "每关额外获得洗牌、锤子、泡泡袋各 1 次。",
     tone: "gold",
+    rarity: "uncommon",
+    archetype: "道具",
   },
   {
     id: "magnet_core",
@@ -68,6 +80,8 @@ export const RELICS: RelicDefinition[] = [
     name: "引力果核",
     description: "同级水果吸引速度提高 55%。",
     tone: "pink",
+    rarity: "uncommon",
+    archetype: "合成",
   },
   {
     id: "blast_juice",
@@ -75,6 +89,8 @@ export const RELICS: RelicDefinition[] = [
     name: "爆浆配方",
     description: "炸弹卡出现率和爆炸范围提高。",
     tone: "gold",
+    rarity: "uncommon",
+    archetype: "爆发",
   },
   {
     id: "lucky_bloom",
@@ -82,6 +98,8 @@ export const RELICS: RelicDefinition[] = [
     name: "幸运花期",
     description: "每波开局额外生成一颗低阶水果。",
     tone: "pink",
+    rarity: "common",
+    archetype: "开局",
   },
   {
     id: "honey_glaze",
@@ -89,6 +107,8 @@ export const RELICS: RelicDefinition[] = [
     name: "蜜糖涂层",
     description: "三消后 18% 概率掉落双份水果。",
     tone: "gold",
+    rarity: "rare",
+    archetype: "掉落",
   },
   {
     id: "combo_engine",
@@ -96,6 +116,8 @@ export const RELICS: RelicDefinition[] = [
     name: "连击引擎",
     description: "连击窗口从 2.3 秒延长到 3.4 秒。",
     tone: "pink",
+    rarity: "uncommon",
+    archetype: "连击",
   },
   {
     id: "crystal_seed",
@@ -103,6 +125,8 @@ export const RELICS: RelicDefinition[] = [
     name: "水晶果核",
     description: "开局额外获得万能果、榨汁各 1 次。",
     tone: "cyan",
+    rarity: "rare",
+    archetype: "资源",
   },
   {
     id: "storm_stir",
@@ -110,6 +134,8 @@ export const RELICS: RelicDefinition[] = [
     name: "龙卷搅拌",
     description: "戳水果没有冷却，力道加倍。",
     tone: "cyan",
+    rarity: "common",
+    archetype: "操控",
   },
   {
     id: "frost_ward",
@@ -117,6 +143,8 @@ export const RELICS: RelicDefinition[] = [
     name: "向阳花田",
     description: "冰冻卡与藤蔓卡出现率减半。",
     tone: "gold",
+    rarity: "common",
+    archetype: "净化",
   },
   {
     id: "fever_bloom",
@@ -124,6 +152,8 @@ export const RELICS: RelicDefinition[] = [
     name: "甜度沸腾",
     description: "狂热能量获取速度提高 40%。",
     tone: "pink",
+    rarity: "uncommon",
+    archetype: "狂热",
   },
   {
     id: "gold_rain",
@@ -131,6 +161,8 @@ export const RELICS: RelicDefinition[] = [
     name: "果币雨",
     description: "结算果币收益提高 50%。",
     tone: "gold",
+    rarity: "common",
+    archetype: "收益",
   },
   {
     id: "second_wind",
@@ -138,6 +170,8 @@ export const RELICS: RelicDefinition[] = [
     name: "回魂果露",
     description: "每局一次：卡槽满时自动弹出两张卡。",
     tone: "cyan",
+    rarity: "rare",
+    archetype: "救场",
   },
 ];
 
@@ -162,9 +196,36 @@ export const MODE_INFO: Record<
   },
 };
 
-export function pickRelics(owned: RelicId[], count = 3) {
+export function pickRelics(
+  owned: RelicId[],
+  count = 3,
+  wave = 1,
+  random: () => number = Math.random,
+) {
   const pool = RELICS.filter((relic) => !owned.includes(relic.id));
-  return [...pool].sort(() => Math.random() - 0.5).slice(0, count);
+  const choices: RelicDefinition[] = [];
+  const draw = (candidates: RelicDefinition[]) => {
+    const available = candidates.filter(
+      (candidate) => !choices.some((choice) => choice.id === candidate.id),
+    );
+    if (available.length === 0) return;
+    const weights = available.map((relic) =>
+      relic.rarity === "common"
+        ? 5
+        : relic.rarity === "uncommon"
+          ? 3.2
+          : 1.1 + wave * 0.18,
+    );
+    const total = weights.reduce((sum, weight) => sum + weight, 0);
+    let roll = random() * total;
+    const index = weights.findIndex((weight) => (roll -= weight) <= 0);
+    choices.push(available[Math.max(0, index)]);
+  };
+  // 每三关至少出现一件稀有奇物，形成可预期的构筑强度节点。
+  if (wave > 1 && wave % 3 === 0)
+    draw(pool.filter((relic) => relic.rarity === "rare"));
+  while (choices.length < Math.min(count, pool.length)) draw(pool);
+  return choices;
 }
 
 // 变异波次:无尽/远征从第 2 波起每波随机一种,风险换分数
@@ -172,6 +233,7 @@ export type WaveMutator = {
   id: string;
   name: string;
   icon: string;
+  description: string;
   radius?: number;
   score?: number;
   frozen?: boolean;
@@ -181,13 +243,53 @@ export type WaveMutator = {
 };
 
 export const MUTATORS: WaveMutator[] = [
-  { id: "calm", name: "风平浪静", icon: "🍃" },
-  { id: "big", name: "大果日", icon: "🎈", radius: 1.15, score: 1.15 },
-  { id: "ice", name: "冰河期", icon: "🧊", frozen: true, score: 1.2 },
-  { id: "boom", name: "炸弹节", icon: "🎆", bomb: true, score: 1.1 },
-  { id: "gold", name: "黄金雨", icon: "✨", score: 1.3 },
-  { id: "storm", name: "磁暴", icon: "🧲", magnet: 1.5 },
-  { id: "rush", name: "甜度激涌", icon: "⚡", danger: -0.5, score: 1.35 },
+  { id: "calm", name: "风平浪静", icon: "🍃", description: "无额外规则" },
+  {
+    id: "big",
+    name: "大果日",
+    icon: "🎈",
+    description: "水果体积 +15% · 得分 +15%",
+    radius: 1.15,
+    score: 1.15,
+  },
+  {
+    id: "ice",
+    name: "冰河期",
+    icon: "🧊",
+    description: "冰冻牌增多 · 得分 +20%",
+    frozen: true,
+    score: 1.2,
+  },
+  {
+    id: "boom",
+    name: "炸弹节",
+    icon: "🎆",
+    description: "炸弹牌增多 · 得分 +10%",
+    bomb: true,
+    score: 1.1,
+  },
+  {
+    id: "gold",
+    name: "黄金雨",
+    icon: "✨",
+    description: "无额外风险 · 得分 +30%",
+    score: 1.3,
+  },
+  {
+    id: "storm",
+    name: "磁暴",
+    icon: "🧲",
+    description: "同级磁吸 +50%",
+    magnet: 1.5,
+  },
+  {
+    id: "rush",
+    name: "甜度激涌",
+    icon: "⚡",
+    description: "警戒时间 -0.5 秒 · 得分 +35%",
+    danger: -0.5,
+    score: 1.35,
+  },
 ];
 
 export function rollMutator(wave: number): WaveMutator {

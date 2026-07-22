@@ -25,6 +25,7 @@ export type GameSnapshot = {
   feverEnergy: number;
   feverActive: boolean;
   mutator: string;
+  mutatorHint: string;
 };
 
 export type GameResult = GameSnapshot & {

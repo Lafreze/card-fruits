@@ -2,6 +2,11 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { FRUITS, LEVELS, WORLD, type LayoutBlock } from "./data.ts";
 import {
+  buildPlayableDeal,
+  simulateTray,
+  slotIsCovered,
+} from "./logic.ts";
+import {
   MODE_INFO,
   MUTATORS,
   RELICS,
@@ -35,6 +40,14 @@ function isCovered(
     const overlapY = Math.max(0, CARD_HEIGHT - Math.abs(other.y - slot.y));
     return overlapX > 0.5 && overlapY > 0.5;
   });
+}
+
+function seededRandom(seed: number) {
+  let state = seed >>> 0;
+  return () => {
+    state = (state * 1664525 + 1013904223) >>> 0;
+    return state / 0x1_0000_0000;
+  };
 }
 
 test("a lower card is locked by even a slight upper overlap", () => {
@@ -119,6 +132,36 @@ test("all story levels have valid, playable layouts", () => {
   });
 });
 
+test("every generated stack contains a verified low-risk clear route", () => {
+  LEVELS.forEach((level, levelIndex) => {
+    const slots = expandLayout(level.layout);
+    const groups = level.cards.flatMap(({ tier, count }) =>
+      Array.from({ length: count / 3 }, () => tier),
+    );
+    for (let seed = 1; seed <= 12; seed += 1) {
+      const deal = buildPlayableDeal(
+        groups,
+        slots,
+        seededRandom(levelIndex * 100 + seed),
+      );
+      const active = new Set(slots.map((_, index) => index));
+      deal.route.forEach((slotIndex) => {
+        assert.equal(
+          slotIsCovered(slotIndex, slots, active),
+          false,
+          `第 ${levelIndex + 1} 关路线必须只移除顶层卡`,
+        );
+        active.delete(slotIndex);
+      });
+      const sequence = deal.route.map((slotIndex) => deal.tiers[slotIndex]);
+      const tray = simulateTray(sequence);
+      assert.deepEqual(tray.remaining, []);
+      assert.ok(tray.maxSize <= 4, "安全路线最多占用四个卡槽");
+      assert.equal(new Set(sequence.slice(0, 3)).size, 1);
+    }
+  });
+});
+
 test("fruit scale and roguelike catalog stay balanced", () => {
   assert.equal(FRUITS.length, 19);
   FRUITS.forEach((fruit, index) => {
@@ -127,7 +170,9 @@ test("fruit scale and roguelike catalog stay balanced", () => {
   });
   assert.equal(new Set(RELICS.map((relic) => relic.id)).size, RELICS.length);
   assert.equal(RELICS.length, 16);
+  assert.ok(RELICS.some((relic) => relic.rarity === "rare"));
   assert.equal(MUTATORS.length, 7);
+  assert.ok(MUTATORS.every((mutator) => mutator.description.length > 0));
   assert.equal(UPGRADES.length, 10);
   assert.ok(
     Array.from({ length: 40 }, () => rollMutator(2)).every(
@@ -140,6 +185,12 @@ test("fruit scale and roguelike catalog stay balanced", () => {
     "story",
   ]);
   assert.equal(new Set(pickRelics([], 3).map((relic) => relic.id)).size, 3);
+  assert.ok(
+    pickRelics([], 3, 3, () => 0.99).some(
+      (relic) => relic.rarity === "rare",
+    ),
+    "每三关的构筑奖励至少出现一件稀有奇物",
+  );
   assert.equal(
     pickRelics(
       RELICS.slice(0, 14).map((relic) => relic.id),
