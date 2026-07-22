@@ -69,7 +69,7 @@ export const RELICS: RelicDefinition[] = [
     id: "tool_belt",
     icon: "🎒",
     name: "园丁腰包",
-    description: "每关额外获得洗牌、锤子、泡泡袋各 1 次。",
+    description: "每关额外获得洗牌、锤子、泡泡袋、分果各 1 次。",
     tone: "gold",
     rarity: "uncommon",
     archetype: "道具",
@@ -123,7 +123,7 @@ export const RELICS: RelicDefinition[] = [
     id: "crystal_seed",
     icon: "🔮",
     name: "水晶果核",
-    description: "开局额外获得万能果、榨汁各 1 次。",
+    description: "开局额外获得万能果、榨汁、催熟各 1 次。",
     tone: "cyan",
     rarity: "rare",
     archetype: "资源",
@@ -182,7 +182,7 @@ export const MODE_INFO: Record<
   story: {
     icon: "🗺️",
     name: "闯关模式",
-    tagline: "16 关，逐关合成果王",
+    tagline: "20 关，逐关合成果王",
   },
   endless: {
     icon: "∞",

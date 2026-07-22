@@ -19,6 +19,9 @@ export type GameSnapshot = {
   wildLeft: number;
   bubbleLeft: number;
   sunLeft: number;
+  ripenLeft: number;
+  splitLeft: number;
+  shieldLeft: number;
   wave: number;
   mode: GameMode;
   relics: RelicId[];
@@ -68,6 +71,9 @@ export type GameControls = {
   wild: () => void;
   bubble: () => void;
   sunshine: () => void;
+  ripen: () => void;
+  split: () => void;
+  shield: () => void;
   pause: () => void;
   resume: () => void;
   destroy: () => void;

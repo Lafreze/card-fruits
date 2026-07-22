@@ -3,6 +3,8 @@ import test from "node:test";
 import { FRUITS, LEVELS, WORLD, type LayoutBlock } from "./data.ts";
 import {
   buildPlayableDeal,
+  evaluateDropPlacement,
+  scatterStackSlots,
   simulateTray,
   slotIsCovered,
 } from "./logic.ts";
@@ -63,7 +65,7 @@ test("a lower card is locked by even a slight upper overlap", () => {
 });
 
 test("all story levels have valid, playable layouts", () => {
-  assert.equal(LEVELS.length, 16);
+  assert.equal(LEVELS.length, 20);
 
   LEVELS.forEach((level, index) => {
     const slots = expandLayout(level.layout);
@@ -75,7 +77,6 @@ test("all story levels have valid, playable layouts", () => {
     level.cards.forEach((card) => {
       synthesis[card.tier] += card.count / 3;
     });
-    if (index === 0) synthesis[0] += 2;
     for (let tier = 0; tier < level.target; tier += 1)
       synthesis[tier + 1] += Math.floor(synthesis[tier] / 2);
 
@@ -134,16 +135,60 @@ test("all story levels have valid, playable layouts", () => {
 
 test("every generated stack contains a verified low-risk clear route", () => {
   LEVELS.forEach((level, levelIndex) => {
-    const slots = expandLayout(level.layout);
     const groups = level.cards.flatMap(({ tier, count }) =>
       Array.from({ length: count / 3 }, () => tier),
     );
-    for (let seed = 1; seed <= 12; seed += 1) {
+    for (let seed = 1; seed <= 16; seed += 1) {
+      const original = expandLayout(level.layout);
+      const slots = original.map((slot) => ({ ...slot }));
+      const random = seededRandom(levelIndex * 100 + seed);
+      scatterStackSlots(
+        slots,
+        {
+          left: 46,
+          right: WORLD.width - 46,
+          top: WORLD.stack.y + 52,
+          bottom: WORLD.stack.y + WORLD.stack.height - 38,
+          cardWidth: CARD_WIDTH,
+          cardHeight: CARD_HEIGHT,
+        },
+        random,
+      );
       const deal = buildPlayableDeal(
         groups,
         slots,
-        seededRandom(levelIndex * 100 + seed),
+        random,
+        levelIndex < 2,
       );
+      const averageMovement =
+        slots.reduce(
+          (total, slot, index) =>
+            total + Math.hypot(slot.x - original[index].x, slot.y - original[index].y),
+          0,
+        ) / slots.length;
+      assert.ok(averageMovement >= 7, "随机牌阵需要形成可感知的构图变化");
+      slots.forEach((slot) => {
+        assert.ok(slot.x >= 46 && slot.x <= WORLD.width - 46);
+        assert.ok(
+          slot.y >= WORLD.stack.y + 52 &&
+            slot.y <= WORLD.stack.y + WORLD.stack.height - 38,
+        );
+      });
+      for (let firstIndex = 0; firstIndex < slots.length; firstIndex += 1)
+        for (
+          let secondIndex = firstIndex + 1;
+          secondIndex < slots.length;
+          secondIndex += 1
+        ) {
+          const first = slots[firstIndex];
+          const second = slots[secondIndex];
+          if (first.layer !== second.layer) continue;
+          assert.ok(
+            Math.abs(first.x - second.x) >= CARD_WIDTH + 2.5 ||
+              Math.abs(first.y - second.y) >= CARD_HEIGHT + 2.5,
+            `第 ${levelIndex + 1} 关同层卡片不应互相遮挡`,
+          );
+        }
       const active = new Set(slots.map((_, index) => index));
       deal.route.forEach((slotIndex) => {
         assert.equal(
@@ -157,13 +202,31 @@ test("every generated stack contains a verified low-risk clear route", () => {
       const tray = simulateTray(sequence);
       assert.deepEqual(tray.remaining, []);
       assert.ok(tray.maxSize <= 4, "安全路线最多占用四个卡槽");
-      assert.equal(new Set(sequence.slice(0, 3)).size, 1);
+      assert.equal(
+        new Set(sequence.slice(0, 3)).size,
+        levelIndex < 2 ? 1 : 2,
+        "前两关直接教学三消，后续关卡用双组交织开局",
+      );
     }
   });
 });
 
+test("manual drop precision rewards intentional matching placement", () => {
+  assert.equal(evaluateDropPlacement(120, 145, 10).precision, true);
+  assert.equal(evaluateDropPlacement(120, 151, 10).precision, false);
+  assert.equal(evaluateDropPlacement(200, 260, 40).precision, true);
+  assert.equal(
+    evaluateDropPlacement(200, undefined, 40).precision,
+    false,
+  );
+});
+
 test("fruit scale and roguelike catalog stay balanced", () => {
-  assert.equal(FRUITS.length, 19);
+  assert.equal(FRUITS.length, 23);
+  assert.deepEqual(
+    FRUITS.slice(-5).map((fruit) => fruit.name),
+    ["杨桃", "哈密瓜", "南瓜", "西瓜", "黄金果王"],
+  );
   FRUITS.forEach((fruit, index) => {
     assert.ok(fruit.radius <= 60, `${fruit.name} 不应重新撑满果箱`);
     if (index > 0) assert.ok(fruit.radius > FRUITS[index - 1].radius);

@@ -6,6 +6,15 @@ export type StackSlot = {
 
 type RandomSource = () => number;
 
+export type StackScatterBounds = {
+  left: number;
+  right: number;
+  top: number;
+  bottom: number;
+  cardWidth: number;
+  cardHeight: number;
+};
+
 const CARD_COVER_WIDTH = 64;
 const CARD_COVER_HEIGHT = 72;
 const COVER_EPSILON = 0.5;
@@ -17,6 +26,141 @@ function shuffled<T>(items: T[], random: RandomSource) {
     [result[index], result[target]] = [result[target], result[index]];
   }
   return result;
+}
+
+function clamp(value: number, minimum: number, maximum: number) {
+  return Math.max(minimum, Math.min(maximum, value));
+}
+
+/**
+ * Turns authored grids into one of six organic stack silhouettes. Variation is
+ * correlated by layer (fan, cascade, split, wave, stagger or orbit) instead of
+ * being pure per-card noise, so the result feels shuffled but still designed.
+ */
+export function scatterStackSlots(
+  slots: StackSlot[],
+  bounds: StackScatterBounds,
+  random: RandomSource = Math.random,
+) {
+  if (slots.length === 0) return slots;
+  const mirrorX = random() < 0.5;
+  const mirrorY = random() < 0.28;
+  const motif = Math.floor(random() * 6);
+  const maxLayer = Math.max(...slots.map((slot) => slot.layer));
+  const centerX = (bounds.left + bounds.right) / 2;
+  const centerY = (bounds.top + bounds.bottom) / 2;
+  const width = bounds.right - bounds.left;
+  const height = bounds.bottom - bounds.top;
+  const intensity = 0.82 + random() * 0.42;
+  const rotation = (random() - 0.5) * 0.16;
+  const twist = (random() - 0.5) * 0.026;
+  const shear = (random() - 0.5) * 0.14;
+  const wave = (random() - 0.5) * 15;
+  const globalDx = (random() - 0.5) * 22;
+  const globalDy = (random() - 0.5) * 14;
+  const layerDrift = new Map<
+    number,
+    { dx: number; dy: number; phase: number }
+  >();
+
+  slots.forEach((slot) => {
+    if (mirrorX) slot.x = centerX * 2 - slot.x;
+    if (mirrorY) slot.y = centerY * 2 - slot.y;
+    const layerOffset = slot.layer - maxLayer / 2;
+    const angle = rotation + layerOffset * twist;
+    const originalX = slot.x - centerX;
+    const originalY = slot.y - centerY;
+    slot.x =
+      centerX + originalX * Math.cos(angle) - originalY * Math.sin(angle);
+    slot.y =
+      centerY + originalX * Math.sin(angle) + originalY * Math.cos(angle);
+    slot.x += (slot.y - centerY) * shear;
+    slot.y += Math.sin(slot.x / 43 + slot.layer * 1.17) * wave;
+
+    const side = slot.x < centerX ? -1 : 1;
+    switch (motif) {
+      case 0: // fan
+        slot.x += layerOffset * 13 * intensity;
+        slot.y += Math.abs(slot.x - centerX) * 0.045 * intensity;
+        break;
+      case 1: // cascade
+        slot.x += layerOffset * 8 * intensity;
+        slot.y += layerOffset * 5.5 * intensity;
+        break;
+      case 2: // split wings
+        slot.x += side * (5 + (slot.layer % 3) * 6) * intensity;
+        slot.y -= Math.abs(slot.x - centerX) * 0.035 * intensity;
+        break;
+      case 3: // ribbon wave
+        slot.x += Math.sin(slot.layer * 1.63) * 18 * intensity;
+        slot.y += Math.cos(slot.layer * 1.21 + slot.x / 82) * 10 * intensity;
+        break;
+      case 4: // alternating stair
+        slot.x += (slot.layer % 2 ? 1 : -1) * (9 + slot.layer * 2) * intensity;
+        slot.y += layerOffset * 3.5 * intensity;
+        break;
+      default: { // loose orbit
+        const orbit = (slot.layer % 4) * (Math.PI / 2) + random() * 0.35;
+        slot.x += Math.cos(orbit) * (7 + slot.layer * 2.1) * intensity;
+        slot.y += Math.sin(orbit) * (5 + slot.layer * 1.4) * intensity;
+      }
+    }
+
+    if (!layerDrift.has(slot.layer))
+      layerDrift.set(slot.layer, {
+        dx: (random() - 0.5) * 34,
+        dy: (random() - 0.5) * 23,
+        phase: random() * Math.PI * 2,
+      });
+    const drift = layerDrift.get(slot.layer)!;
+    slot.x +=
+      globalDx +
+      drift.dx +
+      Math.sin(drift.phase + slot.y / Math.max(1, height)) * 5 +
+      (random() - 0.5) * 16;
+    slot.y += globalDy + drift.dy + (random() - 0.5) * 13;
+    slot.x = clamp(slot.x, bounds.left, bounds.right);
+    slot.y = clamp(slot.y, bounds.top, bounds.bottom);
+  });
+
+  // Keep cards on the same authored layer from visually sitting on each other;
+  // cross-layer overlap is intentional and is what creates the puzzle.
+  const minX = bounds.cardWidth + 3;
+  const minY = bounds.cardHeight + 3;
+  for (let pass = 0; pass < 24; pass += 1) {
+    let moved = false;
+    for (let firstIndex = 0; firstIndex < slots.length; firstIndex += 1)
+      for (
+        let secondIndex = firstIndex + 1;
+        secondIndex < slots.length;
+        secondIndex += 1
+      ) {
+        const first = slots[firstIndex];
+        const second = slots[secondIndex];
+        if (first.layer !== second.layer) continue;
+        const overlapX = minX - Math.abs(first.x - second.x);
+        const overlapY = minY - Math.abs(first.y - second.y);
+        if (overlapX <= 0 || overlapY <= 0) continue;
+        moved = true;
+        if (overlapX < overlapY) {
+          const direction = first.x <= second.x ? -1 : 1;
+          const push = overlapX / 2 + 1;
+          first.x += direction * push;
+          second.x -= direction * push;
+        } else {
+          const direction = first.y <= second.y ? -1 : 1;
+          const push = overlapY / 2 + 1;
+          first.y += direction * push;
+          second.y -= direction * push;
+        }
+        first.x = clamp(first.x, bounds.left, bounds.right);
+        first.y = clamp(first.y, bounds.top, bounds.bottom);
+        second.x = clamp(second.x, bounds.left, bounds.right);
+        second.y = clamp(second.y, bounds.top, bounds.bottom);
+      }
+    if (!moved) break;
+  }
+  return slots;
 }
 
 export function slotIsCovered(
@@ -87,11 +231,17 @@ export function buildRemovalRoute(
  * never needs more than four tray slots, while visible alternatives still let
  * the player trade safety for a faster reveal.
  */
-export function buildSafeMatchSequence(groupTiers: number[]) {
+export function buildSafeMatchSequence(
+  groupTiers: number[],
+  easyOpening = true,
+) {
   if (groupTiers.length === 0) return [];
   const sequence: number[] = [];
-  const [opening, ...remaining] = groupTiers;
-  sequence.push(opening, opening, opening);
+  const remaining = [...groupTiers];
+  if (easyOpening) {
+    const opening = remaining.shift()!;
+    sequence.push(opening, opening, opening);
+  }
   for (let index = 0; index < remaining.length; index += 2) {
     const first = remaining[index];
     const second = remaining[index + 1];
@@ -105,12 +255,17 @@ export function buildPlayableDeal(
   groupTiers: number[],
   slots: StackSlot[],
   random: RandomSource = Math.random,
+  easyOpening = true,
 ) {
   if (groupTiers.length * 3 !== slots.length)
     throw new Error("三消组数量与牌阵卡位不一致");
   const groups = shuffled(groupTiers, random);
+  if (!easyOpening && groups.length > 1 && groups[0] === groups[1]) {
+    const different = groups.findIndex((tier, index) => index > 1 && tier !== groups[0]);
+    if (different >= 0) [groups[1], groups[different]] = [groups[different], groups[1]];
+  }
   const route = buildRemovalRoute(slots, random);
-  const sequence = buildSafeMatchSequence(groups);
+  const sequence = buildSafeMatchSequence(groups, easyOpening);
   const tiers = new Array(slots.length).fill(0);
   route.forEach((slotIndex, order) => {
     tiers[slotIndex] = sequence[order];
@@ -141,4 +296,19 @@ export function simulateTray(sequence: number[]) {
     maxSize = Math.max(maxSize, tray.length);
   }
   return { remaining: tray, maxSize };
+}
+
+export function evaluateDropPlacement(
+  chosenX: number,
+  partnerX: number | undefined,
+  fruitRadius: number,
+) {
+  const tolerance = Math.max(30, fruitRadius * 1.65);
+  const distance =
+    partnerX === undefined ? Number.POSITIVE_INFINITY : Math.abs(chosenX - partnerX);
+  return {
+    precision: distance <= tolerance,
+    distance,
+    tolerance,
+  };
 }

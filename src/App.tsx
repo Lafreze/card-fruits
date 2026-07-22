@@ -49,6 +49,9 @@ const EMPTY_SNAPSHOT: GameSnapshot = {
   wildLeft: 1,
   bubbleLeft: 1,
   sunLeft: 1,
+  ripenLeft: 1,
+  splitLeft: 1,
+  shieldLeft: 1,
   wave: 1,
   mode: "story",
   relics: [],
@@ -907,6 +910,36 @@ export default function App() {
                           <span>净化</span>
                           <em>×{snapshot.sunLeft}</em>
                         </button>
+                        <button
+                          disabled={!snapshot.ripenLeft}
+                          onClick={() =>
+                            useTool((controls) => controls.ripen())
+                          }
+                        >
+                          <i>🌱</i>
+                          <span>催熟</span>
+                          <em>×{snapshot.ripenLeft}</em>
+                        </button>
+                        <button
+                          disabled={!snapshot.splitLeft}
+                          onClick={() =>
+                            useTool((controls) => controls.split())
+                          }
+                        >
+                          <i>✂️</i>
+                          <span>分果</span>
+                          <em>×{snapshot.splitLeft}</em>
+                        </button>
+                        <button
+                          disabled={!snapshot.shieldLeft}
+                          onClick={() =>
+                            useTool((controls) => controls.shield())
+                          }
+                        >
+                          <i>🛡️</i>
+                          <span>甜度盾</span>
+                          <em>×{snapshot.shieldLeft}</em>
+                        </button>
                       </div>
                     </>
                   ) : null}
@@ -924,8 +957,8 @@ export default function App() {
                         <span>同果合成</span>
                       </div>
                       <div className="help-rules">
-                        <span>被压住的卡片不能选</span>
-                        <span>拖动可选择水果落点</span>
+                        <span>三消后先投放水果</span>
+                        <span>点击投放，拖动选位</span>
                       </div>
                       <h3>合成路径</h3>
                       <div className="help-chain">

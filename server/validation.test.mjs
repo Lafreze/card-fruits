@@ -24,6 +24,17 @@ test("accepts expedition runs and endless-scale scores", () => {
   );
 });
 
+test("accepts the expanded late-game fruit tiers", () => {
+  const parsed = finishRunSchema.safeParse({
+    runId: "bd71b982-f0e3-4aa1-927c-0379724db890",
+    username: "Fruit Master",
+    score: 880000,
+    maxCombo: 12,
+    fruitTier: 22,
+  });
+  assert.equal(parsed.success, true);
+});
+
 test("normalizes username whitespace", () => {
   assert.equal(cleanUsername("  果王   007 "), "果王 007");
 });
