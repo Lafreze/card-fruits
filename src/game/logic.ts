@@ -33,8 +33,8 @@ function clamp(value: number, minimum: number, maximum: number) {
 }
 
 /**
- * Turns authored grids into one of six organic stack silhouettes. Variation is
- * correlated by layer (fan, cascade, split, wave, stagger or orbit) instead of
+ * Turns authored grids into one of eight organic stack silhouettes. Variation is
+ * correlated by layer (fan, cascade, split, wave, stagger, orbit or broken clusters) instead of
  * being pure per-card noise, so the result feels shuffled but still designed.
  */
 export function scatterStackSlots(
@@ -45,23 +45,43 @@ export function scatterStackSlots(
   if (slots.length === 0) return slots;
   const mirrorX = random() < 0.5;
   const mirrorY = random() < 0.28;
-  const motif = Math.floor(random() * 6);
+  const motif = Math.floor(random() * 8);
   const maxLayer = Math.max(...slots.map((slot) => slot.layer));
   const centerX = (bounds.left + bounds.right) / 2;
   const centerY = (bounds.top + bounds.bottom) / 2;
   const width = bounds.right - bounds.left;
   const height = bounds.bottom - bounds.top;
-  const intensity = 0.82 + random() * 0.42;
-  const rotation = (random() - 0.5) * 0.16;
-  const twist = (random() - 0.5) * 0.026;
-  const shear = (random() - 0.5) * 0.14;
-  const wave = (random() - 0.5) * 15;
-  const globalDx = (random() - 0.5) * 22;
-  const globalDy = (random() - 0.5) * 14;
+  const intensity = 0.9 + random() * 0.55;
+  const rotation = (random() - 0.5) * 0.22;
+  const twist = (random() - 0.5) * 0.04;
+  const shear = (random() - 0.5) * 0.18;
+  const wave = (random() - 0.5) * 22;
+  const globalDx = (random() - 0.5) * 30;
+  const globalDy = (random() - 0.5) * 20;
   const layerDrift = new Map<
     number,
-    { dx: number; dy: number; phase: number }
+    {
+      dx: number;
+      dy: number;
+      phase: number;
+      scaleX: number;
+      scaleY: number;
+      ripple: number;
+      notch: number;
+    }
   >();
+
+  new Set(slots.map((slot) => slot.layer)).forEach((layer) =>
+    layerDrift.set(layer, {
+      dx: (random() - 0.5) * 48,
+      dy: (random() - 0.5) * 34,
+      phase: random() * Math.PI * 2,
+      scaleX: 0.9 + random() * 0.2,
+      scaleY: 0.9 + random() * 0.18,
+      ripple: (random() - 0.5) * 20,
+      notch: (random() - 0.5) * 18,
+    }),
+  );
 
   slots.forEach((slot) => {
     if (mirrorX) slot.x = centerX * 2 - slot.x;
@@ -76,6 +96,15 @@ export function scatterStackSlots(
       centerY + originalX * Math.sin(angle) + originalY * Math.cos(angle);
     slot.x += (slot.y - centerY) * shear;
     slot.y += Math.sin(slot.x / 43 + slot.layer * 1.17) * wave;
+
+    const drift = layerDrift.get(slot.layer)!;
+    slot.x = centerX + (slot.x - centerX) * drift.scaleX;
+    slot.y = centerY + (slot.y - centerY) * drift.scaleY;
+    const localX = (slot.x - centerX) / Math.max(1, width / 2);
+    const localY = (slot.y - centerY) / Math.max(1, height / 2);
+    slot.y += Math.sin(localX * Math.PI * 1.7 + drift.phase) * drift.ripple;
+    if (Math.abs(localX) < 0.28)
+      slot.x += Math.sign(localY || 1) * drift.notch;
 
     const side = slot.x < centerX ? -1 : 1;
     switch (motif) {
@@ -99,26 +128,28 @@ export function scatterStackSlots(
         slot.x += (slot.layer % 2 ? 1 : -1) * (9 + slot.layer * 2) * intensity;
         slot.y += layerOffset * 3.5 * intensity;
         break;
-      default: { // loose orbit
+      case 5: { // loose orbit
         const orbit = (slot.layer % 4) * (Math.PI / 2) + random() * 0.35;
         slot.x += Math.cos(orbit) * (7 + slot.layer * 2.1) * intensity;
         slot.y += Math.sin(orbit) * (5 + slot.layer * 1.4) * intensity;
+        break;
       }
+      case 6: // broken terraces
+        slot.x += (localY > 0 ? 1 : -1) * (8 + Math.abs(layerOffset) * 5);
+        slot.y += (localX > 0 ? -1 : 1) * (6 + (slot.layer % 3) * 4);
+        break;
+      default: // clustered pockets
+        slot.x += Math.sign(localX || 1) * (10 + (slot.layer % 2) * 8);
+        slot.y += Math.sign(localY || 1) * (5 + (slot.layer % 3) * 3);
+        break;
     }
 
-    if (!layerDrift.has(slot.layer))
-      layerDrift.set(slot.layer, {
-        dx: (random() - 0.5) * 34,
-        dy: (random() - 0.5) * 23,
-        phase: random() * Math.PI * 2,
-      });
-    const drift = layerDrift.get(slot.layer)!;
     slot.x +=
       globalDx +
       drift.dx +
       Math.sin(drift.phase + slot.y / Math.max(1, height)) * 5 +
-      (random() - 0.5) * 16;
-    slot.y += globalDy + drift.dy + (random() - 0.5) * 13;
+      (random() - 0.5) * 24;
+    slot.y += globalDy + drift.dy + (random() - 0.5) * 20;
     slot.x = clamp(slot.x, bounds.left, bounds.right);
     slot.y = clamp(slot.y, bounds.top, bounds.bottom);
   });
@@ -127,7 +158,7 @@ export function scatterStackSlots(
   // cross-layer overlap is intentional and is what creates the puzzle.
   const minX = bounds.cardWidth + 3;
   const minY = bounds.cardHeight + 3;
-  for (let pass = 0; pass < 24; pass += 1) {
+  for (let pass = 0; pass < 32; pass += 1) {
     let moved = false;
     for (let firstIndex = 0; firstIndex < slots.length; firstIndex += 1)
       for (
@@ -308,6 +339,20 @@ export function evaluateDropPlacement(
     partnerX === undefined ? Number.POSITIVE_INFINITY : Math.abs(chosenX - partnerX);
   return {
     precision: distance <= tolerance,
+    distance,
+    tolerance,
+  };
+}
+
+export function evaluateNectarPlacement(
+  chosenX: number,
+  nectarX: number,
+  fruitRadius: number,
+) {
+  const tolerance = Math.max(28, Math.min(44, fruitRadius * 0.9));
+  const distance = Math.abs(chosenX - nectarX);
+  return {
+    hit: distance <= tolerance,
     distance,
     tolerance,
   };

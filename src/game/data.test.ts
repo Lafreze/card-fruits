@@ -4,6 +4,7 @@ import { FRUITS, LEVELS, WORLD, type LayoutBlock } from "./data.ts";
 import {
   buildPlayableDeal,
   evaluateDropPlacement,
+  evaluateNectarPlacement,
   scatterStackSlots,
   simulateTray,
   slotIsCovered,
@@ -166,7 +167,16 @@ test("every generated stack contains a verified low-risk clear route", () => {
             total + Math.hypot(slot.x - original[index].x, slot.y - original[index].y),
           0,
         ) / slots.length;
-      assert.ok(averageMovement >= 7, "随机牌阵需要形成可感知的构图变化");
+      const independentlyShifted = slots.filter(
+        (slot, index) =>
+          Math.abs(slot.x - original[index].x) >= 8 ||
+          Math.abs(slot.y - original[index].y) >= 8,
+      ).length;
+      assert.ok(averageMovement >= 12, "随机牌阵需要形成可感知的构图变化");
+      assert.ok(
+        independentlyShifted / slots.length >= 0.68,
+        "大部分卡片都需要脱离原始网格位置",
+      );
       slots.forEach((slot) => {
         assert.ok(slot.x >= 46 && slot.x <= WORLD.width - 46);
         assert.ok(
@@ -219,6 +229,9 @@ test("manual drop precision rewards intentional matching placement", () => {
     evaluateDropPlacement(200, undefined, 40).precision,
     false,
   );
+  assert.equal(evaluateNectarPlacement(100, 128, 8).hit, true);
+  assert.equal(evaluateNectarPlacement(99, 128, 8).hit, false);
+  assert.equal(evaluateNectarPlacement(200, 244, 60).hit, true);
 });
 
 test("fruit scale and roguelike catalog stay balanced", () => {
