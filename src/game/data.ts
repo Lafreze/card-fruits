@@ -1,6 +1,7 @@
 export type FruitDefinition = {
   name: string;
   emoji: string;
+  icon?: string;
   radius: number;
   color: number;
   glow: number;
@@ -25,7 +26,7 @@ export type LevelDefinition = {
   layout: LayoutBlock[];
 };
 
-// 23 级合成链:橄榄、青苹果、杨桃和南瓜补齐早中后段，黄金果王仍为终点。
+// 23 级合成链:橄榄、青苹果、火龙果和南瓜补齐早中后段，黄金果王仍为终点。
 export const FRUITS: FruitDefinition[] = [
   { name: "蓝莓", emoji: "🫐", radius: 8, color: 0x5c7cfa, glow: 0xa5b4ff },
   { name: "橄榄", emoji: "🫒", radius: 9, color: 0x718c3a, glow: 0xc7df85 },
@@ -35,9 +36,21 @@ export const FRUITS: FruitDefinition[] = [
   { name: "柠檬", emoji: "🍋", radius: 16, color: 0xffd166, glow: 0xffef9f },
   { name: "猕猴桃", emoji: "🥝", radius: 18, color: 0x8ac926, glow: 0xc5f277 },
   { name: "番茄", emoji: "🍅", radius: 20, color: 0xf94144, glow: 0xffa3a5 },
-  { name: "牛油果", emoji: "🥑", radius: 22.5, color: 0x6f9f3d, glow: 0xc6f68d },
+  {
+    name: "牛油果",
+    emoji: "🥑",
+    radius: 22.5,
+    color: 0x6f9f3d,
+    glow: 0xc6f68d,
+  },
   { name: "橙子", emoji: "🍊", radius: 25, color: 0xff9f1c, glow: 0xffc971 },
-  { name: "青苹果", emoji: "🍏", radius: 27.5, color: 0x78b83f, glow: 0xcaf28c },
+  {
+    name: "青苹果",
+    emoji: "🍏",
+    radius: 27.5,
+    color: 0x78b83f,
+    glow: 0xcaf28c,
+  },
   { name: "苹果", emoji: "🍎", radius: 30, color: 0xff595e, glow: 0xff9c9f },
   { name: "梨", emoji: "🍐", radius: 32.5, color: 0xb8d64f, glow: 0xe9f99c },
   { name: "桃子", emoji: "🍑", radius: 35, color: 0xff8fab, glow: 0xffc2d1 },
@@ -45,16 +58,24 @@ export const FRUITS: FruitDefinition[] = [
   { name: "香蕉", emoji: "🍌", radius: 41, color: 0xffd43b, glow: 0xfff19a },
   { name: "椰子", emoji: "🥥", radius: 44, color: 0xa9805b, glow: 0xe6cfb0 },
   { name: "菠萝", emoji: "🍍", radius: 47, color: 0xf7c948, glow: 0xffe69a },
-  { name: "杨桃", emoji: "⭐", radius: 49.5, color: 0xf5bd1f, glow: 0xffe68a },
+  {
+    name: "火龙果",
+    emoji: "",
+    icon: "/fruits/dragon-fruit.webp",
+    radius: 49.5,
+    color: 0xe62b76,
+    glow: 0xff8fbc,
+  },
   { name: "哈密瓜", emoji: "🍈", radius: 52, color: 0x90be6d, glow: 0xc7f9b5 },
   { name: "南瓜", emoji: "🎃", radius: 54, color: 0xe97924, glow: 0xffb56f },
   { name: "西瓜", emoji: "🍉", radius: 57, color: 0x43aa8b, glow: 0x9bf6cf },
   {
     name: "黄金果王",
-    emoji: "👑",
+    emoji: "",
+    icon: "/fruits/durian-king.webp",
     radius: 60,
-    color: 0xffd60a,
-    glow: 0xfff3a3,
+    color: 0xc9a21f,
+    glow: 0xffdc67,
   },
 ];
 
@@ -260,7 +281,7 @@ const CANOPY = [
   B(5, 251, 244, 3, 1),
 ];
 
-// 第 16 关 · 60 张:六层星果宫殿,三张塔尖作为开局入口
+// 第 16 关 · 60 张:六层龙果宫殿,三张塔尖作为开局入口
 const KING_PALACE = [
   B(0, 215, 244, 5, 3),
   B(1, 215, 244, 5, 3),
@@ -438,7 +459,7 @@ export const LEVELS: LevelDefinition[] = [
     layout: CANOPY,
   },
   {
-    name: "星果旋涡",
+    name: "龙果霓虹",
     target: 18,
     cards: ladderCards(18, 60),
     specialRate: 0.33,

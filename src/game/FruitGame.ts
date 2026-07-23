@@ -1,9 +1,11 @@
 import {
   Application,
+  Assets,
   BlurFilter,
   Container,
   FederatedPointerEvent,
   Graphics,
+  Sprite,
   Text,
 } from "pixi.js";
 import "pixi.js/unsafe-eval";
@@ -77,7 +79,7 @@ type Ring = { view: Graphics; life: number; maxLife: number; size: number };
 type FloatLabel = { view: Text; life: number; maxLife: number };
 type ConversionSequence = {
   cards: Container[];
-  fruit: Text;
+  fruit: Container;
   starts: Array<{ x: number; y: number }>;
   targetX: number;
   tier: number;
@@ -95,9 +97,9 @@ type CardFlight = {
   maxLife: number;
 };
 type FusionEcho = {
-  first: Text;
-  second: Text;
-  result: Text;
+  first: Container;
+  second: Container;
+  result: Container;
   fromA: { x: number; y: number };
   fromB: { x: number; y: number };
   center: { x: number; y: number };
@@ -371,6 +373,9 @@ export class FruitGame implements GameControls {
   }
 
   private async initialize(canvas: HTMLCanvasElement) {
+    await Promise.all(
+      FRUITS.flatMap((fruit) => (fruit.icon ? [Assets.load(fruit.icon)] : [])),
+    );
     await this.app.init({
       canvas,
       width: WORLD.width,
@@ -442,6 +447,36 @@ export class FruitGame implements GameControls {
     return FRUITS[tier].radius * this.radiusScale * (this.mutator.radius || 1);
   }
 
+  private makeFruitIcon(tier: number, size: number, withGlow = false) {
+    const fruit = FRUITS[tier];
+    if (fruit.icon) {
+      const icon = Sprite.from(fruit.icon);
+      icon.anchor.set(0.5);
+      icon.width = size;
+      icon.height = size;
+      return icon;
+    }
+    const icon = new Text({
+      text: fruit.emoji,
+      style: {
+        fontSize: size,
+        align: "center",
+        ...(withGlow
+          ? {
+              dropShadow: {
+                color: fruit.glow,
+                alpha: 0.52,
+                blur: Math.max(3, size * 0.12),
+                distance: 0,
+              },
+            }
+          : {}),
+      },
+    });
+    icon.anchor.set(0.5);
+    return icon;
+  }
+
   private drawScene() {
     // 深色桌游底台：紫黑丝绒承载卡片与水果，金色只用在关键交互上。
     const background = new Graphics()
@@ -465,10 +500,12 @@ export class FruitGame implements GameControls {
 
     const dotPalette = [0xbba4ec, 0xd8b878, 0x7895c5];
     for (let index = 0; index < 22; index += 1) {
-      const star = new Graphics().circle(0, 0, 0.65 + Math.random() * 1.05).fill({
-        color: dotPalette[index % dotPalette.length],
-        alpha: 0.12 + Math.random() * 0.2,
-      });
+      const star = new Graphics()
+        .circle(0, 0, 0.65 + Math.random() * 1.05)
+        .fill({
+          color: dotPalette[index % dotPalette.length],
+          alpha: 0.12 + Math.random() * 0.2,
+        });
       star.position.set(
         Math.random() * WORLD.width,
         Math.random() * WORLD.height,
@@ -715,7 +752,12 @@ export class FruitGame implements GameControls {
         this.fruitFocusUntil,
         this.elapsed + 0.62,
       );
-      this.burst(WORLD.width / 2, WORLD.box.y + WORLD.box.height - 34, 0x9de9ff, 28);
+      this.burst(
+        WORLD.width / 2,
+        WORLD.box.y + WORLD.box.height - 34,
+        0x9de9ff,
+        28,
+      );
       sounds.launch();
     }
     return candidates.length;
@@ -747,7 +789,10 @@ export class FruitGame implements GameControls {
 
   private createCards(definition = LEVELS[this.levelIndex]) {
     // 布局块展开成卡位,按层从低到高排序;设计上卡位数 = 卡片数,不足时向上叠补
-    const cardCount = definition.cards.reduce((sum, card) => sum + card.count, 0);
+    const cardCount = definition.cards.reduce(
+      (sum, card) => sum + card.count,
+      0,
+    );
     const slots = definition.layout
       .flatMap((block) =>
         Array.from({ length: block.cols * block.rows }, (_, cell) => ({
@@ -905,13 +950,7 @@ export class FruitGame implements GameControls {
       )
       .fill({ color: 0xa887df, alpha: 0.18 });
     const glowInner = new Graphics()
-      .roundRect(
-        -CARD_W / 2 - 2,
-        -CARD_H / 2 - 2,
-        CARD_W + 4,
-        CARD_H + 4,
-        14.5,
-      )
+      .roundRect(-CARD_W / 2 - 2, -CARD_H / 2 - 2, CARD_W + 4, CARD_H + 4, 14.5)
       .stroke({ color: 0xd2b86f, alpha: 0.72, width: 1.35 });
     glow.addChild(glowOuter, glowInner);
     const face = new Graphics()
@@ -920,13 +959,7 @@ export class FruitGame implements GameControls {
       .stroke({ color: 0xcfc5d4, alpha: 0.96, width: 1 });
     face.label = "card-face";
     const paperWash = new Graphics()
-      .roundRect(
-        -CARD_W / 2 + 2,
-        -CARD_H / 2 + 2,
-        CARD_W - 4,
-        CARD_H - 4,
-        10.5,
-      )
+      .roundRect(-CARD_W / 2 + 2, -CARD_H / 2 + 2, CARD_W - 4, CARD_H - 4, 10.5)
       .fill({ color: 0xfffcf5, alpha: 0.48 });
     const innerFrame = new Graphics()
       .roundRect(
@@ -945,17 +978,9 @@ export class FruitGame implements GameControls {
       .roundRect(-13, -23, 26, 5.5, 2.75)
       .fill({ color: 0xffffff, alpha: 0.28 });
     sheen.label = "card-sheen";
-    const emoji = new Text({
-      text: fruit.emoji,
-      style: {
-        fontSize: 31,
-        align: "center",
-        dropShadow: { color: 0x251b35, alpha: 0.24, blur: 4, distance: 2 },
-      },
-    });
-    emoji.anchor.set(0.5);
-    emoji.position.set(0, -2.5);
-    emoji.label = "card-symbol";
+    const fruitIcon = this.makeFruitIcon(tier, fruit.icon ? 37 : 31);
+    fruitIcon.position.set(0, -2.5);
+    fruitIcon.label = "card-symbol";
     const serial = new Text({
       text: String(tier + 1).padStart(2, "0"),
       style: {
@@ -989,25 +1014,25 @@ export class FruitGame implements GameControls {
       innerFrame,
       topGlint,
       sheen,
-      emoji,
+      fruitIcon,
       serial,
       resonanceDot,
       shade,
     );
     if (special === "frozen") {
-      this.addCardBadge(view, "❄", 0x6c91b5, "lock");
+      this.addCardBadge(view, "🧊", 0x6c91b5, "lock");
     } else if (special === "bomb") {
-      this.addCardBadge(view, "●", 0xa35663, "special-icon");
+      this.addCardBadge(view, "💣", 0xa35663, "special-icon");
     } else if (special === "vine") {
-      this.addCardBadge(view, "✦", 0x4f8b72, "special-icon");
+      this.addCardBadge(view, "🌿", 0x4f8b72, "special-icon");
     } else if (special === "sugar") {
-      this.addCardBadge(view, "ϟ", 0xb88937, "special-icon");
+      this.addCardBadge(view, "🍬", 0xb88937, "special-icon");
     } else if (special === "harvest") {
-      this.addCardBadge(view, "穗", 0x8b8145, "special-icon");
+      this.addCardBadge(view, "🌾", 0x8b8145, "special-icon");
     } else if (special === "prism") {
-      this.addCardBadge(view, "◇", 0x7868a4, "special-icon");
+      this.addCardBadge(view, "🔮", 0x7868a4, "special-icon");
     } else if (special === "gust") {
-      this.addCardBadge(view, "↟", 0x4f7e8c, "special-icon");
+      this.addCardBadge(view, "🌪️", 0x4f7e8c, "special-icon");
     }
     return view;
   }
@@ -1032,7 +1057,7 @@ export class FruitGame implements GameControls {
       text: glyph,
       style: {
         fontFamily: "system-ui",
-        fontSize: glyph === "❄" ? 9 : 10,
+        fontSize: glyph === "🧊" ? 8.5 : 9,
         fontWeight: "900",
         fill: 0xffffff,
       },
@@ -1054,19 +1079,22 @@ export class FruitGame implements GameControls {
   }
 
   private cardOverlaps(first: CardNode, second: CardNode) {
-    return rotatedRectanglesOverlap({
-      x: first.x,
-      y: first.y,
-      width: CARD_COVER_W,
-      height: CARD_COVER_H,
-      rotation: first.view.rotation,
-    }, {
-      x: second.x,
-      y: second.y,
-      width: CARD_COVER_W,
-      height: CARD_COVER_H,
-      rotation: second.view.rotation,
-    });
+    return rotatedRectanglesOverlap(
+      {
+        x: first.x,
+        y: first.y,
+        width: CARD_COVER_W,
+        height: CARD_COVER_H,
+        rotation: first.view.rotation,
+      },
+      {
+        x: second.x,
+        y: second.y,
+        width: CARD_COVER_W,
+        height: CARD_COVER_H,
+        rotation: second.view.rotation,
+      },
+    );
   }
 
   private coveringCards(card: CardNode) {
@@ -1225,12 +1253,12 @@ export class FruitGame implements GameControls {
     if (special === "prism") {
       this.prismCharge = 1;
       this.burst(card.x, card.y, 0xc7b2ff, 16);
-      this.callbacks.onToast("◇ 棱镜牌 · 下次落果触发强震", "pink");
+      this.callbacks.onToast("🔮 棱镜牌 · 下次落果触发强震", "pink");
     }
     if (launchesFruit) {
       const launched = this.launchFruits(3, 0.9);
       if (launched)
-        this.callbacks.onToast(`↟ 季风牌 · 弹开 ${launched} 颗水果`, "cyan");
+        this.callbacks.onToast(`🌪️ 季风牌 · 弹开 ${launched} 颗水果`, "cyan");
     }
     this.collectTier(card.tier);
     if (detonates) this.detonate(card);
@@ -1277,7 +1305,7 @@ export class FruitGame implements GameControls {
         this.gainFever(8);
         this.startConversion(tier, []);
         this.callbacks.onToast(
-          `🫧 泡泡归组 · ${FRUITS[tier].emoji} 转为水果`,
+          `🫧 泡泡归组 · ${FRUITS[tier].name}转为水果`,
           "cyan",
         );
       } else {
@@ -1447,11 +1475,10 @@ export class FruitGame implements GameControls {
     const frame = new Graphics()
       .roundRect(-16.5, -21.5, 33, 41, 8)
       .stroke({ color: 0x756581, alpha: 0.3, width: 0.7 });
-    const icon = new Text({
-      text: FRUITS[card.tier].emoji,
-      style: { fontSize: 23 },
-    });
-    icon.anchor.set(0.5);
+    const icon = this.makeFruitIcon(
+      card.tier,
+      FRUITS[card.tier].icon ? 27 : 23,
+    );
     icon.position.set(0, -1);
     view.addChild(shadow, edge, face, frame, icon);
     view.position.set(card.x, card.y);
@@ -1478,9 +1505,7 @@ export class FruitGame implements GameControls {
     const slotWidth =
       (WORLD.tray.width - 20 - gap * (this.trayLimit - 1)) / this.trayLimit;
     const counts = new Map<number, number>();
-    this.tray.forEach((tier) =>
-      counts.set(tier, (counts.get(tier) || 0) + 1),
-    );
+    this.tray.forEach((tier) => counts.set(tier, (counts.get(tier) || 0) + 1));
     for (let index = 0; index < this.trayLimit; index += 1) {
       const x = WORLD.tray.x + 10 + slotWidth / 2 + index * (slotWidth + gap);
       const tier = this.tray[index];
@@ -1512,13 +1537,12 @@ export class FruitGame implements GameControls {
       slot.position.set(x, WORLD.tray.y + WORLD.tray.height / 2);
       this.trayLayer.addChild(slot);
       if (tier !== undefined) {
-        const emoji = new Text({
-          text: FRUITS[tier].emoji,
-          style: { fontSize: this.trayLimit > 7 ? 23 : 26 },
-        });
-        emoji.anchor.set(0.5);
-        emoji.position.set(x, WORLD.tray.y + WORLD.tray.height / 2 - 1);
-        this.trayLayer.addChild(emoji);
+        const fruitIcon = this.makeFruitIcon(
+          tier,
+          FRUITS[tier].icon ? 31 : this.trayLimit > 7 ? 23 : 26,
+        );
+        fruitIcon.position.set(x, WORLD.tray.y + WORLD.tray.height / 2 - 1);
+        this.trayLayer.addChild(fruitIcon);
       }
     }
   }
@@ -1571,30 +1595,14 @@ export class FruitGame implements GameControls {
       const face = new Graphics()
         .roundRect(-13, -16, 26, 32, 8)
         .fill({ color: 0xffffff });
-      const icon = new Text({
-        text: FRUITS[tier].emoji,
-        style: { fontSize: 16 },
-      });
-      icon.anchor.set(0.5);
+      const icon = this.makeFruitIcon(tier, FRUITS[tier].icon ? 20 : 16);
       miniCard.addChild(face, icon);
       miniCard.position.set(x, y);
       miniCard.visible = false;
       this.fxLayer.addChild(miniCard);
       return miniCard;
     });
-    const fruit = new Text({
-      text: FRUITS[tier].emoji,
-      style: {
-        fontSize: 26,
-        dropShadow: {
-          color: FRUITS[tier].glow,
-          alpha: 0.9,
-          blur: 10,
-          distance: 0,
-        },
-      },
-    });
-    fruit.anchor.set(0.5);
+    const fruit = this.makeFruitIcon(tier, FRUITS[tier].icon ? 31 : 26, true);
     fruit.position.set(transferX, transferY);
     fruit.visible = false;
     this.fxLayer.addChild(fruit);
@@ -1682,10 +1690,7 @@ export class FruitGame implements GameControls {
     );
   }
 
-  private queueFruitRain(
-    tier: number,
-    power = this.dropPowerForTier(tier),
-  ) {
+  private queueFruitRain(tier: number, power = this.dropPowerForTier(tier)) {
     if (this.destroyed || this.status !== "playing") return;
     const total = fruitBatchCount(
       this.fruitBatchLevel,
@@ -1712,35 +1717,28 @@ export class FruitGame implements GameControls {
       this.nextRainReleaseAt = releaseAt;
     });
     if (total > 1)
-      this.callbacks.onToast(`🌾 温室丰收 ×${total}`, total >= 3 ? "gold" : "cyan");
+      this.callbacks.onToast(
+        `🌾 温室丰收 ×${total}`,
+        total >= 3 ? "gold" : "cyan",
+      );
     this.updateCardAccess();
     haptic(total === 3 ? [12, 22, 12, 22, 20] : [10, 24, 12]);
   }
 
   private makeRainPreview(tier: number, total: number) {
     const view = new Container();
-    const glow = new Graphics()
-      .circle(0, 0, 24)
-      .fill({
-        color: total >= 3 ? 0xd4ac55 : FRUITS[tier].glow,
-        alpha: total >= 3 ? 0.14 : 0.1,
-      });
-    glow.filters = [new BlurFilter({ strength: 7 })];
-    const emoji = new Text({
-      text: FRUITS[tier].emoji,
-      style: {
-        fontSize: 23,
-        dropShadow: {
-          color: FRUITS[tier].glow,
-          alpha: 0.72,
-          blur: 8,
-          distance: 0,
-        },
-      },
+    const glow = new Graphics().circle(0, 0, 24).fill({
+      color: total >= 3 ? 0xd4ac55 : FRUITS[tier].glow,
+      alpha: total >= 3 ? 0.14 : 0.1,
     });
-    emoji.anchor.set(0.5);
-    emoji.position.set(0, -1);
-    view.addChild(glow, emoji);
+    glow.filters = [new BlurFilter({ strength: 7 })];
+    const fruitIcon = this.makeFruitIcon(
+      tier,
+      FRUITS[tier].icon ? 29 : 23,
+      true,
+    );
+    fruitIcon.position.set(0, -1);
+    view.addChild(glow, fruitIcon);
     for (let index = 0; index < 3; index += 1) {
       const pip = new Graphics().circle(0, 0, 1.8).fill({
         color: 0xd8b766,
@@ -1764,8 +1762,7 @@ export class FruitGame implements GameControls {
         const ready = Math.max(0, Math.min(1, 1 - timeLeft / 0.28));
         drop.view.alpha = 0.3 + ready * 0.7;
         drop.view.scale.set(0.68 + ready * 0.32);
-        drop.view.y =
-          WORLD.box.y + 28 - Math.sin(ready * Math.PI) * 7;
+        drop.view.y = WORLD.box.y + 28 - Math.sin(ready * Math.PI) * 7;
         remaining.push(drop);
         return;
       }
@@ -1775,8 +1772,7 @@ export class FruitGame implements GameControls {
       const partner = this.findDropPartner(drop.tier, drop.x);
       const impactPower = Math.min(
         3,
-        Math.max(drop.power, drop.total) +
-          Number(this.hasRelic("shock_core")),
+        Math.max(drop.power, drop.total) + Number(this.hasRelic("shock_core")),
       );
       const dropped = this.spawnFruit(drop.tier, drop.x, WORLD.box.y + 18);
       if (dropped) {
@@ -1886,11 +1882,7 @@ export class FruitGame implements GameControls {
       : `${secondId}:${firstId}`;
   }
 
-  private linkFusionPair(
-    first: FruitNode,
-    second: FruitNode,
-    power = 1,
-  ) {
+  private linkFusionPair(first: FruitNode, second: FruitNode, power = 1) {
     if (
       first === second ||
       first.tier !== second.tier ||
@@ -1985,21 +1977,13 @@ export class FruitGame implements GameControls {
       .stroke({ color: 0xd8a94f, alpha: 0.72, width: 1.6 });
     resonanceHalo.label = "resonance-halo";
     resonanceHalo.visible = false;
-    const emoji = new Text({
-      text: definition.emoji,
-      style: {
-        fontSize: Math.max(18, radius * 1.72),
-        dropShadow: {
-          color: definition.glow,
-          alpha: 0.42,
-          blur: Math.max(2, radius * 0.12),
-          distance: 0,
-        },
-      },
-    });
-    emoji.anchor.set(0.5);
-    emoji.position.set(0, 1);
-    view.addChild(resonanceHalo, emoji);
+    const fruitIcon = this.makeFruitIcon(
+      tier,
+      Math.max(18, radius * (definition.icon ? 1.82 : 1.72)),
+      true,
+    );
+    fruitIcon.position.set(0, 1);
+    view.addChild(resonanceHalo, fruitIcon);
     view.scale.set(0.2);
     return view;
   }
@@ -2035,8 +2019,7 @@ export class FruitGame implements GameControls {
     if (!plugin.impactPending) return;
     plugin.impactPending = false;
     const power = Math.max(1, Math.min(3, Number(plugin.dropPower || 1)));
-    const radius =
-      (72 + power * 34) * (this.hasRelic("storm_stir") ? 1.25 : 1);
+    const radius = (72 + power * 34) * (this.hasRelic("storm_stir") ? 1.25 : 1);
     const nearby = [...this.fruits.values()].filter(
       (fruit) =>
         fruit !== node &&
@@ -2052,7 +2035,7 @@ export class FruitGame implements GameControls {
       const dy = fruit.body.position.y - node.body.position.y;
       const distance = Math.max(1, Math.hypot(dx, dy));
       const falloff = Math.max(0.18, 1 - distance / radius);
-      const direction = Math.sign(dx || (Math.random() - 0.5)) || 1;
+      const direction = Math.sign(dx || Math.random() - 0.5) || 1;
       Body.setVelocity(fruit.body, {
         x: Math.max(
           -4.6,
@@ -2210,7 +2193,9 @@ export class FruitGame implements GameControls {
     this.processCollision(event, true);
   };
 
-  private onCollisionActive = (event: Matter.IEventCollision<Matter.Engine>) => {
+  private onCollisionActive = (
+    event: Matter.IEventCollision<Matter.Engine>,
+  ) => {
     this.processCollision(event, false);
   };
 
@@ -2246,19 +2231,16 @@ export class FruitGame implements GameControls {
       tier >= 8 ? "gold" : "cyan",
     );
     const fusionIcon = (fruitTier: number, fontScale = 1) => {
-      const icon = new Text({
-        text: FRUITS[fruitTier].emoji,
-        style: {
-          fontSize: Math.max(18, this.fruitRadius(fruitTier) * 1.72 * fontScale),
-          dropShadow: {
-            color: FRUITS[fruitTier].glow,
-            alpha: 0.55,
-            blur: 8,
-            distance: 0,
-          },
-        },
-      });
-      icon.anchor.set(0.5);
+      const icon = this.makeFruitIcon(
+        fruitTier,
+        Math.max(
+          18,
+          this.fruitRadius(fruitTier) *
+            (FRUITS[fruitTier].icon ? 1.82 : 1.72) *
+            fontScale,
+        ),
+        true,
+      );
       this.fxLayer.addChild(icon);
       return icon;
     };
@@ -2294,7 +2276,9 @@ export class FruitGame implements GameControls {
       ] as const) {
         icon.position.set(
           start.x + (echo.center.x - start.x) * eased,
-          start.y + (echo.center.y - start.y) * eased - Math.sin(gather * Math.PI) * 6,
+          start.y +
+            (echo.center.y - start.y) * eased -
+            Math.sin(gather * Math.PI) * 6,
         );
         icon.rotation = direction * eased * 0.18;
         icon.scale.set(1 - eased * 0.68);
@@ -2304,7 +2288,9 @@ export class FruitGame implements GameControls {
         const reveal = Math.min(1, (echo.elapsed - 0.13) / 0.18);
         echo.result.visible = true;
         echo.result.alpha = Math.min(1, reveal * 2.2);
-        echo.result.scale.set(0.32 + Math.sin(reveal * Math.PI) * 0.88 + reveal * 0.68);
+        echo.result.scale.set(
+          0.32 + Math.sin(reveal * Math.PI) * 0.88 + reveal * 0.68,
+        );
         echo.result.rotation = (1 - reveal) * -0.12;
       }
       if (echo.elapsed < 0.32) return true;
@@ -2312,7 +2298,12 @@ export class FruitGame implements GameControls {
       echo.second.destroy();
       echo.result.destroy();
       echo.sourceIds.forEach((id) => this.merging.delete(id));
-      this.burst(echo.center.x, echo.center.y, FRUITS[echo.tier].color, 18 + echo.tier);
+      this.burst(
+        echo.center.x,
+        echo.center.y,
+        FRUITS[echo.tier].color,
+        18 + echo.tier,
+      );
       this.ring(echo.center.x, echo.center.y, FRUITS[echo.tier].glow, 0.9);
       const result = this.spawnFruit(
         echo.tier,
@@ -2989,7 +2980,9 @@ export class FruitGame implements GameControls {
     active.forEach((card) =>
       activeCounts.set(card.tier, (activeCounts.get(card.tier) || 0) + 1),
     );
-    const preferredTier = [...new Set([...trayCounts.keys(), ...activeCounts.keys()])]
+    const preferredTier = [
+      ...new Set([...trayCounts.keys(), ...activeCounts.keys()]),
+    ]
       .map((tier) => ({
         tier,
         held: trayCounts.get(tier) || 0,
@@ -3020,7 +3013,11 @@ export class FruitGame implements GameControls {
       ) {
         const source = sources[index];
         const target = targets[index];
-        const sourcePosition = { x: source.x, y: source.y, layer: source.layer };
+        const sourcePosition = {
+          x: source.x,
+          y: source.y,
+          layer: source.layer,
+        };
         source.x = target.x;
         source.y = target.y;
         source.layer = target.layer;
@@ -3090,7 +3087,7 @@ export class FruitGame implements GameControls {
     target.view.getChildByLabel("special-icon")?.destroy();
     this.burst(target.x, target.y, 0xffd85e, 20);
     this.callbacks.onToast(
-      `清顶锤 · 自动收取 ${FRUITS[target.tier].emoji}`,
+      `清顶锤 · 自动收取${FRUITS[target.tier].name}`,
       "gold",
     );
     this.pickCard(target);
@@ -3126,7 +3123,7 @@ export class FruitGame implements GameControls {
       return;
     }
     this.wildLeft -= 1;
-    this.callbacks.onToast(`万能果 · 补齐 ${FRUITS[tier].emoji} 三消`, "gold");
+    this.callbacks.onToast(`万能果 · 补齐${FRUITS[tier].name}三消`, "gold");
     this.burst(WORLD.width / 2, WORLD.tray.y + 30, 0xb6f36a, 24);
     haptic([16, 30, 24]);
     sources.forEach((card) => {
@@ -3160,17 +3157,17 @@ export class FruitGame implements GameControls {
       .sort((a, b) => b.index - a.index);
     ordered.forEach(({ index }) => {
       const tier = this.tray[index];
-      this.bubbleGroups.set(
-        tier,
-        ((this.bubbleGroups.get(tier) || 0) + 1) % 3,
-      );
+      this.bubbleGroups.set(tier, ((this.bubbleGroups.get(tier) || 0) + 1) % 3);
       this.tray.splice(index, 1);
     });
     this.bubbleLeft -= 1;
     this.lastPick = null;
     this.drawTray();
     this.burst(WORLD.width / 2, WORLD.tray.y + 30, 0x8be9fd, 30);
-    this.callbacks.onToast(`🫧 收起 ${ordered.length} 张 · 凑满仍会转果`, "cyan");
+    this.callbacks.onToast(
+      `🫧 收起 ${ordered.length} 张 · 凑满仍会转果`,
+      "cyan",
+    );
     haptic([12, 25, 12]);
     this.emitSnapshot();
   };
@@ -3218,8 +3215,7 @@ export class FruitGame implements GameControls {
           fruit.tier < FRUITS.length - 1 && !this.merging.has(fruit.body.id),
       )
       .sort(
-        (a, b) =>
-          a.tier - b.tier || b.body.position.y - a.body.position.y,
+        (a, b) => a.tier - b.tier || b.body.position.y - a.body.position.y,
       )[0];
     if (!target) {
       this.callbacks.onToast("果箱里还没有可催熟的水果", "cyan");
@@ -3254,8 +3250,7 @@ export class FruitGame implements GameControls {
           !this.fruitMergeCoolingDown(fruit),
       )
       .sort(
-        (a, b) =>
-          b.tier - a.tier || a.body.position.y - b.body.position.y,
+        (a, b) => b.tier - a.tier || a.body.position.y - b.body.position.y,
       )[0];
     if (!target) {
       this.callbacks.onToast("果箱里还没有可分开的水果", "cyan");
@@ -3337,8 +3332,7 @@ export class FruitGame implements GameControls {
   };
 
   quake = () => {
-    if (this.paused || this.status !== "playing" || this.quakeLeft <= 0)
-      return;
+    if (this.paused || this.status !== "playing" || this.quakeLeft <= 0) return;
     const launched = this.launchFruits(Number.POSITIVE_INFINITY, 1.15);
     if (!launched) {
       this.callbacks.onToast("果箱还是空的", "cyan");
@@ -3346,7 +3340,12 @@ export class FruitGame implements GameControls {
     }
     this.quakeLeft -= 1;
     this.shake = Math.max(this.shake, 7);
-    this.ring(WORLD.width / 2, WORLD.box.y + WORLD.box.height - 30, 0x9de9ff, 1.2);
+    this.ring(
+      WORLD.width / 2,
+      WORLD.box.y + WORLD.box.height - 30,
+      0x9de9ff,
+      1.2,
+    );
     this.callbacks.onToast(`🪇 震荡铃 · 弹开 ${launched} 颗水果`, "cyan");
     haptic([18, 28, 18, 28, 24]);
     this.emitSnapshot();

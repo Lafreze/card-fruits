@@ -178,16 +178,12 @@ test("every generated stack contains a verified low-risk clear route", () => {
         },
         random,
       );
-      const deal = buildPlayableDeal(
-        groups,
-        slots,
-        random,
-        levelIndex < 2,
-      );
+      const deal = buildPlayableDeal(groups, slots, random, levelIndex < 2);
       const averageMovement =
         slots.reduce(
           (total, slot, index) =>
-            total + Math.hypot(slot.x - original[index].x, slot.y - original[index].y),
+            total +
+            Math.hypot(slot.x - original[index].x, slot.y - original[index].y),
           0,
         ) / slots.length;
       const independentlyShifted = slots.filter(
@@ -325,11 +321,7 @@ test("fusion planning keeps one partner per fruit and prioritizes card bonds", (
     { id: 9, tier: 2, x: 9, y: 0 },
   ]);
   assert.deepEqual(
-    pairs.map(({ firstId, secondId, bonded }) => [
-      firstId,
-      secondId,
-      bonded,
-    ]),
+    pairs.map(({ firstId, secondId, bonded }) => [firstId, secondId, bonded]),
     [
       [1, 3, true],
       [2, 4, false],
@@ -347,7 +339,7 @@ test("fruit scale and roguelike catalog stay balanced", () => {
   assert.equal(FRUITS.length, 23);
   assert.deepEqual(
     FRUITS.slice(-5).map((fruit) => fruit.name),
-    ["杨桃", "哈密瓜", "南瓜", "西瓜", "黄金果王"],
+    ["火龙果", "哈密瓜", "南瓜", "西瓜", "黄金果王"],
   );
   FRUITS.forEach((fruit, index) => {
     assert.ok(fruit.radius <= 60, `${fruit.name} 不应重新撑满果箱`);
@@ -365,7 +357,9 @@ test("fruit scale and roguelike catalog stay balanced", () => {
     TOOLS.every(
       (tool) =>
         tool.costs.length === tool.maxLevel &&
-        tool.costs.every((cost, index) => index === 0 || cost > tool.costs[index - 1]),
+        tool.costs.every(
+          (cost, index) => index === 0 || cost > tool.costs[index - 1],
+        ),
     ),
     "道具的每局携带次数必须逐级涨价",
   );
@@ -386,9 +380,7 @@ test("fruit scale and roguelike catalog stay balanced", () => {
   ]);
   assert.equal(new Set(pickRelics([], 3).map((relic) => relic.id)).size, 3);
   assert.ok(
-    pickRelics([], 3, 3, () => 0.99).some(
-      (relic) => relic.rarity === "rare",
-    ),
+    pickRelics([], 3, 3, () => 0.99).some((relic) => relic.rarity === "rare"),
     "每三关的构筑奖励至少出现一件稀有奇物",
   );
   assert.equal(

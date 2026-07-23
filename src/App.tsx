@@ -5,7 +5,7 @@ import {
   startRun,
   type LeaderboardEntry,
 } from "./api";
-import { FRUITS, LEVELS } from "./game/data";
+import { FRUITS, LEVELS, type FruitDefinition } from "./game/data";
 import type { FruitGame } from "./game/FruitGame";
 import { calculateCoinReward } from "./game/logic";
 import {
@@ -92,6 +92,39 @@ function readProgress() {
 type UpgradeLevels = Record<UpgradeId, number>;
 type ToolLevels = Record<ToolId, number>;
 
+function FruitIcon({
+  fruit,
+  className = "",
+  decorative = false,
+}: {
+  fruit: FruitDefinition;
+  className?: string;
+  decorative?: boolean;
+}) {
+  const classes =
+    `fruit-visual ${fruit.icon ? "fruit-visual-image" : "fruit-visual-emoji"} ${className}`.trim();
+  if (fruit.icon) {
+    return (
+      <img
+        className={classes}
+        src={fruit.icon}
+        alt={decorative ? "" : fruit.name}
+        draggable={false}
+      />
+    );
+  }
+  return (
+    <span
+      className={classes}
+      role={decorative ? undefined : "img"}
+      aria-label={decorative ? undefined : fruit.name}
+      aria-hidden={decorative ? true : undefined}
+    >
+      {fruit.emoji}
+    </span>
+  );
+}
+
 function readCoins() {
   const stored = Number(localStorage.getItem("fruit-king-coins") || 0);
   return Number.isFinite(stored) ? Math.max(0, Math.floor(stored)) : 0;
@@ -110,6 +143,7 @@ function readUpgrades(): UpgradeLevels {
     sweet_start: 0,
     relic_start: 0,
   };
+
   try {
     const stored = JSON.parse(
       localStorage.getItem("fruit-king-upgrades") || "{}",
@@ -319,8 +353,11 @@ function Leaderboard({
                       ? `第 ${entry.level} 波`
                       : `远征路线 ${entry.level + 1}`}{" "}
                   · 最高{" "}
-                  {FRUITS[Math.min(entry.fruitTier, FRUITS.length - 1)].emoji} ·{" "}
-                  {entry.maxCombo} 连击
+                  <FruitIcon
+                    fruit={FRUITS[Math.min(entry.fruitTier, FRUITS.length - 1)]}
+                    decorative
+                  />{" "}
+                  · {entry.maxCombo} 连击
                 </small>
               </span>
               <b>{formatScore(entry.score)}</b>
@@ -579,7 +616,9 @@ export default function App() {
 
   useEffect(() => {
     if (screen !== "home") return;
-    const selected = levelTrackRef.current?.querySelector(".level-dot.selected");
+    const selected = levelTrackRef.current?.querySelector(
+      ".level-dot.selected",
+    );
     selected?.scrollIntoView({
       behavior: "smooth",
       block: "nearest",
@@ -720,8 +759,8 @@ export default function App() {
     result?.status === "won" &&
     rewardOptions.length > 0;
   const toolboxItems = [
-    { id: "undo", icon: "↶", label: "撤回", left: snapshot.undoLeft },
-    { id: "shuffle", icon: "⤨", label: "洗牌", left: snapshot.shuffleLeft },
+    { id: "undo", icon: "🕰️", label: "撤回", left: snapshot.undoLeft },
+    { id: "shuffle", icon: "🎲", label: "洗牌", left: snapshot.shuffleLeft },
     { id: "juice", icon: "🥤", label: "榨汁", left: snapshot.juiceLeft },
     { id: "hammer", icon: "🔨", label: "清顶", left: snapshot.hammerLeft },
     { id: "magnet", icon: "🧲", label: "合并", left: snapshot.magnetLeft },
@@ -745,11 +784,6 @@ export default function App() {
       if (id === "sun") controls.sunshine();
       else controls[id]();
     });
-  const currentPath =
-    mode === "story" && currentFruit !== target
-      ? `${currentFruit.emoji} → ${target.emoji}`
-      : `${target.emoji} ×1`;
-
   return (
     <main className="app-shell">
       <div className="noise" />
@@ -760,7 +794,13 @@ export default function App() {
             <span className="orbit-fruit fruit-b">🍋</span>
             <span className="orbit-fruit fruit-c">🍉</span>
             <span className="orbit-fruit fruit-d">🍇</span>
-            <div className="crown-core">👑</div>
+            <div className="crown-core">
+              <FruitIcon
+                fruit={FRUITS[FRUITS.length - 1]}
+                className="hero-fruit-icon"
+                decorative
+              />
+            </div>
           </div>
           <div className="eyebrow">
             <i /> NEON ORCHARD <i />
@@ -823,7 +863,11 @@ export default function App() {
             )}
             <div className="mission-preview">
               <span className="mission-icon">
-                {mode === "story" ? target.emoji : MODE_INFO[mode].icon}
+                {mode === "story" ? (
+                  <FruitIcon fruit={target} decorative />
+                ) : (
+                  MODE_INFO[mode].icon
+                )}
               </span>
               <span>
                 <small>
@@ -853,7 +897,7 @@ export default function App() {
                     ? target.name
                     : mode === "endless"
                       ? "最高分"
-                    : `${RELICS.length} 种`}
+                      : `${RELICS.length} 种`}
                 </b>
               </span>
             </div>
@@ -893,7 +937,7 @@ export default function App() {
                 LEVELS[level].target + 1,
               ).map((fruit, index) => (
                 <span key={fruit.name}>
-                  {fruit.emoji}
+                  <FruitIcon fruit={fruit} decorative />
                   {index < 3 ? <i>›</i> : null}
                 </span>
               ))}
@@ -938,9 +982,22 @@ export default function App() {
                       : `剩余 ${snapshot.remainingCards} 张 · 槽 ${snapshot.trayCount}/${snapshot.trayLimit}`}
                 </small>
                 <strong>
-                  {mode === "endless"
-                    ? `${currentFruit.emoji} ${currentFruit.name}`
-                    : currentPath}
+                  {mode === "endless" ? (
+                    <>
+                      <FruitIcon fruit={currentFruit} decorative />{" "}
+                      {currentFruit.name}
+                    </>
+                  ) : currentFruit !== target ? (
+                    <>
+                      <FruitIcon fruit={currentFruit} decorative />
+                      <i className="fruit-path-arrow">→</i>
+                      <FruitIcon fruit={target} decorative />
+                    </>
+                  ) : (
+                    <>
+                      <FruitIcon fruit={target} decorative /> ×1
+                    </>
+                  )}
                 </strong>
               </div>
               {availableToolboxItems.length ? (
@@ -949,7 +1006,7 @@ export default function App() {
                   onClick={() => openGamePanel("tools")}
                   aria-label={`打开道具箱，${availableToolboxItems.length} 种可用`}
                 >
-                  <i>✦</i>
+                  <i>🧰</i>
                   <span>道具</span>
                 </button>
               ) : null}
@@ -958,7 +1015,7 @@ export default function App() {
                 onClick={() => openGamePanel("menu")}
                 aria-label="打开游戏菜单"
               >
-                <i>≡</i>
+                <i>⚙️</i>
                 <span>菜单</span>
               </button>
             </header>
@@ -1061,19 +1118,21 @@ export default function App() {
                       </div>
                       <h3>特殊牌角标</h3>
                       <div className="special-legend">
-                        <span>❄ 冰冻</span>
-                        <span>● 炸弹</span>
-                        <span>✦ 藤蔓</span>
-                        <span>ϟ 甜度</span>
-                        <span>穗 丰收</span>
-                        <span>◇ 棱镜</span>
-                        <span>↟ 季风</span>
+                        <span>🧊 冰冻</span>
+                        <span>💣 炸弹</span>
+                        <span>🌿 藤蔓</span>
+                        <span>🍬 甜度</span>
+                        <span>🌾 丰收</span>
+                        <span>🔮 棱镜</span>
+                        <span>🌪️ 季风</span>
                       </div>
                       <h3>合成路径</h3>
                       <div className="help-chain">
                         {helpChain.map((fruit, index) => (
                           <span key={fruit.name}>
-                            <b>{fruit.emoji}</b>
+                            <b>
+                              <FruitIcon fruit={fruit} decorative />
+                            </b>
                             <small>{fruit.name}</small>
                             {index < helpChain.length - 1 ? <i>›</i> : null}
                           </span>
@@ -1145,11 +1204,13 @@ export default function App() {
                 <div className={`result-card result-${result.status}`}>
                   <div className="result-rays" />
                   <div className="result-emoji">
-                    {result.status === "won"
-                      ? target.emoji
-                      : mode === "endless"
-                        ? "∞"
-                        : "🍹"}
+                    {result.status === "won" ? (
+                      <FruitIcon fruit={target} decorative />
+                    ) : mode === "endless" ? (
+                      "∞"
+                    ) : (
+                      "🍹"
+                    )}
                   </div>
                   <div className="result-kicker">
                     {isRelicReward
@@ -1186,11 +1247,14 @@ export default function App() {
                     <span>
                       <small>最大水果</small>
                       <b>
-                        {
-                          FRUITS[
-                            Math.min(result.maxFruitTier, FRUITS.length - 1)
-                          ].emoji
-                        }
+                        <FruitIcon
+                          fruit={
+                            FRUITS[
+                              Math.min(result.maxFruitTier, FRUITS.length - 1)
+                            ]
+                          }
+                          decorative
+                        />
                       </b>
                     </span>
                     <span>
@@ -1377,8 +1441,7 @@ export default function App() {
                       <b>
                         {item.name}
                         <small>
-                          {"●".repeat(levelNow)}
-                          {"○".repeat(item.maxLevel - levelNow)}
+                          Lv. {levelNow}/{item.maxLevel}
                         </small>
                       </b>
                       <small>
