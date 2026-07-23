@@ -130,9 +130,9 @@ export const RELICS: RelicDefinition[] = [
   },
   {
     id: "storm_stir",
-    icon: "🌪️",
-    name: "龙卷搅拌",
-    description: "戳水果没有冷却，力道加倍。",
+    icon: "💍",
+    name: "共鸣指环",
+    description: "轻推无冷却，落地冲击范围提高 25%。",
     tone: "cyan",
     rarity: "common",
     archetype: "操控",

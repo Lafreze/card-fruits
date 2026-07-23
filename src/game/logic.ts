@@ -352,7 +352,8 @@ export function evaluateDropPlacement(
   partnerX: number | undefined,
   fruitRadius: number,
 ) {
-  const tolerance = Math.max(30, fruitRadius * 1.65);
+  // 三果位的最大半间距约 56px；容差覆盖最近果位，同时仍能区分错道。
+  const tolerance = Math.max(58, fruitRadius * 1.65);
   const distance =
     partnerX === undefined ? Number.POSITIVE_INFINITY : Math.abs(chosenX - partnerX);
   return {
@@ -362,18 +363,22 @@ export function evaluateDropPlacement(
   };
 }
 
-export function evaluateNectarPlacement(
-  chosenX: number,
-  nectarX: number,
-  fruitRadius: number,
+export function forecastFusionChain(
+  existingTiers: readonly number[],
+  incomingTier: number,
+  maxTier: number,
 ) {
-  const tolerance = Math.max(28, Math.min(44, fruitRadius * 0.9));
-  const distance = Math.abs(chosenX - nectarX);
-  return {
-    hit: distance <= tolerance,
-    distance,
-    tolerance,
-  };
+  const counts = new Array(maxTier + 1).fill(0);
+  existingTiers.forEach((tier) => {
+    if (tier >= 0 && tier <= maxTier) counts[tier] += 1;
+  });
+  let finalTier = Math.max(0, Math.min(maxTier, incomingTier));
+  let merges = 0;
+  while (finalTier < maxTier && counts[finalTier] % 2 === 1) {
+    merges += 1;
+    finalTier += 1;
+  }
+  return { merges, finalTier };
 }
 
 /**

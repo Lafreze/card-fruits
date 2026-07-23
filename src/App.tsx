@@ -957,8 +957,8 @@ export default function App() {
                         <span>同果合成</span>
                       </div>
                       <div className="help-rules">
-                        <span>金星牌：箱内已有同果</span>
-                        <span>三消后稳定共鸣合成</span>
+                        <span>金星牌：下一果压 +1</span>
+                        <span>三果位：预判物理连锁</span>
                       </div>
                       <h3>合成路径</h3>
                       <div className="help-chain">

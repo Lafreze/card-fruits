@@ -5,7 +5,7 @@ import {
   buildFusionPairs,
   buildPlayableDeal,
   evaluateDropPlacement,
-  evaluateNectarPlacement,
+  forecastFusionChain,
   scatterStackSlots,
   simulateTray,
   slotIsCovered,
@@ -222,17 +222,33 @@ test("every generated stack contains a verified low-risk clear route", () => {
   });
 });
 
-test("manual drop precision rewards intentional matching placement", () => {
-  assert.equal(evaluateDropPlacement(120, 145, 10).precision, true);
-  assert.equal(evaluateDropPlacement(120, 151, 10).precision, false);
+test("three drop gates cover the nearest partner without accepting a wrong lane", () => {
+  assert.equal(evaluateDropPlacement(120, 175, 10).precision, true);
+  assert.equal(evaluateDropPlacement(120, 179, 10).precision, false);
   assert.equal(evaluateDropPlacement(200, 260, 40).precision, true);
   assert.equal(
     evaluateDropPlacement(200, undefined, 40).precision,
     false,
   );
-  assert.equal(evaluateNectarPlacement(100, 128, 8).hit, true);
-  assert.equal(evaluateNectarPlacement(99, 128, 8).hit, false);
-  assert.equal(evaluateNectarPlacement(200, 244, 60).hit, true);
+});
+
+test("fusion forecast follows the incoming fruit through deterministic pairs", () => {
+  assert.deepEqual(forecastFusionChain([], 0, 6), {
+    merges: 0,
+    finalTier: 0,
+  });
+  assert.deepEqual(forecastFusionChain([0], 0, 6), {
+    merges: 1,
+    finalTier: 1,
+  });
+  assert.deepEqual(forecastFusionChain([0, 1, 2], 0, 6), {
+    merges: 3,
+    finalTier: 3,
+  });
+  assert.deepEqual(forecastFusionChain([6], 6, 6), {
+    merges: 0,
+    finalTier: 6,
+  });
 });
 
 test("fusion planning keeps one partner per fruit and prioritizes card bonds", () => {
