@@ -418,31 +418,31 @@ export class FruitGame implements GameControls {
   }
 
   private drawScene() {
-    // 暖象牙底 + 低饱和紫金光场；高饱和色只留给水果与关键反馈。
+    // 深色桌游底台：紫黑丝绒承载卡片与水果，金色只用在关键交互上。
     const background = new Graphics()
       .rect(0, 0, WORLD.width, WORLD.height)
-      .fill({ color: 0xf4f0ea });
+      .fill({ color: 0x0e0b18 });
     this.ambientLayer.addChild(background);
 
     const haloA = new Graphics()
-      .circle(70, 175, 125)
-      .fill({ color: 0xe8d8ca, alpha: 0.34 });
+      .circle(62, 170, 138)
+      .fill({ color: 0x5f3f89, alpha: 0.24 });
     const haloB = new Graphics()
-      .circle(380, 610, 150)
-      .fill({ color: 0xd9d1ed, alpha: 0.38 });
+      .circle(388, 590, 164)
+      .fill({ color: 0x253f73, alpha: 0.25 });
     const haloC = new Graphics()
-      .circle(215, 830, 130)
-      .fill({ color: 0xd9e1d8, alpha: 0.28 });
-    haloA.filters = [new BlurFilter({ strength: 52 })];
-    haloB.filters = [new BlurFilter({ strength: 60 })];
-    haloC.filters = [new BlurFilter({ strength: 55 })];
+      .circle(204, 842, 145)
+      .fill({ color: 0x5b4226, alpha: 0.16 });
+    haloA.filters = [new BlurFilter({ strength: 64 })];
+    haloB.filters = [new BlurFilter({ strength: 72 })];
+    haloC.filters = [new BlurFilter({ strength: 68 })];
     this.ambientLayer.addChild(haloA, haloB, haloC);
 
-    const dotPalette = [0xc4b8d8, 0xd2c3b4, 0xb9c8bd];
-    for (let index = 0; index < 18; index += 1) {
-      const star = new Graphics().circle(0, 0, 0.8 + Math.random() * 1.2).fill({
+    const dotPalette = [0xbba4ec, 0xd8b878, 0x7895c5];
+    for (let index = 0; index < 22; index += 1) {
+      const star = new Graphics().circle(0, 0, 0.65 + Math.random() * 1.05).fill({
         color: dotPalette[index % dotPalette.length],
-        alpha: 0.16 + Math.random() * 0.22,
+        alpha: 0.12 + Math.random() * 0.2,
       });
       star.position.set(
         Math.random() * WORLD.width,
@@ -452,26 +452,34 @@ export class FruitGame implements GameControls {
       this.ambientLayer.addChild(star);
     }
 
-    // 三块悬浮面板共用同一纸张、细边和阴影体系。
+    // 三块区域采用同一套深色玻璃、内描边与底部厚度。
     const panel = (
       x: number,
       y: number,
       width: number,
       height: number,
       radius: number,
-      tint = 0xffffff,
+      tint = 0x171321,
+      border = 0x7f6aa9,
     ) => {
       const shadow = new Graphics()
-        .roundRect(x + 2, y + 7, width - 4, height, radius + 2)
-        .fill({ color: 0x44394f, alpha: 0.13 });
+        .roundRect(x + 2, y + 8, width - 4, height, radius + 2)
+        .fill({ color: 0x05040a, alpha: 0.58 });
+      const edge = new Graphics()
+        .roundRect(x, y + 3, width, height, radius)
+        .fill({ color: 0x251c35, alpha: 0.94 })
+        .stroke({ color: border, alpha: 0.2, width: 1 });
       const face = new Graphics()
         .roundRect(x, y, width, height, radius)
-        .fill({ color: tint, alpha: 0.96 })
-        .stroke({ color: 0xe5dfe7, alpha: 0.9, width: 1 });
+        .fill({ color: tint, alpha: 0.965 })
+        .stroke({ color: border, alpha: 0.46, width: 1.15 });
+      const inner = new Graphics()
+        .roundRect(x + 4, y + 4, width - 8, height - 8, Math.max(8, radius - 4))
+        .stroke({ color: 0xffffff, alpha: 0.045, width: 1 });
       const highlight = new Graphics()
-        .roundRect(x + 13, y + 10, width - 26, 2, 1)
-        .fill({ color: 0xffffff, alpha: 0.92 });
-      this.ambientLayer.addChild(shadow, face, highlight);
+        .roundRect(x + 16, y + 8, width - 32, 1.5, 1)
+        .fill({ color: 0xd7c9f2, alpha: 0.16 });
+      this.ambientLayer.addChild(shadow, edge, face, inner, highlight);
     };
     panel(
       WORLD.stack.x,
@@ -479,15 +487,26 @@ export class FruitGame implements GameControls {
       WORLD.stack.width,
       WORLD.stack.height,
       30,
+      0x171321,
+      0x826aaf,
     );
-    panel(WORLD.tray.x, WORLD.tray.y, WORLD.tray.width, WORLD.tray.height, 22);
+    panel(
+      WORLD.tray.x,
+      WORLD.tray.y,
+      WORLD.tray.width,
+      WORLD.tray.height,
+      22,
+      0x15111f,
+      0x9b81c3,
+    );
     panel(
       WORLD.box.x,
       WORLD.box.y,
       WORLD.box.width,
       WORLD.box.height,
       28,
-      0xfffdf8,
+      0x101722,
+      0x537aa3,
     );
 
     // 甜度警戒在安全时近乎隐形，真正超线后再逐级显现。
@@ -499,7 +518,7 @@ export class FruitGame implements GameControls {
         36,
         18,
       )
-      .fill({ color: 0xe67d72, alpha: 1 });
+      .fill({ color: 0xf05f67, alpha: 1 });
     this.dangerGlow.alpha = 0;
     const danger = new Graphics()
       .roundRect(
@@ -509,7 +528,7 @@ export class FruitGame implements GameControls {
         4,
         2,
       )
-      .fill({ color: 0xd99186, alpha: 0.28 });
+      .fill({ color: 0xf17a77, alpha: 0.25 });
     danger.label = "danger-line";
     this.ambientLayer.addChild(this.dangerGlow, danger);
 
@@ -520,7 +539,7 @@ export class FruitGame implements GameControls {
           fontFamily: "system-ui",
           fontSize: 10,
           fontWeight: "800",
-          fill: 0xaaa2b8,
+          fill: 0x8f87a8,
           letterSpacing: 1.4,
         },
       });
@@ -539,8 +558,8 @@ export class FruitGame implements GameControls {
     DROP_GATE_RATIOS.forEach((ratio, index) => {
       const gate = new Graphics()
         .circle(0, 0, 18)
-        .fill({ color: 0x9c8bdd, alpha: 0.025 })
-        .stroke({ color: 0xb8acd0, alpha: 0.13, width: 1 });
+        .fill({ color: 0xa890dc, alpha: 0.025 })
+        .stroke({ color: 0x8e83ad, alpha: 0.17, width: 1 });
       gate.position.set(
         WORLD.box.x + WORLD.box.width * ratio,
         WORLD.box.y + 29,
@@ -555,7 +574,7 @@ export class FruitGame implements GameControls {
         fontFamily: "system-ui",
         fontSize: 9,
         fontWeight: "800",
-        fill: 0xb98b84,
+        fill: 0xc0787d,
         letterSpacing: 1,
       },
     });
@@ -571,7 +590,7 @@ export class FruitGame implements GameControls {
         4,
         2,
       )
-      .fill({ color: 0xe9e4f0, alpha: 1 });
+      .fill({ color: 0x282135, alpha: 1 });
     this.feverFill = new Graphics()
       .roundRect(0, 0, WORLD.tray.width - 28, 4, 2)
       .fill({ color: 0xffffff });
@@ -579,7 +598,7 @@ export class FruitGame implements GameControls {
       WORLD.tray.x + 14,
       WORLD.tray.y + WORLD.tray.height - 9,
     );
-    this.feverFill.tint = 0xa48ef0;
+    this.feverFill.tint = 0xc2a5ff;
     this.feverFill.scale.x = this.feverEnergy / 100;
     this.feverLabel = new Text({
       text: "FEVER ×2",
@@ -587,8 +606,8 @@ export class FruitGame implements GameControls {
         fontFamily: "system-ui",
         fontSize: 9,
         fontWeight: "900",
-        fill: 0x8a76d8,
-        stroke: { color: 0xffffff, width: 3 },
+        fill: 0xd7c3ff,
+        stroke: { color: 0x171120, width: 3 },
       },
     });
     this.feverLabel.anchor.set(0.5, 1);
@@ -607,7 +626,7 @@ export class FruitGame implements GameControls {
         fontFamily: "system-ui",
         fontSize: 10,
         fontWeight: "800",
-        fill: 0xaaa2b8,
+        fill: 0x948cab,
         letterSpacing: 0.5,
       },
     });
@@ -625,9 +644,9 @@ export class FruitGame implements GameControls {
         fontFamily: "system-ui",
         fontSize: 10,
         fontWeight: "900",
-        fill: 0x8c6b32,
+        fill: 0xe0bd74,
         letterSpacing: 0.5,
-        stroke: { color: 0xffffff, width: 4 },
+        stroke: { color: 0x171120, width: 4 },
       },
     });
     this.phaseLabel.anchor.set(0.5, 0);
@@ -882,83 +901,180 @@ export class FruitGame implements GameControls {
   private makeCard(tier: number, special: CardSpecial, layer = 0) {
     const fruit = FRUITS[tier];
     const view = new Container();
-    // 暖白卡面只用中性的层级阴影与统一紫罗兰选中光，水果是唯一高饱和色。
-    const shadow = new Graphics()
+    // 实体收藏卡：深色厚边、暖象牙纸、双层压印框和克制的烫金细节。
+    const farShadow = new Graphics()
       .roundRect(
-        -CARD_W / 2 + 1.5,
-        -CARD_H / 2 + 4 + Math.min(2.5, layer * 0.35),
-        CARD_W,
-        CARD_H,
-        15,
+        -CARD_W / 2 - 1,
+        -CARD_H / 2 + 7 + Math.min(3, layer * 0.38),
+        CARD_W + 4,
+        CARD_H + 3,
+        13.5,
       )
-      .fill({ color: 0x40384e, alpha: 0.13 + Math.min(0.07, layer * 0.01) });
+      .fill({ color: 0x030208, alpha: 0.48 + Math.min(0.12, layer * 0.014) });
+    const cardEdge = new Graphics()
+      .roundRect(-CARD_W / 2, -CARD_H / 2 + 3, CARD_W, CARD_H, 12.5)
+      .fill({ color: 0x312641, alpha: 1 })
+      .stroke({ color: 0x6d5a86, alpha: 0.78, width: 1 });
     const glow = new Container();
     glow.label = "access-glow";
     const glowOuter = new Graphics()
-      .roundRect(-CARD_W / 2 - 5, -CARD_H / 2 - 5, CARD_W + 10, CARD_H + 10, 20)
-      .fill({ color: 0xb9ade9, alpha: 0.26 });
+      .roundRect(
+        -CARD_W / 2 - 4.5,
+        -CARD_H / 2 - 4.5,
+        CARD_W + 9,
+        CARD_H + 9,
+        17,
+      )
+      .fill({ color: 0xa887df, alpha: 0.18 });
     const glowInner = new Graphics()
       .roundRect(
-        -CARD_W / 2 - 2.5,
-        -CARD_H / 2 - 2.5,
-        CARD_W + 5,
-        CARD_H + 5,
-        18,
+        -CARD_W / 2 - 2,
+        -CARD_H / 2 - 2,
+        CARD_W + 4,
+        CARD_H + 4,
+        14.5,
       )
-      .fill({ color: 0x9c8bdd, alpha: 0.42 });
+      .stroke({ color: 0xd2b86f, alpha: 0.72, width: 1.35 });
     glow.addChild(glowOuter, glowInner);
     const face = new Graphics()
-      .roundRect(-CARD_W / 2, -CARD_H / 2, CARD_W, CARD_H, 15)
-      .fill({ color: 0xfffefa })
-      .stroke({ color: 0xe9e4ec, alpha: 0.9, width: 1 });
+      .roundRect(-CARD_W / 2, -CARD_H / 2, CARD_W, CARD_H, 12.5)
+      .fill({ color: 0xf0ece4 })
+      .stroke({ color: 0xcfc5d4, alpha: 0.96, width: 1 });
+    face.label = "card-face";
+    const paperWash = new Graphics()
+      .roundRect(
+        -CARD_W / 2 + 2,
+        -CARD_H / 2 + 2,
+        CARD_W - 4,
+        CARD_H - 4,
+        10.5,
+      )
+      .fill({ color: 0xfffcf5, alpha: 0.48 });
+    const innerFrame = new Graphics()
+      .roundRect(
+        -CARD_W / 2 + 4.5,
+        -CARD_H / 2 + 4.5,
+        CARD_W - 9,
+        CARD_H - 9,
+        8.5,
+      )
+      .stroke({ color: 0x77688c, alpha: 0.26, width: 0.8 });
+    innerFrame.label = "card-rim";
+    const topGlint = new Graphics()
+      .roundRect(-CARD_W / 2 + 9, -CARD_H / 2 + 5.5, CARD_W - 18, 1.25, 1)
+      .fill({ color: 0xffffff, alpha: 0.82 });
+    const medallion = new Graphics()
+      .circle(0, -2, 19.5)
+      .fill({ color: 0x6f6383, alpha: 0.055 })
+      .stroke({ color: 0xa895bb, alpha: 0.18, width: 0.75 });
+    const sheen = new Graphics()
+      .roundRect(-13, -23, 26, 5.5, 2.75)
+      .fill({ color: 0xffffff, alpha: 0.28 });
+    sheen.label = "card-sheen";
     const emoji = new Text({
       text: fruit.emoji,
       style: {
-        fontSize: 30,
+        fontSize: 31,
         align: "center",
-        dropShadow: { color: 0x8a7f9e, alpha: 0.16, blur: 3, distance: 2 },
+        dropShadow: { color: 0x251b35, alpha: 0.24, blur: 4, distance: 2 },
       },
     });
     emoji.anchor.set(0.5);
-    emoji.position.set(0, -4);
+    emoji.position.set(0, -2.5);
+    emoji.label = "card-symbol";
+    const serial = new Text({
+      text: String(tier + 1).padStart(2, "0"),
+      style: {
+        fontFamily: "Georgia, serif",
+        fontSize: 6.5,
+        fontWeight: "700",
+        fill: 0x655876,
+        letterSpacing: 0.4,
+      },
+    });
+    serial.position.set(-CARD_W / 2 + 7, -CARD_H / 2 + 7);
+    const collection = new Text({
+      text: "ORCHARD",
+      style: {
+        fontFamily: "system-ui",
+        fontSize: 5.5,
+        fontWeight: "800",
+        fill: 0x796d83,
+        letterSpacing: 1.05,
+      },
+    });
+    collection.anchor.set(0.5, 1);
+    collection.position.set(0, CARD_H / 2 - 5.5);
     const resonanceDot = new Graphics()
-      .star(0, 0, 4, 3.4, 1.45)
-      .fill({ color: 0xd7a84d, alpha: 0.9 });
-    resonanceDot.position.set(-20, 23);
+      .star(0, 0, 4, 3, 1.25)
+      .fill({ color: 0xd8b55f, alpha: 0.95 })
+      .stroke({ color: 0xffedac, alpha: 0.72, width: 0.6 });
+    resonanceDot.position.set(-20.5, 23);
     resonanceDot.label = "resonance-dot";
     resonanceDot.visible = false;
     const shade = new Graphics()
-      .roundRect(-CARD_W / 2, -CARD_H / 2, CARD_W, CARD_H, 15)
-      .fill({ color: 0xded9e2, alpha: 0.8 });
+      .roundRect(-CARD_W / 2, -CARD_H / 2, CARD_W, CARD_H, 12.5)
+      .fill({ color: 0x171220, alpha: 0.72 })
+      .stroke({ color: 0x71677f, alpha: 0.36, width: 1 });
     shade.label = "shade";
     shade.visible = false;
-    view.addChild(shadow, glow, face, emoji, resonanceDot, shade);
+    view.addChild(
+      farShadow,
+      cardEdge,
+      glow,
+      face,
+      paperWash,
+      innerFrame,
+      topGlint,
+      medallion,
+      sheen,
+      emoji,
+      serial,
+      collection,
+      resonanceDot,
+      shade,
+    );
     if (special === "frozen") {
-      const lock = new Text({ text: "❄", style: { fontSize: 13 } });
-      lock.anchor.set(0.5);
-      lock.position.set(19, -25);
-      lock.label = "lock";
-      view.addChild(lock);
+      this.addCardBadge(view, "❄", 0x6c91b5, "lock");
     } else if (special === "bomb") {
-      const bomb = new Text({ text: "💣", style: { fontSize: 14 } });
-      bomb.anchor.set(0.5);
-      bomb.position.set(19, -24);
-      bomb.label = "special-icon";
-      view.addChild(bomb);
+      this.addCardBadge(view, "●", 0xa35663, "special-icon");
     } else if (special === "vine") {
-      const vine = new Text({ text: "🌿", style: { fontSize: 14 } });
-      vine.anchor.set(0.5);
-      vine.position.set(19, -24);
-      vine.label = "special-icon";
-      view.addChild(vine);
+      this.addCardBadge(view, "✦", 0x4f8b72, "special-icon");
     } else if (special === "sugar") {
-      const sugar = new Text({ text: "⚡", style: { fontSize: 14 } });
-      sugar.anchor.set(0.5);
-      sugar.position.set(19, -24);
-      sugar.label = "special-icon";
-      view.addChild(sugar);
+      this.addCardBadge(view, "ϟ", 0xb88937, "special-icon");
     }
     return view;
+  }
+
+  private addCardBadge(
+    view: Container,
+    glyph: string,
+    color: number,
+    label: "lock" | "special-icon",
+  ) {
+    const badge = new Container();
+    badge.label = label;
+    badge.position.set(20, -25);
+    const shadow = new Graphics()
+      .circle(0, 1.4, 7.2)
+      .fill({ color: 0x110d17, alpha: 0.34 });
+    const seal = new Graphics()
+      .circle(0, 0, 7)
+      .fill({ color, alpha: 0.96 })
+      .stroke({ color: 0xfff0ce, alpha: 0.74, width: 0.8 });
+    const icon = new Text({
+      text: glyph,
+      style: {
+        fontFamily: "system-ui",
+        fontSize: glyph === "❄" ? 9 : 10,
+        fontWeight: "900",
+        fill: 0xffffff,
+      },
+    });
+    icon.anchor.set(0.5);
+    icon.position.set(0, -0.4);
+    badge.addChild(shadow, seal, icon);
+    view.addChild(badge);
   }
 
   private isCovered(card: CardNode) {
@@ -1077,13 +1193,14 @@ export class FruitGame implements GameControls {
       const resonanceDot = card.view.getChildByLabel("resonance-dot");
       if (shade) {
         shade.visible = !usable;
-        shade.alpha = covered ? 0.88 : 0.58;
+        // 被遮挡牌保留水果轮廓与纸边，层级清楚但不会与可点牌争夺焦点。
+        shade.alpha = covered ? 0.7 : 0.48;
       }
       if (accessGlow) accessGlow.visible = usable && phaseReady;
       if (resonanceDot)
         resonanceDot.visible = usable && phaseReady && boxTiers.has(card.tier);
-      card.view.alpha = phaseReady ? 1 : usable ? 0.76 : 0.88;
-      card.view.scale.set(usable ? (phaseReady ? 1 : 0.985) : 0.97);
+      card.view.alpha = phaseReady ? 1 : usable ? 0.82 : 0.9;
+      card.view.scale.set(usable ? (phaseReady ? 1 : 0.988) : 0.982);
     });
   }
 
@@ -1308,18 +1425,26 @@ export class FruitGame implements GameControls {
   private flyCardToTray(card: CardNode, destinationIndex: number) {
     const view = new Container();
     const shadow = new Graphics()
-      .roundRect(-20, -23, 40, 48, 12)
-      .fill({ color: 0x9186ad, alpha: 0.18 });
+      .roundRect(-21, -21, 42, 48, 10)
+      .fill({ color: 0x050308, alpha: 0.46 });
+    const edge = new Graphics()
+      .roundRect(-20, -23, 40, 48, 9)
+      .fill({ color: 0x332641 })
+      .stroke({ color: 0x806c9c, alpha: 0.6, width: 1 });
     const face = new Graphics()
       .roundRect(-20, -25, 40, 48, 12)
-      .fill({ color: 0xffffff });
+      .fill({ color: 0xf0ece4 })
+      .stroke({ color: 0xd6c6ad, alpha: 0.8, width: 0.8 });
+    const frame = new Graphics()
+      .roundRect(-16.5, -21.5, 33, 41, 8)
+      .stroke({ color: 0x756581, alpha: 0.3, width: 0.7 });
     const icon = new Text({
       text: FRUITS[card.tier].emoji,
       style: { fontSize: 23 },
     });
     icon.anchor.set(0.5);
     icon.position.set(0, -1);
-    view.addChild(shadow, face, icon);
+    view.addChild(shadow, edge, face, frame, icon);
     view.position.set(card.x, card.y);
     view.rotation = card.view.rotation;
     this.fxLayer.addChild(view);
@@ -1357,17 +1482,21 @@ export class FruitGame implements GameControls {
         .roundRect(-slotWidth / 2, -25, slotWidth, 50, 12)
         .fill({
           color: pairReady
-            ? 0xe8e3f2
+            ? 0x302543
             : index < this.tray.length
-              ? 0xf4f0e9
+              ? 0x241c31
               : pressure && lastOpen
-                ? 0xf3dfdc
-                : 0xefebef,
+                ? 0x3a202b
+                : 0x211a2b,
           alpha: 1,
         })
         .stroke({
-          color: pairReady ? 0xa999d0 : pressure && lastOpen ? 0xd49b92 : 0xe3dde5,
-          alpha: pairReady || (pressure && lastOpen) ? 0.78 : 0.5,
+          color: pairReady
+            ? 0xc0a0ef
+            : pressure && lastOpen
+              ? 0xea7d82
+              : 0x59496c,
+          alpha: pairReady || (pressure && lastOpen) ? 0.82 : 0.6,
           width: 1,
         });
       if (pairReady) slot.label = "tray-pair-ready";
@@ -2331,9 +2460,20 @@ export class FruitGame implements GameControls {
     this.cards.forEach((card) => {
       if (!card.active) return;
       const glow = card.view.getChildByLabel("access-glow");
-      if (glow?.visible)
+      if (glow?.visible) {
         glow.alpha =
-          0.72 + Math.sin(this.elapsed * 3.2 + card.id * 0.35) * 0.28;
+          0.62 + Math.sin(this.elapsed * 2.6 + card.id * 0.35) * 0.18;
+        const breathe =
+          1.0025 + Math.sin(this.elapsed * 2.25 + card.id * 0.27) * 0.0025;
+        card.view.scale.set(breathe);
+      }
+      const sheen = card.view.getChildByLabel("card-sheen");
+      if (sheen) {
+        sheen.alpha =
+          (glow?.visible ? 0.3 : 0.13) +
+          Math.sin(this.elapsed * 1.55 + card.id * 0.21) * 0.055;
+        sheen.x = Math.sin(this.elapsed * 0.72 + card.id) * 1.5;
+      }
       const resonanceDot = card.view.getChildByLabel("resonance-dot");
       if (resonanceDot?.visible) {
         resonanceDot.alpha =

@@ -782,7 +782,7 @@ export default function App() {
                 onClick={() => openGamePanel("tools")}
                 aria-label="打开道具箱"
               >
-                <i>🧰</i>
+                <i>✦</i>
                 <span>道具</span>
               </button>
               <button

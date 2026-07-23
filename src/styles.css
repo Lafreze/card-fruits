@@ -1697,3 +1697,441 @@ input:focus-visible {
     transition-duration: 0.001ms !important;
   }
 }
+
+/* ──────────────────────────────────────────────────────────────────────────
+   OBSIDIAN ORCHARD · 统一的精品桌游视觉系统
+   深紫黑为舞台，象牙纸牌与低饱和金属色承担层级，不靠杂色堆叠信息。
+   ────────────────────────────────────────────────────────────────────────── */
+:root {
+  color-scheme: dark;
+  color: #eeeaf4;
+  background: #090710;
+  --ink: #eeeaf4;
+  --ink-soft: #aca4ba;
+  --ink-faint: #746d82;
+  --paper: #171321;
+  --coral: #ee858e;
+  --gold: #d3b36c;
+  --lav: #b39ade;
+  --mint: #78b8a3;
+  --pink: #d28aa9;
+  --card-shadow: 0 26px 70px rgba(2, 1, 7, 0.48);
+  --card-shadow-soft: 0 13px 34px rgba(2, 1, 7, 0.34);
+}
+
+body {
+  background: #090710;
+}
+
+button:focus-visible,
+input:focus-visible {
+  outline-color: rgba(210, 184, 111, 0.72);
+}
+
+.app-shell {
+  background:
+    radial-gradient(circle at 14% 9%, rgba(93, 62, 137, 0.29), transparent 31rem),
+    radial-gradient(circle at 88% 78%, rgba(37, 61, 104, 0.25), transparent 33rem),
+    radial-gradient(circle at 50% 105%, rgba(126, 91, 43, 0.13), transparent 26rem),
+    linear-gradient(155deg, #0c0913 0%, #110c1b 52%, #090c14 100%);
+}
+
+.app-shell::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background-image:
+    linear-gradient(rgba(255, 255, 255, 0.012) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.012) 1px, transparent 1px);
+  background-size: 44px 44px;
+  mask-image: radial-gradient(circle at 50% 35%, #000, transparent 82%);
+}
+
+.noise {
+  opacity: 0.045;
+  mix-blend-mode: soft-light;
+}
+
+.crown-core {
+  color: #f7d789;
+  background:
+    radial-gradient(circle at 34% 26%, rgba(255, 244, 197, 0.24), transparent 28%),
+    linear-gradient(145deg, #3b2c4f, #1c1628 58%, #15101e);
+  border: 1px solid rgba(217, 183, 108, 0.48);
+  box-shadow:
+    0 24px 62px rgba(5, 2, 13, 0.62),
+    0 0 42px rgba(159, 119, 211, 0.24),
+    inset 0 1px rgba(255, 239, 198, 0.18);
+}
+
+@keyframes crownPulse {
+  50% {
+    transform: translate(-50%, -50%) scale(1.045) rotate(1.5deg);
+    box-shadow:
+      0 28px 72px rgba(5, 2, 13, 0.68),
+      0 0 52px rgba(159, 119, 211, 0.31),
+      inset 0 1px rgba(255, 239, 198, 0.23);
+  }
+}
+
+.orbit-fruit {
+  background: linear-gradient(145deg, rgba(43, 34, 57, 0.96), rgba(19, 15, 28, 0.98));
+  border: 1px solid rgba(183, 157, 221, 0.2);
+  box-shadow:
+    0 14px 34px rgba(2, 1, 6, 0.5),
+    inset 0 1px rgba(255, 255, 255, 0.07);
+}
+
+.eyebrow {
+  color: #887a9c;
+}
+
+.home-screen h1 {
+  color: #f3eff6;
+  text-shadow: 0 8px 28px rgba(0, 0, 0, 0.44);
+}
+
+.home-screen h1 span,
+.brand-button span {
+  background-image: linear-gradient(125deg, #e2c27b, #c5a6ed 58%, #8eaee0);
+}
+
+.tagline {
+  color: #aaa1b6;
+}
+
+.mode-switch button {
+  color: #9f97ac;
+  border-color: rgba(179, 154, 222, 0.14);
+  background: rgba(25, 20, 36, 0.9);
+  box-shadow:
+    0 12px 30px rgba(2, 1, 7, 0.35),
+    inset 0 1px rgba(255, 255, 255, 0.045);
+}
+
+.mode-switch button.active {
+  color: #f7f2fb;
+  border-color: rgba(213, 185, 116, 0.36);
+  background:
+    linear-gradient(135deg, rgba(109, 83, 148, 0.94), rgba(50, 38, 72, 0.98));
+  box-shadow:
+    0 15px 38px rgba(4, 2, 11, 0.46),
+    inset 0 1px rgba(255, 244, 208, 0.13);
+}
+
+.mode-card,
+.modal-card,
+.result-card {
+  color: var(--ink);
+  border-color: rgba(185, 158, 223, 0.2);
+  background:
+    linear-gradient(145deg, rgba(27, 22, 39, 0.98), rgba(17, 14, 25, 0.985));
+  box-shadow:
+    0 32px 90px rgba(2, 1, 7, 0.54),
+    inset 0 1px rgba(255, 255, 255, 0.055);
+}
+
+.mode-card {
+  position: relative;
+}
+
+.mode-card::before,
+.game-panel-card::before,
+.modal-card::before,
+.result-card::before {
+  content: "";
+  position: absolute;
+  pointer-events: none;
+  inset: 5px;
+  border: 1px solid rgba(255, 255, 255, 0.035);
+  border-radius: inherit;
+}
+
+.mode-topline,
+.mode-topline b,
+.mission-preview strong {
+  color: #f0ebf4;
+}
+
+.mode-topline b,
+.mission-target b,
+.score-total strong,
+.coin-balance,
+.coin-reward {
+  color: #d8b972;
+}
+
+.level-dot,
+.level-dot.unlocked {
+  color: #82798f;
+  background: #211a2e;
+  box-shadow: inset 0 0 0 1px rgba(175, 151, 211, 0.1);
+}
+
+.level-dot.unlocked {
+  color: #c5bbcf;
+}
+
+.level-dot.selected {
+  color: #fff9ed;
+  background: linear-gradient(145deg, #8e70bb, #5b477d);
+  box-shadow:
+    0 9px 24px rgba(4, 2, 10, 0.48),
+    0 0 0 1px rgba(222, 191, 116, 0.4);
+}
+
+.mission-preview {
+  border-color: rgba(184, 158, 217, 0.14);
+  background: rgba(10, 8, 16, 0.38);
+  box-shadow: inset 0 1px rgba(255, 255, 255, 0.025);
+}
+
+.mission-icon {
+  background: linear-gradient(145deg, #2a2138, #17121f);
+  border: 1px solid rgba(211, 181, 111, 0.23);
+  box-shadow:
+    0 10px 24px rgba(2, 1, 6, 0.4),
+    inset 0 1px rgba(255, 255, 255, 0.06);
+}
+
+.button-play,
+.button-primary,
+.panel-primary {
+  color: #fffaf0;
+  background: linear-gradient(108deg, #8061a8, #5b427e 62%, #3e315c);
+  border: 1px solid rgba(225, 195, 125, 0.26);
+  box-shadow:
+    0 18px 44px rgba(3, 1, 9, 0.5),
+    inset 0 1px rgba(255, 246, 219, 0.14);
+}
+
+.home-links {
+  gap: 18px;
+}
+
+.leaderboard-link {
+  color: #92899e;
+}
+
+.leaderboard-link:hover {
+  color: #d5c9e2;
+}
+
+.desktop-brief {
+  color: #9e95aa;
+}
+
+.brand-button {
+  color: #eee8f2;
+}
+
+.brief-chain {
+  border: 1px solid rgba(183, 158, 218, 0.15);
+  background: rgba(24, 19, 34, 0.94);
+  box-shadow: var(--card-shadow-soft);
+}
+
+.game-phone {
+  border-color: rgba(183, 157, 220, 0.28);
+  background: #0e0b18;
+  box-shadow:
+    0 42px 110px rgba(1, 0, 5, 0.72),
+    0 0 0 1px rgba(255, 255, 255, 0.025),
+    0 0 64px rgba(81, 56, 122, 0.17);
+}
+
+.score-chip,
+.target-chip,
+.top-action {
+  color: #d6cfdd;
+  border-color: rgba(186, 159, 221, 0.2);
+  background:
+    linear-gradient(145deg, rgba(31, 25, 43, 0.94), rgba(17, 14, 25, 0.96));
+  box-shadow:
+    0 10px 25px rgba(2, 1, 7, 0.44),
+    inset 0 1px rgba(255, 255, 255, 0.065);
+  backdrop-filter: blur(14px) saturate(1.08);
+}
+
+.score-chip small,
+.target-chip small {
+  color: #82798e;
+}
+
+.score-chip b {
+  color: #e0c47f;
+}
+
+.target-chip strong {
+  color: #f1ebf5;
+}
+
+.top-action {
+  color: #aaa0b8;
+}
+
+.top-action i {
+  color: #cdb5ee;
+  text-shadow: 0 0 13px rgba(176, 137, 227, 0.34);
+}
+
+@media (hover: hover) {
+  .top-action:hover {
+    color: #f3edf7;
+    background: linear-gradient(145deg, #302440, #1b1427);
+    box-shadow:
+      0 12px 28px rgba(2, 1, 7, 0.5),
+      0 0 0 1px rgba(214, 185, 115, 0.22);
+  }
+}
+
+.combo-pill {
+  color: #dac1fa;
+  border-color: rgba(194, 162, 236, 0.32);
+  background: rgba(17, 13, 25, 0.84);
+  box-shadow:
+    0 7px 22px rgba(2, 1, 7, 0.45),
+    inset 0 1px rgba(255, 255, 255, 0.06);
+  text-shadow: 0 0 12px rgba(181, 136, 235, 0.36);
+}
+
+.game-toast {
+  padding: 5px 10px;
+  border-radius: 999px;
+  color: #eee8f2;
+  background: rgba(13, 10, 19, 0.72);
+  box-shadow: 0 8px 26px rgba(2, 1, 7, 0.4);
+  text-shadow: 0 0 12px currentColor;
+  backdrop-filter: blur(9px);
+}
+
+.toast-gold {
+  color: #e2be6e;
+}
+
+.toast-cyan {
+  color: #78c7af;
+}
+
+.toast-pink {
+  color: #ed94b8;
+}
+
+.game-panel-layer,
+.result-layer,
+.modal-backdrop {
+  background: rgba(5, 3, 9, 0.68);
+  backdrop-filter: blur(18px) saturate(0.72);
+}
+
+.game-panel-card {
+  color: var(--ink);
+  border-color: rgba(186, 158, 220, 0.22);
+  background: linear-gradient(145deg, rgba(29, 23, 41, 0.99), rgba(15, 12, 23, 0.99));
+  box-shadow:
+    0 36px 90px rgba(1, 0, 5, 0.68),
+    inset 0 1px rgba(255, 255, 255, 0.065);
+}
+
+.panel-close,
+.panel-actions button,
+.button-ghost,
+.leaderboard-tabs button {
+  color: #a99fb6;
+  background: #251d32;
+  box-shadow: inset 0 0 0 1px rgba(180, 154, 216, 0.1);
+}
+
+.toolbox-grid button,
+.help-flow span,
+.help-rules span,
+.help-chain,
+.run-build,
+.run-relics > span,
+.result-stats span,
+.save-box,
+.relic-choice,
+.rank-row,
+.upgrade-row {
+  color: var(--ink);
+  border-color: rgba(182, 156, 216, 0.13);
+  background: rgba(40, 31, 53, 0.72);
+  box-shadow:
+    inset 0 1px rgba(255, 255, 255, 0.035),
+    0 7px 18px rgba(2, 1, 6, 0.12);
+}
+
+.toolbox-grid button:active {
+  background: #352744;
+}
+
+@media (hover: hover) {
+  .panel-close:hover,
+  .toolbox-grid button:hover:not(:disabled) {
+    color: #f3edf7;
+    background: #342744;
+  }
+}
+
+.toolbox-grid em,
+.run-mutator span {
+  color: #c7a9ee;
+}
+
+.panel-primary,
+.result-actions .button,
+.modal-actions .button {
+  position: relative;
+}
+
+.run-relics > span {
+  background: #20182b;
+}
+
+.name-row input {
+  color: #eee9f2;
+  background: #14101d;
+  box-shadow: inset 0 0 0 1px rgba(181, 155, 216, 0.2);
+}
+
+.leaderboard-tabs button.active,
+.name-row button,
+.upgrade-row > button {
+  color: #fff8e9;
+  background: linear-gradient(120deg, #9a7440, #72522e);
+  box-shadow: inset 0 1px rgba(255, 243, 207, 0.16);
+}
+
+.rank-row:nth-child(-n + 3),
+.rarity-rare {
+  border-color: rgba(211, 179, 103, 0.24);
+  background: linear-gradient(100deg, rgba(67, 49, 31, 0.76), rgba(37, 28, 43, 0.82));
+}
+
+.rank-row > b,
+.result-kicker,
+.modal-kicker {
+  color: #d8b66a;
+}
+
+.greenhouse-stage {
+  border: 1px solid rgba(184, 158, 218, 0.17);
+  background:
+    linear-gradient(rgba(255, 255, 255, 0.035) 1px, transparent 1px),
+    linear-gradient(155deg, #263a50 0%, #29483f 53%, #414732 100%);
+  background-size:
+    100% 31px,
+    100% 100%;
+}
+
+.greenhouse-stage::after {
+  background: linear-gradient(#435d3f, #293b2d);
+}
+
+@media (max-width: 800px) {
+  .game-phone {
+    background: #0e0b18;
+  }
+}
