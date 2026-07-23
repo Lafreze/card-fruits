@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { FRUITS, LEVELS, WORLD, type LayoutBlock } from "./data.ts";
 import {
+  buildFusionPairs,
   buildPlayableDeal,
   evaluateDropPlacement,
   evaluateNectarPlacement,
@@ -232,6 +233,37 @@ test("manual drop precision rewards intentional matching placement", () => {
   assert.equal(evaluateNectarPlacement(100, 128, 8).hit, true);
   assert.equal(evaluateNectarPlacement(99, 128, 8).hit, false);
   assert.equal(evaluateNectarPlacement(200, 244, 60).hit, true);
+});
+
+test("fusion planning keeps one partner per fruit and prioritizes card bonds", () => {
+  const pairs = buildFusionPairs([
+    { id: 1, tier: 0, x: 0, y: 0, linkedId: 3 },
+    { id: 2, tier: 0, x: 4, y: 0 },
+    { id: 3, tier: 0, x: 80, y: 0 },
+    { id: 4, tier: 0, x: 84, y: 0 },
+    { id: 5, tier: 1, x: 0, y: 0 },
+    { id: 6, tier: 1, x: 6, y: 0 },
+    { id: 7, tier: 2, x: 0, y: 0, blockedIds: [8] },
+    { id: 8, tier: 2, x: 2, y: 0, blockedIds: [7] },
+    { id: 9, tier: 2, x: 9, y: 0 },
+  ]);
+  assert.deepEqual(
+    pairs.map(({ firstId, secondId, bonded }) => [
+      firstId,
+      secondId,
+      bonded,
+    ]),
+    [
+      [1, 3, true],
+      [2, 4, false],
+      [5, 6, false],
+      [8, 9, false],
+    ],
+  );
+  assert.equal(
+    new Set(pairs.flatMap((pair) => [pair.firstId, pair.secondId])).size,
+    pairs.length * 2,
+  );
 });
 
 test("fruit scale and roguelike catalog stay balanced", () => {

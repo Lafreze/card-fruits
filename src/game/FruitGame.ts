@@ -10,6 +10,7 @@ import "pixi.js/unsafe-eval";
 import Matter from "matter-js";
 import { FRUITS, LEVELS, WORLD } from "./data";
 import {
+  buildFusionPairs,
   buildPlayableDeal,
   evaluateDropPlacement,
   evaluateNectarPlacement,
@@ -67,6 +68,7 @@ type ConversionSequence = {
   cards: Container[];
   fruit: Text;
   starts: Array<{ x: number; y: number }>;
+  targetX: number;
   tier: number;
   elapsed: number;
   condensed: boolean;
@@ -91,6 +93,23 @@ type FusionEcho = {
   tier: number;
   velocityX: number;
   elapsed: number;
+};
+
+type FruitPluginState = {
+  tier: number;
+  birth: number;
+  noMergeUntil?: number;
+  splitGroup?: number;
+  splitUntil?: number;
+  linkTargetId?: number;
+  linkUntil?: number;
+  resonanceUntil?: number;
+};
+
+type FusionPairState = {
+  pairedFor: number;
+  stalledFor: number;
+  lastDistance: number;
 };
 
 const { Engine, Bodies, Body, Composite, Events } = Matter;
@@ -144,6 +163,7 @@ export class FruitGame implements GameControls {
   private focusedFruitIds = new Set<number>();
   private lastCardPhaseReady = true;
   private merging = new Set<number>();
+  private fusionPairStates = new Map<string, FusionPairState>();
   private timers = new Set<number>();
   private callbacks: GameCallbacks;
   private levelIndex: number;
@@ -190,6 +210,7 @@ export class FruitGame implements GameControls {
   private stirAt = -1;
   private nectarLane = Math.floor(Math.random() * 3);
   private nectarChain = 0;
+  private previewPartnerId: number | null = null;
   private mutator: WaveMutator = rollMutator(1);
   private feverEnergy = 0;
   private feverUntil = -1;
@@ -339,7 +360,7 @@ export class FruitGame implements GameControls {
     if (this.mode === "story" && this.levelIndex === 0) {
       this.setTimer(
         () =>
-          this.callbacks.onToast("三消后，由你决定水果落点", "cyan"),
+          this.callbacks.onToast("三消造果 · 同果稳定共鸣", "cyan"),
         360,
       );
     }
@@ -935,12 +956,18 @@ export class FruitGame implements GameControls {
     });
     emoji.anchor.set(0.5);
     emoji.position.set(0, -4);
+    const resonanceDot = new Graphics()
+      .star(0, 0, 4, 3.4, 1.45)
+      .fill({ color: 0xd7a84d, alpha: 0.9 });
+    resonanceDot.position.set(-20, 23);
+    resonanceDot.label = "resonance-dot";
+    resonanceDot.visible = false;
     const shade = new Graphics()
       .roundRect(-CARD_W / 2, -CARD_H / 2, CARD_W, CARD_H, 15)
       .fill({ color: 0xded9e2, alpha: 0.8 });
     shade.label = "shade";
     shade.visible = false;
-    view.addChild(shadow, glow, face, emoji, shade);
+    view.addChild(shadow, glow, face, emoji, resonanceDot, shade);
     if (special === "frozen") {
       const lock = new Text({ text: "❄", style: { fontSize: 13 } });
       lock.anchor.set(0.5);
@@ -1065,6 +1092,9 @@ export class FruitGame implements GameControls {
     if (this.dropTarget)
       this.dropTarget.cursor = this.pendingDrops.length > 0 ? "crosshair" : "grab";
     const accessible = active.filter((card) => !this.isCovered(card));
+    const boxTiers = new Set(
+      [...this.fruits.values()].map((fruit) => fruit.tier),
+    );
     if (accessible.length > 0 && accessible.every((card) => card.locked)) {
       accessible.slice(0, 2).forEach((card) => {
         card.locked = false;
@@ -1079,11 +1109,14 @@ export class FruitGame implements GameControls {
       card.view.cursor = phaseReady && usable ? "pointer" : "default";
       const shade = card.view.getChildByLabel("shade");
       const accessGlow = card.view.getChildByLabel("access-glow");
+      const resonanceDot = card.view.getChildByLabel("resonance-dot");
       if (shade) {
         shade.visible = !usable;
         shade.alpha = covered ? 0.88 : 0.58;
       }
       if (accessGlow) accessGlow.visible = usable && phaseReady;
+      if (resonanceDot)
+        resonanceDot.visible = usable && phaseReady && boxTiers.has(card.tier);
       card.view.alpha = phaseReady ? 1 : usable ? 0.76 : 0.88;
       card.view.scale.set(usable ? (phaseReady ? 1 : 0.985) : 0.97);
     });
@@ -1416,7 +1449,9 @@ export class FruitGame implements GameControls {
   }
 
   private startConversion(tier: number, matchedSlots: number[]) {
-    const transferX = WORLD.width / 2;
+    this.activateCardResonance(tier);
+    const transferX =
+      this.findDropPartner(tier)?.body.position.x ?? WORLD.width / 2;
     const transferY = WORLD.box.y - 2;
     const starts = matchedSlots.map((index) => ({
       x: this.traySlotX(index),
@@ -1463,6 +1498,7 @@ export class FruitGame implements GameControls {
       cards,
       fruit,
       starts,
+      targetX: transferX,
       tier,
       elapsed: -0.2,
       condensed: false,
@@ -1470,9 +1506,9 @@ export class FruitGame implements GameControls {
   }
 
   private updateConversions(seconds: number) {
-    const transferX = WORLD.width / 2;
     const transferY = WORLD.box.y - 2;
     this.conversions = this.conversions.filter((sequence) => {
+      const transferX = sequence.targetX;
       sequence.elapsed += seconds;
       if (sequence.elapsed < 0) return true;
       sequence.cards.forEach((card) => {
@@ -1536,13 +1572,114 @@ export class FruitGame implements GameControls {
     }
   }
 
-  private preferredDropX(tier: number) {
-    const sameTier = [...this.fruits.values()]
+  private fruitPlugin(fruit: FruitNode) {
+    return fruit.body.plugin as FruitPluginState;
+  }
+
+  private activeBondTarget(fruit: FruitNode) {
+    const plugin = this.fruitPlugin(fruit);
+    if (!plugin.linkTargetId || Number(plugin.linkUntil || 0) <= this.elapsed)
+      return;
+    const target = this.fruits.get(plugin.linkTargetId);
+    if (
+      !target ||
+      target.tier !== fruit.tier ||
+      this.merging.has(target.body.id) ||
+      this.fruitsShareSplitGroup(fruit, target)
+    )
+      return;
+    return target;
+  }
+
+  // 优先选择没有被其他共鸣占用、且位于果堆上层的同级水果。
+  private findDropPartner(tier: number) {
+    const candidates = [...this.fruits.values()]
       .filter(
-        (fruit) => fruit.tier === tier && !this.merging.has(fruit.body.id),
+        (fruit) =>
+          fruit.tier === tier &&
+          !this.merging.has(fruit.body.id) &&
+          !this.fruitMergeCoolingDown(fruit),
       )
-      .sort((a, b) => b.body.position.y - a.body.position.y)[0];
-    return sameTier?.body.position.x ?? WORLD.box.x + WORLD.box.width / 2;
+      .sort((a, b) => a.body.position.y - b.body.position.y);
+    return candidates.find((fruit) => !this.activeBondTarget(fruit));
+  }
+
+  private fusionPairKey(firstId: number, secondId: number) {
+    return firstId < secondId
+      ? `${firstId}:${secondId}`
+      : `${secondId}:${firstId}`;
+  }
+
+  private linkFusionPair(
+    first: FruitNode,
+    second: FruitNode,
+    precise = false,
+  ) {
+    if (
+      first === second ||
+      first.tier !== second.tier ||
+      this.merging.has(first.body.id) ||
+      this.merging.has(second.body.id)
+    )
+      return;
+    const until = this.elapsed + (precise ? 3.2 : 4.8);
+    const firstPlugin = this.fruitPlugin(first);
+    const secondPlugin = this.fruitPlugin(second);
+    firstPlugin.linkTargetId = second.body.id;
+    firstPlugin.linkUntil = until;
+    firstPlugin.resonanceUntil = until;
+    secondPlugin.linkTargetId = first.body.id;
+    secondPlugin.linkUntil = until;
+    secondPlugin.resonanceUntil = until;
+    this.fusionPairStates.delete(
+      this.fusionPairKey(first.body.id, second.body.id),
+    );
+    this.ring(first.body.position.x, first.body.position.y, 0xd8a94f, 0.5);
+    this.ring(second.body.position.x, second.body.position.y, 0xd8a94f, 0.5);
+  }
+
+  // 卡牌三消会先唤醒果箱内的同级水果；已有同果成对时建立稳定共鸣。
+  private activateCardResonance(tier: number) {
+    const matches = [...this.fruits.values()].filter(
+      (fruit) =>
+        fruit.tier === tier &&
+        !this.merging.has(fruit.body.id) &&
+        !this.fruitMergeCoolingDown(fruit),
+    );
+    matches.forEach((fruit) => {
+      this.fruitPlugin(fruit).resonanceUntil = this.elapsed + 3.8;
+      this.ring(
+        fruit.body.position.x,
+        fruit.body.position.y,
+        FRUITS[tier].glow,
+        0.52,
+      );
+    });
+    if (matches.length < 2) return;
+    const pairs = buildFusionPairs(
+      matches.map((fruit) => ({
+        id: fruit.body.id,
+        tier,
+        x: fruit.body.position.x,
+        y: fruit.body.position.y,
+        linkedId: this.activeBondTarget(fruit)?.body.id,
+        blockedIds: matches
+          .filter((other) => this.fruitsShareSplitGroup(fruit, other))
+          .map((other) => other.body.id),
+      })),
+    );
+    pairs.forEach((pair) => {
+      const first = this.fruits.get(pair.firstId);
+      const second = this.fruits.get(pair.secondId);
+      if (first && second) this.linkFusionPair(first, second, true);
+    });
+  }
+
+  private preferredDropX(tier: number) {
+    return (
+      this.findDropPartner(tier)?.body.position.x ??
+      WORLD.box.x + WORLD.box.width / 2
+    );
   }
 
   private nectarX() {
@@ -1554,12 +1691,18 @@ export class FruitGame implements GameControls {
     this.nectarLane = (this.nectarLane + 1 + Math.floor(Math.random() * 2)) % 3;
   }
 
+  private rewardDropX(partner?: FruitNode) {
+    return partner?.body.position.x ?? this.nectarX();
+  }
+
   private renderDropPreview() {
     this.dropPreviewLayer
       .removeChildren()
       .forEach((child) => child.destroy({ children: true }));
+    this.previewPartnerId = null;
     const tier = this.pendingDrops[0];
     if (tier === undefined || this.status !== "playing") return;
+    const partner = this.findDropPartner(tier);
     const radius = this.fruitRadius(tier);
     const margin = radius + 9;
     const aiming = this.aimX !== null;
@@ -1570,14 +1713,16 @@ export class FruitGame implements GameControls {
         this.aimX ?? this.preferredDropX(tier),
       ),
     );
-    const nectarX = this.nectarX();
-    const nectarHit = evaluateNectarPlacement(x, nectarX, radius).hit;
+    // 有同级水果时，奖励点与最佳合成落点合一，不再让玩家二选一。
+    const rewardX = this.rewardDropX(partner);
+    const nectarHit = evaluateNectarPlacement(x, rewardX, radius).hit;
     const nectarGlow = new Graphics()
       .circle(0, 0, 24)
       .fill({ color: 0xf2c65f, alpha: nectarHit ? 0.16 : 0.07 })
       .circle(0, 0, 13)
       .fill({ color: 0xffdc79, alpha: nectarHit ? 0.18 : 0.08 });
-    nectarGlow.position.set(nectarX, WORLD.box.y + 35);
+    nectarGlow.label = "reward-glow";
+    nectarGlow.position.set(rewardX, WORLD.box.y + 35);
     const nectarStar = new Text({
       text: "✦",
       style: {
@@ -1588,8 +1733,9 @@ export class FruitGame implements GameControls {
       },
     });
     nectarStar.anchor.set(0.5);
+    nectarStar.label = "reward-star";
     nectarStar.alpha = nectarHit ? 0.9 : 0.55;
-    nectarStar.position.set(nectarX, WORLD.box.y + 35);
+    nectarStar.position.set(rewardX, WORLD.box.y + 35);
     const landing = new Graphics()
       .circle(0, 0, radius + 5)
       .fill({ color: FRUITS[tier].glow, alpha: aiming ? 0.1 : 0.06 })
@@ -1611,10 +1757,14 @@ export class FruitGame implements GameControls {
     emoji.position.set(x, WORLD.box.y + 27);
     const hint = new Text({
       text: aiming
-        ? "松手投放"
-        : this.pendingDrops.length > 1
-          ? `点击投放 · 队列 ${this.pendingDrops.length}`
-          : "点击投放 · 拖动选位",
+        ? partner
+          ? "松手 · 共鸣合成"
+          : "松手投放"
+        : partner
+          ? "同果共鸣"
+          : this.pendingDrops.length > 1
+            ? `待投 ${this.pendingDrops.length}`
+            : "点击投放",
       style: {
         fontFamily: "system-ui",
         fontSize: 9,
@@ -1624,7 +1774,7 @@ export class FruitGame implements GameControls {
     });
     hint.anchor.set(0.5);
     hint.position.set(WORLD.width / 2, WORLD.box.y + 79);
-    const hintWidth = this.pendingDrops.length > 1 ? 124 : 132;
+    const hintWidth = partner ? 96 : this.pendingDrops.length > 1 ? 82 : 76;
     const hintBack = new Graphics()
       .roundRect(-hintWidth / 2, -10, hintWidth, 20, 10)
       .fill({ color: 0x40384e, alpha: 0.82 });
@@ -1644,20 +1794,17 @@ export class FruitGame implements GameControls {
           color: 0xd5a640,
           alpha: index < this.nectarChain ? 0.78 : 0.18,
         });
-      pip.position.set(nectarX + (index - 1) * 8, WORLD.box.y + 57);
+      pip.label = `reward-pip-${index}`;
+      pip.position.set(rewardX + (index - 1) * 8, WORLD.box.y + 57);
       this.dropPreviewLayer.addChild(pip);
     }
-    const partner = [...this.fruits.values()]
-      .filter(
-        (fruit) => fruit.tier === tier && !this.merging.has(fruit.body.id),
-      )
-      .sort((a, b) => b.body.position.y - a.body.position.y)[0];
     if (partner) {
       const target = new Graphics()
         .circle(0, 0, this.fruitRadius(tier) + 7)
         .stroke({ color: FRUITS[tier].glow, alpha: 0.38, width: 2 });
       target.position.copyFrom(partner.body.position);
       target.label = "merge-target";
+      this.previewPartnerId = partner.body.id;
       this.dropPreviewLayer.addChildAt(target, 0);
     }
     // 排队中的后续水果缩略显示
@@ -1686,11 +1833,7 @@ export class FruitGame implements GameControls {
       WORLD.box.x + margin,
       Math.min(WORLD.box.x + WORLD.box.width - margin, chosenX ?? fallbackX),
     );
-    const partner = [...this.fruits.values()]
-      .filter(
-        (fruit) => fruit.tier === tier && !this.merging.has(fruit.body.id),
-      )
-      .sort((a, b) => b.body.position.y - a.body.position.y)[0];
+    const partner = this.findDropPartner(tier);
     const placement = evaluateDropPlacement(
       x,
       partner?.body.position.x,
@@ -1698,11 +1841,14 @@ export class FruitGame implements GameControls {
     );
     const nectar = evaluateNectarPlacement(
       x,
-      this.nectarX(),
+      this.rewardDropX(partner),
       this.fruitRadius(tier),
     );
     const dropped = this.spawnFruit(tier, x, WORLD.box.y + 18);
-    if (dropped) this.focusedFruitIds.add(dropped.body.id);
+    if (dropped) {
+      this.focusedFruitIds.add(dropped.body.id);
+      if (partner) this.linkFusionPair(dropped, partner, placement.precision);
+    }
     // 手动投放不消耗连击窗口；玩家可以先观察果箱，再从容操作。
     if (this.combo > 0) this.comboAt = this.elapsed;
     this.fruitFocusUntil = Math.max(
@@ -1744,13 +1890,14 @@ export class FruitGame implements GameControls {
       this.callbacks.onToast("蜜点连携 · 甜度盾 +4秒", "gold");
     else if (placement.precision && nectar.hit)
       this.callbacks.onToast(
-        `双重落点 · +${precisionBonus + nectarBonus}`,
+        `共鸣命中 · +${precisionBonus + nectarBonus}`,
         "gold",
       );
     else if (nectar.hit)
       this.callbacks.onToast(`蜜点命中 · +${nectarBonus}`, "gold");
     else if (placement.precision)
-      this.callbacks.onToast(`精准投放 · +${precisionBonus}`, "gold");
+      this.callbacks.onToast(`精准共鸣 · +${precisionBonus}`, "gold");
+    else if (partner) this.callbacks.onToast("同果已连接", "cyan");
     this.moveNectarLane();
     this.renderDropPreview();
     this.updateCardAccess();
@@ -1771,7 +1918,7 @@ export class FruitGame implements GameControls {
       density: 0.0012 + tier * 0.00008,
       label: `fruit-${tier}`,
     });
-    body.plugin = { tier, birth: this.elapsed };
+    body.plugin = { tier, birth: this.elapsed } satisfies FruitPluginState;
     const view = this.makeFruit(tier);
     view.position.set(x, y);
     this.fruitLayer.addChild(view);
@@ -1789,6 +1936,7 @@ export class FruitGame implements GameControls {
         850,
       );
     }
+    this.updateCardAccess();
     this.emitSnapshot();
     return node;
   }
@@ -1797,6 +1945,11 @@ export class FruitGame implements GameControls {
     const definition = FRUITS[tier];
     const radius = this.fruitRadius(tier);
     const view = new Container();
+    const resonanceHalo = new Graphics()
+      .circle(0, 0, radius + 5)
+      .stroke({ color: 0xd8a94f, alpha: 0.72, width: 1.6 });
+    resonanceHalo.label = "resonance-halo";
+    resonanceHalo.visible = false;
     const emoji = new Text({
       text: definition.emoji,
       style: {
@@ -1811,7 +1964,7 @@ export class FruitGame implements GameControls {
     });
     emoji.anchor.set(0.5);
     emoji.position.set(0, 1);
-    view.addChild(emoji);
+    view.addChild(resonanceHalo, emoji);
     view.scale.set(0.2);
     return view;
   }
@@ -2003,6 +2156,16 @@ export class FruitGame implements GameControls {
 
   private removeFruit(node: FruitNode) {
     this.focusedFruitIds.delete(node.body.id);
+    this.fruits.forEach((fruit) => {
+      const plugin = this.fruitPlugin(fruit);
+      if (plugin.linkTargetId !== node.body.id) return;
+      delete plugin.linkTargetId;
+      delete plugin.linkUntil;
+      plugin.resonanceUntil = Math.min(
+        Number(plugin.resonanceUntil || this.elapsed),
+        this.elapsed + 0.42,
+      );
+    });
     Composite.remove(this.engine.world, node.body);
     this.fruits.delete(node.body.id);
     node.view.destroy({ children: true });
@@ -2101,8 +2264,37 @@ export class FruitGame implements GameControls {
         const next = Math.min(1, fruit.view.scale.x + 0.11 * delta);
         fruit.view.scale.set(next);
       }
+      const plugin = this.fruitPlugin(fruit);
+      const resonanceHalo = fruit.view.getChildByLabel("resonance-halo");
+      if (resonanceHalo) {
+        const resonating =
+          Number(plugin.linkUntil || 0) > this.elapsed ||
+          Number(plugin.resonanceUntil || 0) > this.elapsed;
+        resonanceHalo.visible = resonating;
+        resonanceHalo.alpha = 0.5 + Math.sin(this.elapsed * 7.2) * 0.28;
+        resonanceHalo.rotation = -fruit.body.angle + this.elapsed * 0.35;
+      }
     });
     this.attractMatchingFruits(seconds);
+
+    if (this.previewPartnerId !== null) {
+      const partner = this.fruits.get(this.previewPartnerId);
+      const target = this.dropPreviewLayer.getChildByLabel("merge-target");
+      if (partner && target) {
+        target.position.copyFrom(partner.body.position);
+        const rewardX = partner.body.position.x;
+        const rewardGlow = this.dropPreviewLayer.getChildByLabel("reward-glow");
+        const rewardStar = this.dropPreviewLayer.getChildByLabel("reward-star");
+        if (rewardGlow) rewardGlow.x = rewardX;
+        if (rewardStar) rewardStar.x = rewardX;
+        for (let index = 0; index < 3; index += 1) {
+          const pip = this.dropPreviewLayer.getChildByLabel(
+            `reward-pip-${index}`,
+          );
+          if (pip) pip.x = rewardX + (index - 1) * 8;
+        }
+      } else if (this.pendingDrops.length > 0) this.renderDropPreview();
+    }
 
     if (this.dropPreviewLayer.children.length > 0) {
       this.dropPreviewLayer.alpha = 0.8 + Math.sin(this.elapsed * 5.5) * 0.2;
@@ -2114,6 +2306,12 @@ export class FruitGame implements GameControls {
       if (glow?.visible)
         glow.alpha =
           0.72 + Math.sin(this.elapsed * 3.2 + card.id * 0.35) * 0.28;
+      const resonanceDot = card.view.getChildByLabel("resonance-dot");
+      if (resonanceDot?.visible) {
+        resonanceDot.alpha =
+          0.62 + Math.sin(this.elapsed * 5.2 + card.id * 0.2) * 0.28;
+        resonanceDot.rotation += seconds * 0.7;
+      }
     });
 
     this.trayLayer.children.forEach((child) => {
@@ -2132,7 +2330,7 @@ export class FruitGame implements GameControls {
     this.releaseSettledFruitFocus();
     this.refreshCardPhase();
     const fruitPhase = this.status === "playing" && !this.isCardPhaseReady();
-    // 整个投果与结算阶段暂停狂热和警戒倒计时，不制造隐性催促。
+    // 只在转果与真实落地结算时暂停倒计时；待投期间卡牌仍可继续操作。
     if (fruitPhase) {
       if (this.feverUntil > 0) this.feverUntil += seconds;
       if (this.sugarShieldUntil > 0) this.sugarShieldUntil += seconds;
@@ -2194,81 +2392,117 @@ export class FruitGame implements GameControls {
   }
 
   private attractMatchingFruits(seconds: number) {
-    const fruits = [...this.fruits.values()];
-    for (let firstIndex = 0; firstIndex < fruits.length; firstIndex += 1) {
-      const first = fruits[firstIndex];
+    const available = [...this.fruits.values()].filter(
+      (fruit) =>
+        !this.merging.has(fruit.body.id) &&
+        !this.fruitMergeCoolingDown(fruit) &&
+        fruit.tier < FRUITS.length - 1,
+    );
+    const candidates = available.map((fruit) => ({
+      id: fruit.body.id,
+      tier: fruit.tier,
+      x: fruit.body.position.x,
+      y: fruit.body.position.y,
+      linkedId: this.activeBondTarget(fruit)?.body.id,
+      blockedIds: available
+        .filter((other) => this.fruitsShareSplitGroup(fruit, other))
+        .map((other) => other.body.id),
+    }));
+    const plannedPairs = buildFusionPairs(candidates);
+    const activeKeys = new Set<string>();
+
+    for (const plan of plannedPairs) {
+      const first = this.fruits.get(plan.firstId);
+      const second = this.fruits.get(plan.secondId);
       if (
+        !first ||
+        !second ||
         this.merging.has(first.body.id) ||
-        this.fruitMergeCoolingDown(first)
+        this.merging.has(second.body.id) ||
+        this.fruitsShareSplitGroup(first, second)
       )
         continue;
-      for (
-        let secondIndex = firstIndex + 1;
-        secondIndex < fruits.length;
-        secondIndex += 1
-      ) {
-        const second = fruits[secondIndex];
-        if (
-          first.tier !== second.tier ||
-          this.merging.has(second.body.id) ||
-          this.fruitMergeCoolingDown(second) ||
-          this.fruitsShareSplitGroup(first, second)
-        )
-          continue;
-        if (first.tier >= FRUITS.length - 1) continue;
-        const dx = second.body.position.x - first.body.position.x;
-        const dy = second.body.position.y - first.body.position.y;
-        const distance = Math.hypot(dx, dy);
-        // 已经贴上的交给碰撞合成,刚出生的先落稳再吸
-        if (distance < 1 || distance < this.fruitRadius(first.tier) * 2 + 2)
-          continue;
-        if (
-          this.elapsed - Number(first.body.plugin.birth || 0) < 0.5 ||
-          this.elapsed - Number(second.body.plugin.birth || 0) < 0.5
-        )
-          continue;
-        // 越近吸力越强(150~430 px/s²,换算为 Matter 速度单位 px/tick);
-        // 基础吸力需大于地面静摩擦(约 108 px/s²),否则远处的同级水果拉不动
-        const pull =
-          ((150 + Math.max(0, 1 - distance / 150) * 280) *
-            this.magnetMultiplier *
-            (this.mutator.magnet || 1) *
-            (this.feverActive ? 1.8 : 1) *
-            seconds) /
-          60;
-        const pullX = (dx / distance) * pull;
-        const pullY = 0;
-        Body.setVelocity(first.body, {
-          x: first.body.velocity.x + pullX,
-          y: first.body.velocity.y + pullY,
+      const key = this.fusionPairKey(first.body.id, second.body.id);
+      activeKeys.add(key);
+      const dx = second.body.position.x - first.body.position.x;
+      const dy = second.body.position.y - first.body.position.y;
+      const distance = Math.max(0.001, Math.hypot(dx, dy));
+      const contactDistance =
+        this.fruitRadius(first.tier) + this.fruitRadius(second.tier);
+      const state = this.fusionPairStates.get(key) || {
+        pairedFor: 0,
+        stalledFor: 0,
+        lastDistance: distance,
+      };
+      state.pairedFor += seconds;
+      const progress = state.lastDistance - distance;
+      const combinedSpeed = first.body.speed + second.body.speed;
+      if (combinedSpeed < 0.58 || Math.abs(progress) < 0.035)
+        state.stalledFor += seconds;
+      else state.stalledFor = Math.max(0, state.stalledFor - seconds * 0.8);
+      state.lastDistance = distance;
+      this.fusionPairStates.set(key, state);
+
+      const firstAge = this.elapsed - this.fruitPlugin(first).birth;
+      const secondAge = this.elapsed - this.fruitPlugin(second).birth;
+      if (firstAge < 0.24 || secondAge < 0.24) continue;
+
+      // 轻微擦边、卡牌建立的共鸣、或长时间被小果卡住都会完成合成。
+      const closeEnough =
+        distance <= contactDistance + (plan.bonded ? 14 : 5);
+      const bondedRescue =
+        plan.bonded && state.pairedFor >= (distance < 180 ? 1.55 : 2.15);
+      const crowdedRescue =
+        !plan.bonded &&
+        state.stalledFor >= 2.45 &&
+        distance <= contactDistance + 58;
+      if (closeEnough || bondedRescue || crowdedRescue) {
+        this.mergeFruits(first, second);
+        continue;
+      }
+
+      const pull =
+        ((185 + Math.max(0, 1 - distance / 175) * 325) *
+          this.magnetMultiplier *
+          (this.mutator.magnet || 1) *
+          (this.feverActive ? 1.8 : 1) *
+          (plan.bonded ? 1.72 : 1) *
+          seconds) /
+        60;
+      const pullX = (dx / distance) * pull;
+      const clampVelocity = (value: number) =>
+        Math.max(-4.8, Math.min(4.8, value));
+      Body.setVelocity(first.body, {
+        x: clampVelocity(first.body.velocity.x + pullX),
+        y: first.body.velocity.y,
+      });
+      Body.setVelocity(second.body, {
+        x: clampVelocity(second.body.velocity.x - pullX),
+        y: second.body.velocity.y,
+      });
+
+      // 只让较高的水果向下寻找伙伴，不把底部水果自动抛起。
+      if (Math.abs(dy) > contactDistance * 0.45) {
+        const upper = dy > 0 ? first : second;
+        const downward = Math.min(
+          plan.bonded ? 0.92 : 0.52,
+          Math.abs(dy / distance) * pull * (plan.bonded ? 1.22 : 0.72) +
+            (state.stalledFor > 0.72 ? 0.08 : 0),
+        );
+        Body.setVelocity(upper.body, {
+          x: upper.body.velocity.x,
+          y: Math.max(0, upper.body.velocity.y) + downward,
         });
-        Body.setVelocity(second.body, {
-          x: second.body.velocity.x - pullX,
-          y: second.body.velocity.y - pullY,
-        });
-        // 被夹住时改为强力横向滚动，不再自动向上跳。
-        const stuck =
-          Math.abs(first.body.velocity.x) + Math.abs(first.body.velocity.y) <
-            0.67 &&
-          Math.abs(second.body.velocity.x) + Math.abs(second.body.velocity.y) <
-            0.67;
-        const plugin = first.body.plugin as { pairT?: number };
-        if (stuck) {
-          plugin.pairT = (plugin.pairT || 0) + seconds;
-          if (plugin.pairT > 1.1) {
-            plugin.pairT = 0;
-            const direction = dx > 0 ? 1 : -1;
-            Body.setVelocity(first.body, {
-              x: (direction * (210 + distance * 1.1)) / 60,
-              y: Math.max(0, first.body.velocity.y),
-            });
-            Body.setAngularVelocity(first.body, direction * 0.12);
-          }
-        } else {
-          plugin.pairT = 0;
-        }
+      }
+      if (state.stalledFor > 0.72) {
+        const direction = Math.sign(dx || 1);
+        Body.setAngularVelocity(first.body, direction * 0.09);
+        Body.setAngularVelocity(second.body, -direction * 0.09);
       }
     }
+
+    for (const key of this.fusionPairStates.keys())
+      if (!activeKeys.has(key)) this.fusionPairStates.delete(key);
   }
 
   // 狂热倒计时与能量条渲染:激活时能量随剩余时间流失,结束归零重新充能

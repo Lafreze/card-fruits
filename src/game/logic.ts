@@ -4,6 +4,23 @@ export type StackSlot = {
   y: number;
 };
 
+export type FusionCandidate = {
+  id: number;
+  tier: number;
+  x: number;
+  y: number;
+  linkedId?: number;
+  blockedIds?: readonly number[];
+};
+
+export type FusionPair = {
+  firstId: number;
+  secondId: number;
+  tier: number;
+  distance: number;
+  bonded: boolean;
+};
+
 type RandomSource = () => number;
 
 export type StackScatterBounds = {
@@ -34,8 +51,9 @@ function clamp(value: number, minimum: number, maximum: number) {
 
 /**
  * Turns authored grids into one of eight organic stack silhouettes. Variation is
- * correlated by layer (fan, cascade, split, wave, stagger, orbit or broken clusters) instead of
- * being pure per-card noise, so the result feels shuffled but still designed.
+ * correlated by layer (fan, cascade, split, wave, stagger, orbit or broken
+ * clusters) instead of being pure per-card noise, so the result feels
+ * shuffled but still designed.
  */
 export function scatterStackSlots(
   slots: StackSlot[],
@@ -356,4 +374,60 @@ export function evaluateNectarPlacement(
     distance,
     tolerance,
   };
+}
+
+/**
+ * Gives every fruit at most one fusion partner. Explicit card-created bonds
+ * win first, then the remaining fruit are paired by shortest distance. This
+ * avoids the cancelling forces produced by attracting every equal-tier pair.
+ */
+export function buildFusionPairs(candidates: FusionCandidate[]) {
+  const groups = new Map<number, FusionCandidate[]>();
+  candidates.forEach((candidate) => {
+    const group = groups.get(candidate.tier) || [];
+    group.push(candidate);
+    groups.set(candidate.tier, group);
+  });
+
+  const result: FusionPair[] = [];
+  groups.forEach((group, tier) => {
+    const remaining = [...group];
+    while (remaining.length >= 2) {
+      let bestFirst = 0;
+      let bestSecond = -1;
+      let bestDistance = Number.POSITIVE_INFINITY;
+      let bestBonded = false;
+      for (let first = 0; first < remaining.length; first += 1)
+        for (let second = first + 1; second < remaining.length; second += 1) {
+          const a = remaining[first];
+          const b = remaining[second];
+          if (a.blockedIds?.includes(b.id) || b.blockedIds?.includes(a.id))
+            continue;
+          const bonded = a.linkedId === b.id || b.linkedId === a.id;
+          const distance = Math.hypot(a.x - b.x, a.y - b.y);
+          if (
+            (bonded && !bestBonded) ||
+            (bonded === bestBonded && distance < bestDistance)
+          ) {
+            bestFirst = first;
+            bestSecond = second;
+            bestDistance = distance;
+            bestBonded = bonded;
+          }
+        }
+      if (bestSecond < 0) break;
+      const first = remaining[bestFirst];
+      const second = remaining[bestSecond];
+      result.push({
+        firstId: first.id,
+        secondId: second.id,
+        tier,
+        distance: bestDistance,
+        bonded: bestBonded,
+      });
+      remaining.splice(bestSecond, 1);
+      remaining.splice(bestFirst, 1);
+    }
+  });
+  return result;
 }
