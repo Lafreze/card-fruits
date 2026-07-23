@@ -40,6 +40,12 @@ export const sounds = {
     note(250, 0.12, "triangle", 0.045);
     note(510, 0.16, "sine", 0.035, 0.025);
   },
+  impact: (strength: number) => {
+    const weight = Math.max(0, Math.min(1, strength));
+    note(145 + weight * 90, 0.055 + weight * 0.05, "sine", 0.018 + weight * 0.025);
+    if (weight > 0.55)
+      note(310 + weight * 120, 0.07, "triangle", 0.012 + weight * 0.018, 0.012);
+  },
   merge: (tier: number) => {
     const root = 210 + tier * 28;
     note(root, 0.2, "sine", 0.075);

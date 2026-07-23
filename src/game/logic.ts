@@ -4,6 +4,14 @@ export type StackSlot = {
   y: number;
 };
 
+export type RotatedRect = {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  rotation: number;
+};
+
 export type FusionCandidate = {
   id: number;
   tier: number;
@@ -35,6 +43,58 @@ export type StackScatterBounds = {
 const CARD_COVER_WIDTH = 64;
 const CARD_COVER_HEIGHT = 72;
 const COVER_EPSILON = 0.5;
+
+/**
+ * Uses the same rotated card footprint for visual overlap and interaction
+ * locking. Axis-aligned checks make a tilted card appear to cover a neighbour
+ * it never touches, which is especially noticeable after a shuffle.
+ */
+export function rotatedRectanglesOverlap(
+  first: RotatedRect,
+  second: RotatedRect,
+  epsilon = COVER_EPSILON,
+) {
+  const corners = ({ x, y, width, height, rotation }: RotatedRect) => {
+    const cosine = Math.cos(rotation);
+    const sine = Math.sin(rotation);
+    return [
+      [-width / 2, -height / 2],
+      [width / 2, -height / 2],
+      [width / 2, height / 2],
+      [-width / 2, height / 2],
+    ].map(([localX, localY]) => ({
+      x: x + localX * cosine - localY * sine,
+      y: y + localX * sine + localY * cosine,
+    }));
+  };
+  const firstCorners = corners(first);
+  const secondCorners = corners(second);
+  const polygons = [firstCorners, secondCorners];
+
+  for (const polygon of polygons) {
+    for (let index = 0; index < polygon.length; index += 1) {
+      const point = polygon[index];
+      const next = polygon[(index + 1) % polygon.length];
+      const axis = { x: -(next.y - point.y), y: next.x - point.x };
+      const magnitude = Math.hypot(axis.x, axis.y);
+      const unitAxis = { x: axis.x / magnitude, y: axis.y / magnitude };
+      const project = (cornersToProject: typeof firstCorners) => {
+        const values = cornersToProject.map(
+          (corner) => corner.x * unitAxis.x + corner.y * unitAxis.y,
+        );
+        return { min: Math.min(...values), max: Math.max(...values) };
+      };
+      const firstProjection = project(firstCorners);
+      const secondProjection = project(secondCorners);
+      if (
+        firstProjection.max <= secondProjection.min + epsilon ||
+        secondProjection.max <= firstProjection.min + epsilon
+      )
+        return false;
+    }
+  }
+  return true;
+}
 
 function shuffled<T>(items: T[], random: RandomSource) {
   const result = [...items];

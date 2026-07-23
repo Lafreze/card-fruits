@@ -14,6 +14,7 @@ import {
   buildPlayableDeal,
   canMergeAfterLanding,
   fruitBatchCount,
+  rotatedRectanglesOverlap,
   scatterStackSlots,
 } from "./logic";
 import { haptic, sounds } from "./audio";
@@ -46,6 +47,7 @@ type CardNode = {
   id: number;
   tier: number;
   layer: number;
+  stackOrder: number;
   active: boolean;
   x: number;
   y: number;
@@ -109,6 +111,8 @@ type FruitPluginState = {
   birth: number;
   landedAt?: number;
   landingPulseUntil?: number;
+  collisionPulseUntil?: number;
+  collisionPulseStrength?: number;
   noMergeUntil?: number;
   splitGroup?: number;
   splitUntil?: number;
@@ -141,7 +145,6 @@ const CARD_W = 58;
 const CARD_H = 66;
 const CARD_COVER_W = CARD_W + 6;
 const CARD_COVER_H = CARD_H + 6;
-const COVER_EPSILON = 0.5;
 
 function shuffle<T>(items: T[]) {
   const copy = [...items];
@@ -187,6 +190,7 @@ export class FruitGame implements GameControls {
   private nextRainReleaseAt = 0;
   private fruitFocusUntil = 0;
   private focusedFruitIds = new Set<number>();
+  private lastCollisionSoundAt = -1;
   private lastCardPhaseReady = true;
   private merging = new Set<number>();
   private fusionPairStates = new Map<string, FusionPairState>();
@@ -392,8 +396,8 @@ export class FruitGame implements GameControls {
     this.createPhysicsWorld();
     this.createCards();
     this.drawTray();
-    Events.on(this.engine, "collisionStart", this.onCollision);
-    Events.on(this.engine, "collisionActive", this.onCollision);
+    Events.on(this.engine, "collisionStart", this.onCollisionStart);
+    Events.on(this.engine, "collisionActive", this.onCollisionActive);
     this.app.ticker.add(this.tick);
     if (import.meta.env.DEV)
       (window as unknown as { __game?: FruitGame }).__game = this;
@@ -816,10 +820,12 @@ export class FruitGame implements GameControls {
       }
       const locked = special === "frozen" && slot.layer < maxLayer;
       if (special === "frozen" && !locked) special = "normal";
+      const id = ++this.cardIdCounter;
       const card: CardNode = {
-        id: ++this.cardIdCounter,
+        id,
         tier,
         layer: slot.layer,
+        stackOrder: id,
         active: true,
         x,
         y,
@@ -835,7 +841,6 @@ export class FruitGame implements GameControls {
           (Math.random() - 0.5) * 0.15 + Math.sin(x / 47 + slot.layer) * 0.018,
         ),
       );
-      card.view.zIndex = slot.layer * 100 + index;
       card.view.on("pointertap", (event: FederatedPointerEvent) => {
         event.stopPropagation();
         this.pickCard(card);
@@ -844,6 +849,7 @@ export class FruitGame implements GameControls {
       this.cardLayer.addChild(card.view);
     });
     this.cardLayer.sortableChildren = true;
+    this.refreshCardDepth();
     this.updateCardAccess();
   }
 
@@ -1026,25 +1032,46 @@ export class FruitGame implements GameControls {
     view.addChild(badge);
   }
 
-  private isCovered(card: CardNode) {
-    return this.cards.some((other) => {
-      if (!other.active || other.layer <= card.layer || other.id === card.id)
-        return false;
-      const overlapX = Math.max(0, CARD_COVER_W - Math.abs(other.x - card.x));
-      const overlapY = Math.max(0, CARD_COVER_H - Math.abs(other.y - card.y));
-      // 上层牌只要真实压住就锁住下层牌，避免露出一点边角时误点。
-      return overlapX > COVER_EPSILON && overlapY > COVER_EPSILON;
+  // 牌面渲染、遮挡锁定与点击顺序共用同一份深度数据；洗牌后不会再出现
+  // “看着在底下却能点”或“已经露出但仍锁住”的层级脱节。
+  private refreshCardDepth() {
+    this.cards.forEach((card) => {
+      card.view.zIndex = card.layer * 10_000 + card.stackOrder;
+    });
+    this.cardLayer.sortableChildren = true;
+    this.cardLayer.sortChildren();
+  }
+
+  private cardOverlaps(first: CardNode, second: CardNode) {
+    return rotatedRectanglesOverlap({
+      x: first.x,
+      y: first.y,
+      width: CARD_COVER_W,
+      height: CARD_COVER_H,
+      rotation: first.view.rotation,
+    }, {
+      x: second.x,
+      y: second.y,
+      width: CARD_COVER_W,
+      height: CARD_COVER_H,
+      rotation: second.view.rotation,
     });
   }
 
   private coveringCards(card: CardNode) {
-    return this.cards.filter((other) => {
-      if (!other.active || other.layer <= card.layer || other.id === card.id)
-        return false;
-      const overlapX = Math.max(0, CARD_COVER_W - Math.abs(other.x - card.x));
-      const overlapY = Math.max(0, CARD_COVER_H - Math.abs(other.y - card.y));
-      return overlapX > COVER_EPSILON && overlapY > COVER_EPSILON;
-    });
+    return this.cards
+      .filter(
+        (other) =>
+          other.active &&
+          other.id !== card.id &&
+          other.view.zIndex > card.view.zIndex &&
+          this.cardOverlaps(other, card),
+      )
+      .sort((first, second) => second.view.zIndex - first.view.zIndex);
+  }
+
+  private isCovered(card: CardNode) {
+    return this.coveringCards(card).length > 0;
   }
 
   private explainBlocked(card: CardNode) {
@@ -2070,7 +2097,49 @@ export class FruitGame implements GameControls {
     haptic(power >= 3 ? [18, 24, 34] : [10, 18]);
   }
 
-  private onCollision = (event: Matter.IEventCollision<Matter.Engine>) => {
+  private playCollisionFeedback(
+    pair: Matter.Pair,
+    nodeA?: FruitNode,
+    nodeB?: FruitNode,
+  ) {
+    const relativeSpeed = Math.hypot(
+      pair.bodyA.velocity.x - pair.bodyB.velocity.x,
+      pair.bodyA.velocity.y - pair.bodyB.velocity.y,
+    );
+    const strength = Math.max(0, Math.min(1, (relativeSpeed - 0.42) / 4.8));
+    if (strength <= 0) return;
+
+    [nodeA, nodeB].filter(Boolean).forEach((fruit) => {
+      const plugin = this.fruitPlugin(fruit!);
+      plugin.collisionPulseUntil = this.elapsed + 0.12 + strength * 0.08;
+      plugin.collisionPulseStrength = Math.max(
+        Number(plugin.collisionPulseStrength || 0),
+        strength,
+      );
+    });
+
+    if (strength < 0.16) return;
+    const x = (pair.bodyA.position.x + pair.bodyB.position.x) / 2;
+    const y = (pair.bodyA.position.y + pair.bodyB.position.y) / 2;
+    const color = nodeA
+      ? FRUITS[nodeA.tier].glow
+      : nodeB
+        ? FRUITS[nodeB.tier].glow
+        : 0xbda8d8;
+    this.ring(x, y, color, 0.2 + strength * 0.22);
+    if (strength >= 0.38) this.burst(x, y, color, 3 + Math.round(strength * 5));
+    this.shake = Math.max(this.shake, 0.7 + strength * 2.1);
+    if (this.elapsed - this.lastCollisionSoundAt >= 0.09) {
+      sounds.impact(strength);
+      this.lastCollisionSoundAt = this.elapsed;
+    }
+    if (strength >= 0.72) haptic(8);
+  }
+
+  private processCollision(
+    event: Matter.IEventCollision<Matter.Engine>,
+    includeImpactFeedback: boolean,
+  ) {
     if (this.status !== "playing") return;
     const fruitContacts: Array<[FruitNode, FruitNode]> = [];
     const touched = new Set<FruitNode>();
@@ -2078,6 +2147,7 @@ export class FruitGame implements GameControls {
     for (const pair of event.pairs) {
       const nodeA = this.fruits.get(pair.bodyA.id);
       const nodeB = this.fruits.get(pair.bodyB.id);
+      if (includeImpactFeedback) this.playCollisionFeedback(pair, nodeA, nodeB);
       if (nodeA) {
         touched.add(nodeA);
         if (pair.bodyB.label === "floor") this.markFruitLanded(nodeA);
@@ -2123,6 +2193,14 @@ export class FruitGame implements GameControls {
         continue;
       this.mergeFruits(nodeA, nodeB);
     }
+  }
+
+  private onCollisionStart = (event: Matter.IEventCollision<Matter.Engine>) => {
+    this.processCollision(event, true);
+  };
+
+  private onCollisionActive = (event: Matter.IEventCollision<Matter.Engine>) => {
+    this.processCollision(event, false);
   };
 
   private mergeFruits(first: FruitNode, second: FruitNode) {
@@ -2374,6 +2452,16 @@ export class FruitGame implements GameControls {
       if (fruit.view.scale.x < 0.99) {
         const next = Math.min(1, fruit.view.scale.x + 0.11 * delta);
         fruit.view.scale.set(next);
+      } else if (Number(plugin.collisionPulseUntil || 0) > this.elapsed) {
+        const remaining =
+          (Number(plugin.collisionPulseUntil) - this.elapsed) /
+          (0.12 + Number(plugin.collisionPulseStrength || 0) * 0.08);
+        const pulse = Math.sin((1 - remaining) * Math.PI);
+        const strength = Number(plugin.collisionPulseStrength || 0.35);
+        fruit.view.scale.set(
+          1 + pulse * (0.035 + strength * 0.055),
+          1 - pulse * (0.045 + strength * 0.075),
+        );
       } else if (Number(plugin.landingPulseUntil || 0) > this.elapsed) {
         const remaining =
           (Number(plugin.landingPulseUntil) - this.elapsed) / 0.22;
@@ -2875,7 +2963,6 @@ export class FruitGame implements GameControls {
       card.x = positions[index].x;
       card.y = positions[index].y;
       card.layer = positions[index].layer;
-      card.view.zIndex = card.layer * 100 + index;
       card.view.position.set(card.x, card.y);
       card.view.rotation = (Math.random() - 0.5) * 0.17;
     });
@@ -2929,10 +3016,9 @@ export class FruitGame implements GameControls {
         target.layer = sourcePosition.layer;
         source.view.position.set(source.x, source.y);
         target.view.position.set(target.x, target.y);
-        source.view.zIndex = source.layer * 100 + source.id;
-        target.view.zIndex = target.layer * 100 + target.id;
       }
     }
+    this.refreshCardDepth();
     this.shuffleLeft -= 1;
     this.lastPick = null;
     this.updateCardAccess();
@@ -3309,8 +3395,8 @@ export class FruitGame implements GameControls {
     this.destroyed = true;
     this.timers.forEach((id) => window.clearTimeout(id));
     this.timers.clear();
-    Events.off(this.engine, "collisionStart", this.onCollision);
-    Events.off(this.engine, "collisionActive", this.onCollision);
+    Events.off(this.engine, "collisionStart", this.onCollisionStart);
+    Events.off(this.engine, "collisionActive", this.onCollisionActive);
     this.app.ticker.remove(this.tick);
     if (import.meta.env.DEV)
       delete (window as unknown as { __game?: FruitGame }).__game;

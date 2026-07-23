@@ -7,6 +7,7 @@ import {
   calculateCoinReward,
   canMergeAfterLanding,
   fruitBatchCount,
+  rotatedRectanglesOverlap,
   scatterStackSlots,
   simulateTray,
   slotIsCovered,
@@ -64,6 +65,24 @@ test("a lower card is locked by even a slight upper overlap", () => {
   );
   assert.equal(
     isCovered(lower, [lower, { layer: 1, x: 100 + CARD_WIDTH, y: 100 }]),
+    false,
+  );
+});
+
+test("rotated card coverage follows the visible footprint", () => {
+  assert.equal(
+    rotatedRectanglesOverlap(
+      { x: 100, y: 100, width: 64, height: 72, rotation: Math.PI / 4 },
+      { x: 100, y: 100, width: 64, height: 72, rotation: -Math.PI / 5 },
+    ),
+    true,
+  );
+  // 两张倾斜牌的外接矩形仍会相碰，但真实牌面之间留有空隙，不应锁住。
+  assert.equal(
+    rotatedRectanglesOverlap(
+      { x: 100, y: 100, width: 64, height: 72, rotation: Math.PI / 4 },
+      { x: 166, y: 166, width: 64, height: 72, rotation: -Math.PI / 4 },
+    ),
     false,
   );
 });
