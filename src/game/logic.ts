@@ -61,6 +61,18 @@ export function scatterStackSlots(
   random: RandomSource = Math.random,
 ) {
   if (slots.length === 0) return slots;
+  // 将大平层拆成互相咬合的微层。上层数量增加，但每张牌仍沿可验证的移除路线开放，
+  // 视觉上更像真实随手叠起的牌堆，而不是一张铺开的表格。
+  const layerCounts = new Map<number, number>();
+  const topAuthoredLayer = Math.max(...slots.map((slot) => slot.layer));
+  slots.forEach((slot) => {
+    const authoredLayer = slot.layer;
+    const order = layerCounts.get(slot.layer) || 0;
+    layerCounts.set(slot.layer, order + 1);
+    const fork = (order + Math.floor(random() * 3)) % 2;
+    slot.layer =
+      authoredLayer * 2 + (authoredLayer === topAuthoredLayer ? 1 : fork);
+  });
   const mirrorX = random() < 0.5;
   const mirrorY = random() < 0.28;
   const motif = Math.floor(random() * 8);
@@ -209,6 +221,33 @@ export function scatterStackSlots(
       }
     if (!moved) break;
   }
+
+  // 复杂微层仍必须给玩家至少三张开局选择。若随机构图把顶层收得过窄，
+  // 从高层挑三张互不重叠的牌提升为一个新的开放冠层。
+  const active = new Set(slots.map((_, index) => index));
+  const exposed = slots.filter(
+    (_, index) => !slotIsCovered(index, slots, active),
+  );
+  if (exposed.length < 3) {
+    const promoted: StackSlot[] = [];
+    [...slots]
+      .sort((a, b) => b.layer - a.layer)
+      .some((slot) => {
+        const clear = promoted.every(
+          (other) =>
+            Math.abs(slot.x - other.x) >= minX ||
+            Math.abs(slot.y - other.y) >= minY,
+        );
+        if (clear) promoted.push(slot);
+        return promoted.length === 3;
+      });
+    if (promoted.length === 3) {
+      const crownLayer = Math.max(...slots.map((slot) => slot.layer)) + 2;
+      promoted.forEach((slot) => {
+        slot.layer = crownLayer;
+      });
+    }
+  }
   return slots;
 }
 
@@ -347,17 +386,14 @@ export function simulateTray(sequence: number[]) {
   return { remaining: tray, maxSize };
 }
 
-export function rollFruitRainCount(
-  random: () => number,
-  power = 1,
+export function fruitBatchCount(
+  greenhouseLevel = 0,
+  bonus = 0,
 ) {
-  const safePower = Math.max(1, Math.min(3, Math.floor(power)));
-  const roll = Math.max(0, Math.min(0.999_999, random()));
-  const tripleChance = 0.12 + (safePower - 1) * 0.06;
-  const doubleChance = 0.38 + (safePower - 1) * 0.04;
-  if (roll < tripleChance) return 3;
-  if (roll < tripleChance + doubleChance) return 2;
-  return 1;
+  return Math.max(
+    1,
+    Math.min(5, 1 + Math.floor(greenhouseLevel) + Math.floor(bonus)),
+  );
 }
 
 /**

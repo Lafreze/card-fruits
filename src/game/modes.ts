@@ -16,7 +16,13 @@ export type RelicId =
   | "frost_ward"
   | "fever_bloom"
   | "gold_rain"
-  | "second_wind";
+  | "second_wind"
+  | "harvest_gene"
+  | "launch_coil"
+  | "gravity_feather"
+  | "shock_core"
+  | "wild_graft"
+  | "sugar_shell";
 
 export type RelicDefinition = {
   id: RelicId;
@@ -69,7 +75,7 @@ export const RELICS: RelicDefinition[] = [
     id: "tool_belt",
     icon: "🎒",
     name: "园丁腰包",
-    description: "每关额外获得洗牌、锤子、泡泡袋、分果各 1 次。",
+    description: "已配置的洗牌、锤子、泡泡袋、分果每局各 +1 次。",
     tone: "gold",
     rarity: "uncommon",
     archetype: "道具",
@@ -105,10 +111,10 @@ export const RELICS: RelicDefinition[] = [
     id: "honey_glaze",
     icon: "🍯",
     name: "蜜糖涂层",
-    description: "三消后 18% 概率掉落双份水果。",
+    description: "每次三消额外获得 6 点狂热能量。",
     tone: "gold",
     rarity: "rare",
-    archetype: "掉落",
+    archetype: "狂热",
   },
   {
     id: "combo_engine",
@@ -123,7 +129,7 @@ export const RELICS: RelicDefinition[] = [
     id: "crystal_seed",
     icon: "🔮",
     name: "水晶果核",
-    description: "开局额外获得万能果、榨汁、催熟各 1 次。",
+    description: "已配置的万能果、榨汁、催熟每局各 +1 次。",
     tone: "cyan",
     rarity: "rare",
     archetype: "资源",
@@ -132,7 +138,7 @@ export const RELICS: RelicDefinition[] = [
     id: "storm_stir",
     icon: "💍",
     name: "共鸣指环",
-    description: "轻推无冷却，落地冲击范围提高 25%。",
+    description: "弹射无冷却，落地冲击范围提高 25%。",
     tone: "cyan",
     rarity: "common",
     archetype: "操控",
@@ -172,6 +178,60 @@ export const RELICS: RelicDefinition[] = [
     tone: "cyan",
     rarity: "rare",
     archetype: "救场",
+  },
+  {
+    id: "harvest_gene",
+    icon: "🧬",
+    name: "丰收基因",
+    description: "每次三消额外生成 1 颗水果，最多仍为 5 颗。",
+    tone: "gold",
+    rarity: "rare",
+    archetype: "属性·产量",
+  },
+  {
+    id: "launch_coil",
+    icon: "🌀",
+    name: "回弹线圈",
+    description: "点击水果的弹射强度提高 45%。",
+    tone: "cyan",
+    rarity: "uncommon",
+    archetype: "属性·操控",
+  },
+  {
+    id: "gravity_feather",
+    icon: "🪶",
+    name: "低重力羽",
+    description: "果箱重力降低 14%，更容易调整堆叠。",
+    tone: "cyan",
+    rarity: "common",
+    archetype: "属性·物理",
+  },
+  {
+    id: "shock_core",
+    icon: "⚙️",
+    name: "冲击果核",
+    description: "中央落果的冲击与同果牵引等级 +1。",
+    tone: "pink",
+    rarity: "uncommon",
+    archetype: "属性·合成",
+  },
+  {
+    id: "wild_graft",
+    icon: "💠",
+    name: "异色嫁接",
+    description: "功能牌出现率提高 10%，增益牌更常见。",
+    tone: "pink",
+    rarity: "uncommon",
+    archetype: "属性·牌组",
+  },
+  {
+    id: "sugar_shell",
+    icon: "🛡️",
+    name: "糖壳强化",
+    description: "警戒容错再延长 0.8 秒。",
+    tone: "gold",
+    rarity: "common",
+    archetype: "属性·生存",
   },
 ];
 
@@ -323,23 +383,18 @@ export const UPGRADES: UpgradeDefinition[] = [
   {
     id: "pack",
     icon: "🧰",
-    name: "道具背包",
+    name: "补给工坊",
     maxLevel: 3,
-    costs: [150, 420, 900],
+    costs: [480, 1400, 3200],
     describe: (level) =>
-      [
-        "未装备",
-        "开局洗牌 +1",
-        "开局洗牌、清顶锤 +1",
-        "开局洗牌、清顶锤、万能果 +1",
-      ][level],
+      level ? `购买道具价格 -${level * 6}%` : "未装备",
   },
   {
     id: "fever",
     icon: "🍬",
     name: "甜度储备",
     maxLevel: 3,
-    costs: [200, 520, 1100],
+    costs: [520, 1500, 3400],
     describe: (level) =>
       level ? `开局自带 ${[0, 20, 35, 50][level]} 点狂热能量` : "未装备",
   },
@@ -348,7 +403,7 @@ export const UPGRADES: UpgradeDefinition[] = [
     icon: "🛡️",
     name: "警戒缓冲",
     maxLevel: 3,
-    costs: [180, 480, 1000],
+    costs: [460, 1320, 3000],
     describe: (level) =>
       level ? `警戒线容错 +${(level * 0.3).toFixed(1)} 秒` : "未装备",
   },
@@ -357,7 +412,7 @@ export const UPGRADES: UpgradeDefinition[] = [
     icon: "🧲",
     name: "磁力温床",
     maxLevel: 3,
-    costs: [220, 560, 1200],
+    costs: [600, 1700, 3800],
     describe: (level) =>
       level ? `同级水果磁吸永久 +${level * 12}%` : "未装备",
   },
@@ -366,7 +421,7 @@ export const UPGRADES: UpgradeDefinition[] = [
     icon: "💎",
     name: "分数水晶",
     maxLevel: 3,
-    costs: [280, 700, 1500],
+    costs: [720, 2100, 4600],
     describe: (level) => (level ? `全部得分永久 +${level * 6}%` : "未装备"),
   },
   {
@@ -374,41 +429,85 @@ export const UPGRADES: UpgradeDefinition[] = [
     icon: "🎀",
     name: "连击丝带",
     maxLevel: 3,
-    costs: [240, 600, 1250],
+    costs: [620, 1800, 4000],
     describe: (level) =>
       level ? `连击窗口 +${(level * 0.2).toFixed(1)} 秒` : "未装备",
   },
   {
     id: "sweet_start",
-    icon: "🍯",
-    name: "甜蜜开局",
-    maxLevel: 3,
-    costs: [300, 750, 1600],
+    icon: "🌾",
+    name: "丰收培育",
+    maxLevel: 4,
+    costs: [850, 2200, 5200, 12000],
     describe: (level) =>
-      level ? `每关开局自动掉落 ${level} 颗低阶水果` : "未装备",
+      level
+        ? `每次三消固定生成 ${level + 1} 颗水果`
+        : "每次三消固定生成 1 颗水果",
   },
   {
     id: "coin",
     icon: "💰",
     name: "果币磁铁",
     maxLevel: 3,
-    costs: [260, 640, 1350],
+    costs: [680, 1900, 4300],
     describe: (level) => (level ? `结算果币 +${level * 20}%` : "未装备"),
   },
   {
     id: "sun",
-    icon: "☀️",
-    name: "暖棚日光",
-    maxLevel: 2,
-    costs: [320, 800],
-    describe: (level) => (level ? `开局阳光净化 +${level}` : "未装备"),
+    icon: "🌀",
+    name: "弹射培育",
+    maxLevel: 3,
+    costs: [560, 1600, 3600],
+    describe: (level) =>
+      level ? `点击水果弹射强度 +${level * 15}%` : "未装备",
   },
   {
     id: "relic_start",
     icon: "🎁",
     name: "远征福袋",
     maxLevel: 1,
-    costs: [1400],
+    costs: [5200],
     describe: (level) => (level ? "远征开局自带 1 件随机奇物" : "未装备"),
   },
+];
+
+export type ToolId =
+  | "undo"
+  | "shuffle"
+  | "juice"
+  | "hammer"
+  | "magnet"
+  | "wild"
+  | "bubble"
+  | "sun"
+  | "ripen"
+  | "split"
+  | "shield"
+  | "harvest"
+  | "quake";
+
+export type ToolDefinition = {
+  id: ToolId;
+  icon: string;
+  name: string;
+  maxLevel: number;
+  costs: number[];
+  description: string;
+};
+
+// 道具购买的是“每局可用次数”，不是一次性消耗品；玩家用果币构筑自己的补给方案。
+export const TOOLS: ToolDefinition[] = [
+  { id: "shuffle", icon: "⤨", name: "洗牌", maxLevel: 3, costs: [90, 240, 520], description: "重排牌堆并露出可三消路线" },
+  { id: "undo", icon: "↶", name: "撤回", maxLevel: 2, costs: [120, 360], description: "撤回上一张普通卡" },
+  { id: "hammer", icon: "🔨", name: "清顶锤", maxLevel: 2, costs: [150, 420], description: "自动收取一张顶层卡" },
+  { id: "juice", icon: "🥤", name: "榨汁", maxLevel: 2, costs: [180, 480], description: "最高阶水果降一级，立刻减压" },
+  { id: "bubble", icon: "🫧", name: "泡泡袋", maxLevel: 2, costs: [220, 600], description: "收起两张散牌，凑满三张仍会转果" },
+  { id: "shield", icon: "🛡️", name: "甜度盾", maxLevel: 2, costs: [240, 660], description: "短时间冻结警戒进度" },
+  { id: "magnet", icon: "🧲", name: "强磁合并", maxLevel: 2, costs: [260, 700], description: "强制拉近一对同级水果" },
+  { id: "sun", icon: "☀️", name: "阳光净化", maxLevel: 2, costs: [260, 720], description: "净化全部冰晶与藤蔓卡" },
+  { id: "split", icon: "✂️", name: "分果剪", maxLevel: 2, costs: [280, 760], description: "把最高阶水果拆成两颗" },
+  { id: "ripen", icon: "🌱", name: "催熟露", maxLevel: 2, costs: [300, 820], description: "最低阶水果直接升一级" },
+  { id: "wild", icon: "🍀", name: "万能果", maxLevel: 2, costs: [320, 900], description: "补齐卡槽中最接近的三消" },
+  { id: "quake", icon: "🪇", name: "震荡铃", maxLevel: 2, costs: [360, 980], description: "将箱内所有水果向上弹开" },
+  { id: "harvest", icon: "🌾", name: "丰收剂", maxLevel: 2, costs: [420, 1200], description: "下一次三消额外生成一颗水果" },
 ];

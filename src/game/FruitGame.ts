@@ -12,7 +12,7 @@ import { FRUITS, LEVELS, WORLD } from "./data";
 import {
   buildFusionPairs,
   buildPlayableDeal,
-  rollFruitRainCount,
+  fruitBatchCount,
   scatterStackSlots,
 } from "./logic";
 import { haptic, sounds } from "./audio";
@@ -31,7 +31,15 @@ import type {
   GameStatus,
 } from "./types";
 
-type CardSpecial = "normal" | "frozen" | "bomb" | "vine" | "sugar";
+type CardSpecial =
+  | "normal"
+  | "frozen"
+  | "bomb"
+  | "vine"
+  | "sugar"
+  | "harvest"
+  | "prism"
+  | "gust";
 
 type CardNode = {
   id: number;
@@ -131,7 +139,6 @@ const CARD_H = 66;
 const CARD_COVER_W = CARD_W + 6;
 const CARD_COVER_H = CARD_H + 6;
 const COVER_EPSILON = 0.5;
-const DROP_GATE_RATIOS = [0.22, 0.5, 0.78] as const;
 
 function shuffle<T>(items: T[]) {
   const copy = [...items];
@@ -172,6 +179,7 @@ export class FruitGame implements GameControls {
   private cardFlights: CardFlight[] = [];
   private fusionEchoes: FusionEcho[] = [];
   private tray: number[] = [];
+  private bubbleGroups = new Map<number, number>();
   private fruitRain: FruitRainDrop[] = [];
   private nextRainReleaseAt = 0;
   private fruitFocusUntil = 0;
@@ -187,7 +195,11 @@ export class FruitGame implements GameControls {
   private relics: RelicId[];
   private trayLimit = 7;
   private comboWindowBonus = 0;
-  private sweetStart = 0;
+  private fruitBatchLevel = 0;
+  private fruitBatchBonus = 0;
+  private harvestCharge = 0;
+  private prismCharge = 0;
+  private launchMultiplier = 1;
   private radiusScale = 1;
   private scoreMultiplier = 1;
   private dangerLimit = 2;
@@ -206,17 +218,19 @@ export class FruitGame implements GameControls {
   private dangerProgress = 0;
   private exhaustedSince = -1;
   private startedAt = Date.now();
-  private undoLeft = 1;
-  private shuffleLeft = 3;
-  private juiceLeft = 1;
-  private hammerLeft = 1;
-  private magnetLeft = 1;
-  private wildLeft = 1;
-  private bubbleLeft = 1;
-  private sunLeft = 1;
-  private ripenLeft = 1;
-  private splitLeft = 1;
-  private shieldLeft = 1;
+  private undoLeft = 0;
+  private shuffleLeft = 0;
+  private juiceLeft = 0;
+  private hammerLeft = 0;
+  private magnetLeft = 0;
+  private wildLeft = 0;
+  private bubbleLeft = 0;
+  private sunLeft = 0;
+  private ripenLeft = 0;
+  private splitLeft = 0;
+  private shieldLeft = 0;
+  private harvestLeft = 0;
+  private quakeLeft = 0;
   private sugarShieldUntil = -1;
   private mutator: WaveMutator = rollMutator(1);
   private feverEnergy = 0;
@@ -244,32 +258,51 @@ export class FruitGame implements GameControls {
     this.trayLimit = this.hasRelic("deep_tray") ? 8 : 7;
     this.radiusScale = this.hasRelic("mini_orchard") ? 0.86 : 1;
     this.scoreMultiplier = this.hasRelic("golden_touch") ? 1.35 : 1;
-    this.dangerLimit = this.hasRelic("slow_sugar") ? 3.2 : 2;
+    this.dangerLimit =
+      (this.hasRelic("slow_sugar") ? 3.2 : 2) +
+      (this.hasRelic("sugar_shell") ? 0.8 : 0);
     this.magnetMultiplier = this.hasRelic("magnet_core") ? 1.55 : 1;
-    this.specialBonus = this.hasRelic("blast_juice") ? 0.12 : 0;
+    this.specialBonus =
+      (this.hasRelic("blast_juice") ? 0.08 : 0) +
+      (this.hasRelic("wild_graft") ? 0.1 : 0);
+    this.fruitBatchBonus = this.hasRelic("harvest_gene") ? 1 : 0;
+    this.launchMultiplier = this.hasRelic("launch_coil") ? 1.45 : 1;
+    if (this.hasRelic("gravity_feather")) this.engine.gravity.y *= 0.86;
+    const upgrades = config.upgrades || {};
+    const tools = upgrades.tools || {};
+    this.undoLeft += Math.max(0, tools.undo || 0);
+    this.shuffleLeft += Math.max(0, tools.shuffle || 0);
+    this.juiceLeft += Math.max(0, tools.juice || 0);
+    this.hammerLeft += Math.max(0, tools.hammer || 0);
+    this.magnetLeft += Math.max(0, tools.magnet || 0);
+    this.wildLeft += Math.max(0, tools.wild || 0);
+    this.bubbleLeft += Math.max(0, tools.bubble || 0);
+    this.sunLeft += Math.max(0, tools.sun || 0);
+    this.ripenLeft += Math.max(0, tools.ripen || 0);
+    this.splitLeft += Math.max(0, tools.split || 0);
+    this.shieldLeft += Math.max(0, tools.shield || 0);
+    this.harvestLeft += Math.max(0, tools.harvest || 0);
+    this.quakeLeft += Math.max(0, tools.quake || 0);
+    // 奇物只强化已经用果币配置的道具，不会绕过温室直接解锁。
     if (this.hasRelic("tool_belt")) {
-      this.shuffleLeft += 1;
-      this.hammerLeft += 1;
-      this.bubbleLeft += 1;
-      this.splitLeft += 1;
+      if (tools.shuffle) this.shuffleLeft += 1;
+      if (tools.hammer) this.hammerLeft += 1;
+      if (tools.bubble) this.bubbleLeft += 1;
+      if (tools.split) this.splitLeft += 1;
     }
     if (this.hasRelic("crystal_seed")) {
-      this.wildLeft += 1;
-      this.juiceLeft += 1;
-      this.ripenLeft += 1;
+      if (tools.wild) this.wildLeft += 1;
+      if (tools.juice) this.juiceLeft += 1;
+      if (tools.ripen) this.ripenLeft += 1;
     }
-    const upgrades = config.upgrades || {};
-    if ((upgrades.pack || 0) >= 1) this.shuffleLeft += 1;
-    if ((upgrades.pack || 0) >= 2) this.hammerLeft += 1;
-    if ((upgrades.pack || 0) >= 3) this.wildLeft += 1;
-    this.sunLeft += Math.min(2, upgrades.sun || 0);
     this.feverEnergy = [0, 20, 35, 50][Math.min(3, upgrades.fever || 0)];
     this.dangerLimit += 0.3 * Math.min(3, upgrades.danger || 0);
-    // 温室对局内加成:磁力温床/分数水晶/连击丝带/甜蜜开局
+    // 温室对局内加成:磁力温床/分数水晶/连击丝带/固定丰收与弹射强度
     this.magnetMultiplier *= 1 + 0.12 * Math.min(3, upgrades.magnet || 0);
     this.scoreMultiplier *= 1 + 0.06 * Math.min(3, upgrades.score || 0);
     this.comboWindowBonus = 0.2 * Math.min(3, upgrades.combo || 0);
-    this.sweetStart = Math.min(3, upgrades.sweetStart || 0);
+    this.fruitBatchLevel = Math.min(4, upgrades.fruitBatch || 0);
+    this.launchMultiplier *= 1 + 0.15 * Math.min(3, upgrades.launch || 0);
     if (this.mode !== "story") this.mutator = rollMutator(this.wave);
     this.callbacks = callbacks;
   }
@@ -364,7 +397,7 @@ export class FruitGame implements GameControls {
     if (this.mode === "story" && this.levelIndex === 0) {
       this.setTimer(
         () =>
-          this.callbacks.onToast("三消触发果雨 · 自动落入三果位", "cyan"),
+          this.callbacks.onToast("三消从中央落果 · 点击水果可以弹射", "cyan"),
         360,
       );
     }
@@ -378,23 +411,6 @@ export class FruitGame implements GameControls {
           ),
         520,
       );
-    }
-    // 甜蜜开局(温室):每关开局自动掉落 N 颗本关最低阶水果,直接参与合成
-    if (this.sweetStart > 0) {
-      const baseTier = Math.min(
-        ...LEVELS[this.levelIndex].cards.map((card) => card.tier),
-      );
-      for (let index = 0; index < this.sweetStart; index += 1) {
-        this.setTimer(
-          () =>
-            this.spawnFruit(
-              baseTier,
-              WORLD.width / 2 + (index - (this.sweetStart - 1) / 2) * 42,
-              WORLD.box.y + 24,
-            ),
-          640 + index * 200,
-        );
-      }
     }
     if (this.mode === "expedition" && this.wave > 1) {
       this.setTimer(
@@ -516,19 +532,11 @@ export class FruitGame implements GameControls {
     danger.label = "danger-line";
     this.ambientLayer.addChild(this.dangerGlow, danger);
 
-    DROP_GATE_RATIOS.forEach((ratio, index) => {
-      const gate = new Graphics()
-        .circle(0, 0, 18)
-        .fill({ color: 0x9b83c7, alpha: 0.035 })
-        .circle(0, 0, 2)
-        .fill({ color: 0xbca6df, alpha: 0.16 });
-      gate.position.set(
-        WORLD.box.x + WORLD.box.width * ratio,
-        WORLD.box.y + 29,
-      );
-      gate.label = `drop-gate-base-${index}`;
-      this.ambientLayer.addChild(gate);
-    });
+    const centerDropGlow = new Graphics()
+      .ellipse(0, 0, 34, 10)
+      .fill({ color: 0xbca6df, alpha: 0.055 });
+    centerDropGlow.position.set(WORLD.width / 2, WORLD.box.y + 27);
+    this.ambientLayer.addChild(centerDropGlow);
 
     // 狂热能量条:贴在卡槽面板底边,充满触发 9 秒狂热
     const feverBack = new Graphics()
@@ -598,7 +606,7 @@ export class FruitGame implements GameControls {
       .fill({ color: 0xffffff, alpha: 0.001 });
     dropTarget.eventMode = "static";
     dropTarget.cursor = "grab";
-    // 果雨自动从三个果位下落；玩家点击箱内水果仍可轻推同级伙伴。
+    // 所有水果从中央生成；点击任意水果会向同级伙伴方向弹射，主动解除死角。
     dropTarget.on("pointerdown", (event: FederatedPointerEvent) => {
       if (this.status !== "playing" || this.paused) return;
       this.pokeFruit(event.global.x, event.global.y);
@@ -614,7 +622,7 @@ export class FruitGame implements GameControls {
       : "";
   }
 
-  // 戳一戳只做横向滚动；向上弹跳只保留给合成后诞生的新水果。
+  // 弹射是果箱的核心主动操作：向同级伙伴靠拢，同时获得足够向上的脱困速度。
   private pokeFruit(x: number, y: number) {
     const node = [...this.fruits.values()].find(
       (fruit) =>
@@ -627,7 +635,7 @@ export class FruitGame implements GameControls {
     const plugin = node.body.plugin as { pokeAt?: number };
     if (!stormStir && this.elapsed - (plugin.pokeAt ?? -9) < 0.55) return;
     plugin.pokeAt = this.elapsed;
-    const force = stormStir ? 2 : 1;
+    const force = this.launchMultiplier * (stormStir ? 1.22 : 1);
     const partner = [...this.fruits.values()]
       .filter(
         (fruit) =>
@@ -648,28 +656,59 @@ export class FruitGame implements GameControls {
       )[0];
     const direction = partner
       ? Math.sign(partner.body.position.x - node.body.position.x) || 1
-      : Math.random() < 0.5
-        ? -1
-        : 1;
+      : Math.sign(WORLD.width / 2 - node.body.position.x) ||
+        (Math.random() < 0.5 ? -1 : 1);
     Body.setVelocity(node.body, {
-      x: node.body.velocity.x + direction * 3 * force,
-      y: Math.max(0, node.body.velocity.y),
+      x: Math.max(
+        -7.8,
+        Math.min(7.8, node.body.velocity.x * 0.25 + direction * 4.3 * force),
+      ),
+      y: -5.3 * force,
     });
-    Body.setAngularVelocity(node.body, direction * 0.08 * force);
+    Body.setAngularVelocity(node.body, direction * 0.16 * force);
+    this.focusedFruitIds.add(node.body.id);
+    this.fruitFocusUntil = Math.max(this.fruitFocusUntil, this.elapsed + 0.56);
     this.ring(
       node.body.position.x,
       node.body.position.y,
       FRUITS[node.tier].glow,
-      0.55,
+      0.78,
     );
     this.burst(
       node.body.position.x,
       node.body.position.y - 4,
       FRUITS[node.tier].glow,
-      6,
+      14,
     );
-    sounds.tap();
-    haptic();
+    sounds.launch();
+    haptic([10, 20, 16]);
+  }
+
+  private launchFruits(limit = Number.POSITIVE_INFINITY, strength = 1) {
+    const candidates = [...this.fruits.values()]
+      .filter((fruit) => !this.merging.has(fruit.body.id))
+      .sort((a, b) => b.body.position.y - a.body.position.y)
+      .slice(0, limit);
+    candidates.forEach((fruit, index) => {
+      const direction =
+        Math.sign(fruit.body.position.x - WORLD.width / 2) ||
+        (index % 2 === 0 ? -1 : 1);
+      Body.setVelocity(fruit.body, {
+        x: direction * (2.2 + (index % 3) * 0.55) * strength,
+        y: -(3.8 + (index % 2) * 0.55) * strength,
+      });
+      Body.setAngularVelocity(fruit.body, direction * 0.12 * strength);
+      this.focusedFruitIds.add(fruit.body.id);
+    });
+    if (candidates.length) {
+      this.fruitFocusUntil = Math.max(
+        this.fruitFocusUntil,
+        this.elapsed + 0.62,
+      );
+      this.burst(WORLD.width / 2, WORLD.box.y + WORLD.box.height - 34, 0x9de9ff, 28);
+      sounds.launch();
+    }
+    return candidates.length;
   }
 
   private createPhysicsWorld() {
@@ -715,7 +754,8 @@ export class FruitGame implements GameControls {
       slots.push({ layer: top.layer + 1, x: top.x + 5, y: top.y - 6 });
     }
     this.scatterSlots(slots);
-    const maxLayer = slots[slots.length - 1].layer;
+    slots.sort((a, b) => a.layer - b.layer);
+    const maxLayer = Math.max(...slots.map((slot) => slot.layer));
     // 生成一条经过牌阵遮挡验证的安全路线。牌面仍有多条可选分支，
     // 但不再出现“开局能消、后续只能靠洗牌”的纯随机死局。
     const deal = buildPlayableDeal(
@@ -746,13 +786,19 @@ export class FruitGame implements GameControls {
       if (!protectedOpening && specialRoll < specialRate) {
         const kindRoll = Math.random();
         special =
-          kindRoll < 0.38
+          kindRoll < 0.24
             ? "frozen"
-            : kindRoll < 0.68
+            : kindRoll < 0.44
               ? "bomb"
-              : kindRoll < 0.86
+              : kindRoll < 0.59
                 ? "vine"
-                : "sugar";
+                : kindRoll < 0.72
+                  ? "sugar"
+                  : kindRoll < 0.84
+                    ? "harvest"
+                    : kindRoll < 0.94
+                      ? "prism"
+                      : "gust";
         // 变异波次偏置：对应特殊牌约占变异牌的 72%。
         if (this.mutator.frozen && Math.random() < 0.72) special = "frozen";
         if (this.mutator.bomb && Math.random() < 0.72) special = "bomb";
@@ -874,10 +920,6 @@ export class FruitGame implements GameControls {
     const topGlint = new Graphics()
       .roundRect(-CARD_W / 2 + 9, -CARD_H / 2 + 5.5, CARD_W - 18, 1.25, 1)
       .fill({ color: 0xffffff, alpha: 0.82 });
-    const medallion = new Graphics()
-      .circle(0, -2, 19.5)
-      .fill({ color: 0x6f6383, alpha: 0.055 })
-      .stroke({ color: 0xa895bb, alpha: 0.18, width: 0.75 });
     const sheen = new Graphics()
       .roundRect(-13, -23, 26, 5.5, 2.75)
       .fill({ color: 0xffffff, alpha: 0.28 });
@@ -925,7 +967,6 @@ export class FruitGame implements GameControls {
       paperWash,
       innerFrame,
       topGlint,
-      medallion,
       sheen,
       emoji,
       serial,
@@ -940,6 +981,12 @@ export class FruitGame implements GameControls {
       this.addCardBadge(view, "✦", 0x4f8b72, "special-icon");
     } else if (special === "sugar") {
       this.addCardBadge(view, "ϟ", 0xb88937, "special-icon");
+    } else if (special === "harvest") {
+      this.addCardBadge(view, "穗", 0x8b8145, "special-icon");
+    } else if (special === "prism") {
+      this.addCardBadge(view, "◇", 0x7868a4, "special-icon");
+    } else if (special === "gust") {
+      this.addCardBadge(view, "↟", 0x4f7e8c, "special-icon");
     }
     return view;
   }
@@ -954,10 +1001,10 @@ export class FruitGame implements GameControls {
     badge.label = label;
     badge.position.set(20, -25);
     const shadow = new Graphics()
-      .circle(0, 1.4, 7.2)
+      .roundRect(-7.2, -5.8, 14.4, 13.2, 4)
       .fill({ color: 0x110d17, alpha: 0.34 });
     const seal = new Graphics()
-      .circle(0, 0, 7)
+      .roundRect(-7, -7, 14, 14, 4)
       .fill({ color, alpha: 0.96 })
       .stroke({ color: 0xfff0ce, alpha: 0.74, width: 0.8 });
     const icon = new Text({
@@ -1016,7 +1063,7 @@ export class FruitGame implements GameControls {
   }
 
   private isCardPhaseReady() {
-    return this.status === "playing" && this.conversions.length === 0;
+    return this.status === "playing";
   }
 
   private releaseSettledFruitFocus() {
@@ -1043,13 +1090,7 @@ export class FruitGame implements GameControls {
   }
 
   private cardToolBlocked() {
-    if (this.isCardPhaseReady()) return false;
-    this.callbacks.onToast(
-      "水果正在生成",
-      "gold",
-    );
-    haptic([7, 18, 7]);
-    return true;
+    return !this.isCardPhaseReady();
   }
 
   private updateCardAccess() {
@@ -1106,8 +1147,11 @@ export class FruitGame implements GameControls {
     }
     sounds.tap();
     haptic();
-    const detonates = card.special === "bomb";
-    const chargesFever = card.special === "sugar";
+    const special = card.special;
+    const detonates = special === "bomb";
+    const chargesFever = special === "sugar";
+    const boostsHarvest = special === "harvest";
+    const launchesFruit = special === "gust";
     const matchingIndex = this.tray.lastIndexOf(card.tier);
     const trayDestination =
       matchingIndex >= 0 ? matchingIndex + 1 : this.tray.length;
@@ -1116,11 +1160,25 @@ export class FruitGame implements GameControls {
     card.view.visible = false;
     card.special = "normal";
     // 炸弹与甜度牌已经产生不可逆效果，不允许撤回造成状态错账。
-    this.lastPick = detonates || chargesFever ? null : card;
+    this.lastPick = special === "normal" ? card : null;
     if (chargesFever) {
       this.gainFever(10);
       this.burst(card.x, card.y, 0xffd75e, 18);
       this.callbacks.onToast("⚡ 甜度 +10", "gold");
+    }
+    if (boostsHarvest) {
+      this.harvestCharge = Math.min(4, this.harvestCharge + 1);
+      this.callbacks.onToast("🌾 丰收牌 · 下次三消 +1 果", "gold");
+    }
+    if (special === "prism") {
+      this.prismCharge = 1;
+      this.burst(card.x, card.y, 0xc7b2ff, 16);
+      this.callbacks.onToast("◇ 棱镜牌 · 下次落果触发强震", "pink");
+    }
+    if (launchesFruit) {
+      const launched = this.launchFruits(3, 0.9);
+      if (launched)
+        this.callbacks.onToast(`↟ 季风牌 · 弹开 ${launched} 颗水果`, "cyan");
     }
     this.collectTier(card.tier);
     if (detonates) this.detonate(card);
@@ -1158,6 +1216,24 @@ export class FruitGame implements GameControls {
   }
 
   private collectTier(tier: number) {
+    const bubbleCount = this.bubbleGroups.get(tier) || 0;
+    if (bubbleCount > 0) {
+      const nextCount = (bubbleCount + 1) % 3;
+      if (nextCount === 0) {
+        this.bubbleGroups.delete(tier);
+        this.registerCombo();
+        this.gainFever(8);
+        this.startConversion(tier, []);
+        this.callbacks.onToast(
+          `🫧 泡泡归组 · ${FRUITS[tier].emoji} 转为水果`,
+          "cyan",
+        );
+      } else {
+        this.bubbleGroups.set(tier, nextCount);
+      }
+      this.lastPick = null;
+      return;
+    }
     const groupIndex = this.tray.lastIndexOf(tier);
     if (groupIndex >= 0) this.tray.splice(groupIndex + 1, 0, tier);
     else this.tray.push(tier);
@@ -1184,6 +1260,7 @@ export class FruitGame implements GameControls {
       this.lastPick = null;
       this.registerCombo();
       this.gainFever(14);
+      if (this.hasRelic("honey_glaze")) this.gainFever(6);
       const points = Math.round(
         (tier + 1) *
           90 *
@@ -1201,12 +1278,6 @@ export class FruitGame implements GameControls {
         this.combo >= 4 ? "gold" : "pink",
       );
       this.startConversion(tier, matchedSlots);
-      if (this.hasRelic("honey_glaze") && Math.random() < 0.18) {
-        this.setTimer(() => {
-          this.callbacks.onToast("🍯 蜜糖涂层 · 双份掉落！", "gold");
-          this.queueFruitRain(tier);
-        }, 880);
-      }
     }
   }
 
@@ -1428,6 +1499,7 @@ export class FruitGame implements GameControls {
 
   private startConversion(tier: number, matchedSlots: number[]) {
     const power = this.dropPowerForTier(tier);
+    this.prismCharge = 0;
     this.activateCardResonance(tier);
     const transferX = WORLD.width / 2;
     const transferY = WORLD.box.y - 2;
@@ -1551,20 +1623,29 @@ export class FruitGame implements GameControls {
       3,
       1 +
         Number(hasSameFruit || sameFruitWaiting) +
-        Number(this.combo >= 3 || this.feverActive),
+        Number(this.combo >= 3 || this.feverActive) +
+        this.prismCharge * 2,
     );
   }
 
-  private queueFruitRain(tier: number, power = this.dropPowerForTier(tier)) {
+  private queueFruitRain(
+    tier: number,
+    power = this.dropPowerForTier(tier),
+  ) {
     if (this.destroyed || this.status !== "playing") return;
-    const total = rollFruitRainCount(Math.random, power);
-    const gates = shuffle(this.dropGateXs()).slice(0, total);
+    const total = fruitBatchCount(
+      this.fruitBatchLevel,
+      this.fruitBatchBonus + this.harvestCharge,
+    );
+    this.harvestCharge = 0;
     const startAt = Math.max(this.elapsed + 0.12, this.nextRainReleaseAt + 0.1);
-    gates.forEach((x, order) => {
-      const view = this.makeRainPreview(tier, power, total);
-      view.position.set(x, WORLD.box.y + 28);
+    Array.from({ length: total }).forEach((_, order) => {
+      const x = WORLD.width / 2;
+      const view = this.makeRainPreview(tier, total);
+      view.position.set(x, WORLD.box.y + 28 - order * 2.5);
+      view.zIndex = total - order;
       this.dropPreviewLayer.addChild(view);
-      const releaseAt = startAt + order * 0.2;
+      const releaseAt = startAt + order * 0.17;
       this.fruitRain.push({
         tier,
         power,
@@ -1576,21 +1657,19 @@ export class FruitGame implements GameControls {
       });
       this.nextRainReleaseAt = releaseAt;
     });
-    if (total === 3)
-      this.callbacks.onToast("幸运果雨 ×3", "gold");
-    else if (total === 2)
-      this.callbacks.onToast("双果雨 ×2", "cyan");
+    if (total > 1)
+      this.callbacks.onToast(`🌾 温室丰收 ×${total}`, total >= 4 ? "gold" : "cyan");
     this.updateCardAccess();
     haptic(total === 3 ? [12, 22, 12, 22, 20] : [10, 24, 12]);
   }
 
-  private makeRainPreview(tier: number, power: number, total: number) {
+  private makeRainPreview(tier: number, total: number) {
     const view = new Container();
     const glow = new Graphics()
       .circle(0, 0, 24)
       .fill({
-        color: total === 3 ? 0xd4ac55 : FRUITS[tier].glow,
-        alpha: total === 3 ? 0.14 : 0.1,
+        color: total >= 4 ? 0xd4ac55 : FRUITS[tier].glow,
+        alpha: total >= 4 ? 0.14 : 0.1,
       });
     glow.filters = [new BlurFilter({ strength: 7 })];
     const emoji = new Text({
@@ -1608,12 +1687,12 @@ export class FruitGame implements GameControls {
     emoji.anchor.set(0.5);
     emoji.position.set(0, -1);
     view.addChild(glow, emoji);
-    for (let index = 0; index < 3; index += 1) {
+    for (let index = 0; index < 5; index += 1) {
       const pip = new Graphics().circle(0, 0, 1.8).fill({
         color: 0xd8b766,
-        alpha: index < power ? 0.82 : 0.14,
+        alpha: index < total ? 0.82 : 0.14,
       });
-      pip.position.set((index - 1) * 7, 20);
+      pip.position.set((index - 2) * 6, 20);
       view.addChild(pip);
     }
     view.alpha = 0;
@@ -1640,7 +1719,11 @@ export class FruitGame implements GameControls {
       droppedAny = true;
       drop.view.destroy({ children: true });
       const partner = this.findDropPartner(drop.tier, drop.x);
-      const impactPower = Math.min(3, Math.max(drop.power, drop.total));
+      const impactPower = Math.min(
+        3,
+        Math.max(drop.power, drop.total) +
+          Number(this.hasRelic("shock_core")),
+      );
       const dropped = this.spawnFruit(drop.tier, drop.x, WORLD.box.y + 18);
       if (dropped) {
         this.focusedFruitIds.add(dropped.body.id);
@@ -1689,13 +1772,7 @@ export class FruitGame implements GameControls {
     return target;
   }
 
-  private dropGateXs() {
-    return DROP_GATE_RATIOS.map(
-      (ratio) => WORLD.box.x + WORLD.box.width * ratio,
-    );
-  }
-
-  // 选择与当前果位最接近且没有被其他共鸣占用的同级水果。
+  // 选择与中央落点最接近且没有被其他共鸣占用的同级水果。
   private findDropPartner(tier: number, gateX?: number) {
     const candidates = [...this.fruits.values()]
       .filter(
@@ -1749,7 +1826,7 @@ export class FruitGame implements GameControls {
     this.ring(second.body.position.x, second.body.position.y, 0xd8a94f, 0.5);
   }
 
-  // 三消先标亮箱内同果；果雨落下后自动与最近的同级水果建立唯一配对。
+  // 三消先标亮箱内同果；中央批次落下后自动与最近的同级水果建立唯一配对。
   private activateCardResonance(tier: number) {
     const matches = [...this.fruits.values()].filter(
       (fruit) =>
@@ -2269,7 +2346,7 @@ export class FruitGame implements GameControls {
     this.releaseSettledFruitFocus();
     this.refreshCardPhase();
     const fruitPhase = this.status === "playing" && !this.isCardPhaseReady();
-    // 只有三张牌收束成水果的短动画暂停卡牌输入；果雨与物理结算并行。
+    // 转果动画、中央下落与物理结算全程不锁牌，保持两区并行操作。
     if (fruitPhase) {
       if (this.feverUntil > 0) this.feverUntil += seconds;
       if (this.sugarShieldUntil > 0) this.sugarShieldUntil += seconds;
@@ -2622,6 +2699,8 @@ export class FruitGame implements GameControls {
       ripenLeft: this.ripenLeft,
       splitLeft: this.splitLeft,
       shieldLeft: this.shieldLeft,
+      harvestLeft: this.harvestLeft,
+      quakeLeft: this.quakeLeft,
       wave: this.wave,
       mode: this.mode,
       relics: [...this.relics],
@@ -2839,13 +2918,34 @@ export class FruitGame implements GameControls {
     const [tier, count] = [...counts.entries()].sort(
       (a, b) => b[1] - a[1] || b[0] - a[0],
     )[0];
+    const missing = 3 - Math.min(count, 3);
+    // 万能果从牌堆真实抽走缺少的同类牌，而不是凭空补牌；
+    // 这样所有水果卡总数仍保持 3 的倍数，残局不会留下孤张。
+    const sources = this.cards
+      .filter((card) => card.active && card.tier === tier)
+      .sort(
+        (a, b) =>
+          Number(this.isCovered(a)) - Number(this.isCovered(b)) ||
+          b.layer - a.layer,
+      )
+      .slice(0, missing);
+    if (sources.length < missing) {
+      this.callbacks.onToast("牌堆里没有足够的同类卡", "cyan");
+      return;
+    }
     this.wildLeft -= 1;
     this.callbacks.onToast(`万能果 · 补齐 ${FRUITS[tier].emoji} 三消`, "gold");
     this.burst(WORLD.width / 2, WORLD.tray.y + 30, 0xb6f36a, 24);
     haptic([16, 30, 24]);
-    for (let missing = 3 - Math.min(count, 3); missing > 0; missing -= 1)
+    sources.forEach((card) => {
+      card.active = false;
+      card.view.visible = false;
+      card.special = "normal";
+      this.unlockNearby(card);
       this.collectTier(tier);
+    });
     this.lastPick = null;
+    this.updateCardAccess();
     this.drawTray();
     this.emitSnapshot();
   };
@@ -2866,12 +2966,19 @@ export class FruitGame implements GameControls {
       .sort((a, b) => a.count - b.count || b.index - a.index)
       .slice(0, Math.min(2, this.tray.length))
       .sort((a, b) => b.index - a.index);
-    ordered.forEach(({ index }) => this.tray.splice(index, 1));
+    ordered.forEach(({ index }) => {
+      const tier = this.tray[index];
+      this.bubbleGroups.set(
+        tier,
+        ((this.bubbleGroups.get(tier) || 0) + 1) % 3,
+      );
+      this.tray.splice(index, 1);
+    });
     this.bubbleLeft -= 1;
     this.lastPick = null;
     this.drawTray();
     this.burst(WORLD.width / 2, WORLD.tray.y + 30, 0x8be9fd, 30);
-    this.callbacks.onToast(`🫧 弹出 ${ordered.length} 张`, "cyan");
+    this.callbacks.onToast(`🫧 收起 ${ordered.length} 张 · 凑满仍会转果`, "cyan");
     haptic([12, 25, 12]);
     this.emitSnapshot();
   };
@@ -3013,6 +3120,33 @@ export class FruitGame implements GameControls {
     this.ring(WORLD.width / 2, WORLD.dangerY, 0xffcf6a, 1.35);
     this.callbacks.onToast("🛡️ 甜度盾 · 8 秒免疫警戒", "gold");
     haptic([18, 32, 18, 32, 24]);
+    this.emitSnapshot();
+  };
+
+  harvest = () => {
+    if (this.paused || this.status !== "playing" || this.harvestLeft <= 0)
+      return;
+    this.harvestLeft -= 1;
+    this.harvestCharge = Math.min(4, this.harvestCharge + 1);
+    this.burst(WORLD.width / 2, WORLD.tray.y + 24, 0xe2c36b, 22);
+    this.callbacks.onToast("🌾 丰收剂 · 下一次三消额外 +1 果", "gold");
+    haptic([12, 22, 16]);
+    this.emitSnapshot();
+  };
+
+  quake = () => {
+    if (this.paused || this.status !== "playing" || this.quakeLeft <= 0)
+      return;
+    const launched = this.launchFruits(Number.POSITIVE_INFINITY, 1.15);
+    if (!launched) {
+      this.callbacks.onToast("果箱还是空的", "cyan");
+      return;
+    }
+    this.quakeLeft -= 1;
+    this.shake = Math.max(this.shake, 7);
+    this.ring(WORLD.width / 2, WORLD.box.y + WORLD.box.height - 30, 0x9de9ff, 1.2);
+    this.callbacks.onToast(`🪇 震荡铃 · 弹开 ${launched} 颗水果`, "cyan");
+    haptic([18, 28, 18, 28, 24]);
     this.emitSnapshot();
   };
 

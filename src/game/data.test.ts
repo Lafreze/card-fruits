@@ -4,7 +4,7 @@ import { FRUITS, LEVELS, WORLD, type LayoutBlock } from "./data.ts";
 import {
   buildFusionPairs,
   buildPlayableDeal,
-  rollFruitRainCount,
+  fruitBatchCount,
   scatterStackSlots,
   simulateTray,
   slotIsCovered,
@@ -13,6 +13,7 @@ import {
   MODE_INFO,
   MUTATORS,
   RELICS,
+  TOOLS,
   UPGRADES,
   pickRelics,
   rollMutator,
@@ -221,13 +222,13 @@ test("every generated stack contains a verified low-risk clear route", () => {
   });
 });
 
-test("fruit rain always yields one to three drops and power improves the odds", () => {
-  assert.equal(rollFruitRainCount(() => 0.05, 1), 3);
-  assert.equal(rollFruitRainCount(() => 0.2, 1), 2);
-  assert.equal(rollFruitRainCount(() => 0.75, 1), 1);
-  assert.equal(rollFruitRainCount(() => 0.22, 3), 3);
-  assert.equal(rollFruitRainCount(() => 0.65, 3), 2);
-  assert.equal(rollFruitRainCount(() => 0.95, 3), 1);
+test("greenhouse fruit output is deterministic and capped at five", () => {
+  assert.equal(fruitBatchCount(), 1);
+  assert.equal(fruitBatchCount(1), 2);
+  assert.equal(fruitBatchCount(3), 4);
+  assert.equal(fruitBatchCount(4), 5);
+  assert.equal(fruitBatchCount(4, 1), 5);
+  assert.equal(fruitBatchCount(-2, -2), 1);
 });
 
 test("fusion planning keeps one partner per fruit and prioritizes card bonds", () => {
@@ -272,11 +273,26 @@ test("fruit scale and roguelike catalog stay balanced", () => {
     if (index > 0) assert.ok(fruit.radius > FRUITS[index - 1].radius);
   });
   assert.equal(new Set(RELICS.map((relic) => relic.id)).size, RELICS.length);
-  assert.equal(RELICS.length, 16);
+  assert.equal(RELICS.length, 22);
   assert.ok(RELICS.some((relic) => relic.rarity === "rare"));
   assert.equal(MUTATORS.length, 7);
   assert.ok(MUTATORS.every((mutator) => mutator.description.length > 0));
   assert.equal(UPGRADES.length, 10);
+  assert.equal(TOOLS.length, 13);
+  assert.equal(new Set(TOOLS.map((tool) => tool.id)).size, TOOLS.length);
+  assert.ok(
+    TOOLS.every(
+      (tool) =>
+        tool.costs.length === tool.maxLevel &&
+        tool.costs.every((cost, index) => index === 0 || cost > tool.costs[index - 1]),
+    ),
+    "道具的每局携带次数必须逐级涨价",
+  );
+  const harvestUpgrade = UPGRADES.find(
+    (upgrade) => upgrade.id === "sweet_start",
+  );
+  assert.equal(harvestUpgrade?.maxLevel, 4);
+  assert.deepEqual(harvestUpgrade?.costs, [850, 2200, 5200, 12000]);
   assert.ok(
     Array.from({ length: 40 }, () => rollMutator(2)).every(
       (item) => item.id !== "calm",
@@ -296,7 +312,7 @@ test("fruit scale and roguelike catalog stay balanced", () => {
   );
   assert.equal(
     pickRelics(
-      RELICS.slice(0, 14).map((relic) => relic.id),
+      RELICS.slice(0, RELICS.length - 2).map((relic) => relic.id),
       3,
     ).length,
     2,

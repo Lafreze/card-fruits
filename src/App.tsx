@@ -10,11 +10,13 @@ import type { FruitGame } from "./game/FruitGame";
 import {
   MODE_INFO,
   RELICS,
+  TOOLS,
   UPGRADES,
   pickRelics,
   type GameMode,
   type RelicDefinition,
   type RelicId,
+  type ToolId,
   type UpgradeId,
 } from "./game/modes";
 import type {
@@ -41,17 +43,19 @@ const EMPTY_SNAPSHOT: GameSnapshot = {
   remainingCards: 0,
   trayCount: 0,
   dangerProgress: 0,
-  undoLeft: 1,
-  shuffleLeft: 3,
-  juiceLeft: 1,
-  hammerLeft: 1,
-  magnetLeft: 1,
-  wildLeft: 1,
-  bubbleLeft: 1,
-  sunLeft: 1,
-  ripenLeft: 1,
-  splitLeft: 1,
-  shieldLeft: 1,
+  undoLeft: 0,
+  shuffleLeft: 0,
+  juiceLeft: 0,
+  hammerLeft: 0,
+  magnetLeft: 0,
+  wildLeft: 0,
+  bubbleLeft: 0,
+  sunLeft: 0,
+  ripenLeft: 0,
+  splitLeft: 0,
+  shieldLeft: 0,
+  harvestLeft: 0,
+  quakeLeft: 0,
   wave: 1,
   mode: "story",
   relics: [],
@@ -76,6 +80,7 @@ function readProgress() {
 }
 
 type UpgradeLevels = Record<UpgradeId, number>;
+type ToolLevels = Record<ToolId, number>;
 
 function readCoins() {
   const stored = Number(localStorage.getItem("fruit-king-coins") || 0);
@@ -105,6 +110,26 @@ function readUpgrades(): UpgradeLevels {
         ? Math.max(0, Math.min(definition.maxLevel, Math.floor(level)))
         : 0;
     }
+  } catch {
+    /* 损坏数据回退为全 0 */
+  }
+  return empty;
+}
+
+function readTools(): ToolLevels {
+  const empty = Object.fromEntries(
+    TOOLS.map((tool) => [tool.id, 0]),
+  ) as ToolLevels;
+  try {
+    const stored = JSON.parse(
+      localStorage.getItem("fruit-king-tools") || "{}",
+    ) as Partial<Record<ToolId, number>>;
+    TOOLS.forEach((tool) => {
+      const level = Number(stored[tool.id] || 0);
+      empty[tool.id] = Number.isFinite(level)
+        ? Math.max(0, Math.min(tool.maxLevel, Math.floor(level)))
+        : 0;
+    });
   } catch {
     /* 损坏数据回退为全 0 */
   }
@@ -327,6 +352,7 @@ export default function App() {
   const [rewardOptions, setRewardOptions] = useState<RelicDefinition[]>([]);
   const [coins, setCoins] = useState(readCoins);
   const [upgrades, setUpgrades] = useState<UpgradeLevels>(readUpgrades);
+  const [tools, setTools] = useState<ToolLevels>(readTools);
   const [shopOpen, setShopOpen] = useState(false);
   const [shopPulse, setShopPulse] = useState(0);
   const [lastCoinReward, setLastCoinReward] = useState(0);
@@ -335,14 +361,14 @@ export default function App() {
   const toastTimer = useRef<number | null>(null);
   // 传给游戏内核的成长加成(对象引用保持稳定,避免重建游戏)
   const gameUpgrades = useRef<GameUpgrades>({
-    pack: upgrades.pack,
     fever: upgrades.fever,
     danger: upgrades.danger,
-    sun: upgrades.sun,
+    launch: upgrades.sun,
     magnet: upgrades.magnet,
     score: upgrades.score,
     combo: upgrades.combo,
-    sweetStart: upgrades.sweet_start,
+    fruitBatch: upgrades.sweet_start,
+    tools,
   });
 
   const persistCoins = useCallback((next: number) => {
@@ -363,15 +389,34 @@ export default function App() {
     persistCoins(coins - cost);
     setShopPulse((value) => value + 1);
     gameUpgrades.current = {
-      pack: nextUpgrades.pack,
       fever: nextUpgrades.fever,
       danger: nextUpgrades.danger,
-      sun: nextUpgrades.sun,
+      launch: nextUpgrades.sun,
       magnet: nextUpgrades.magnet,
       score: nextUpgrades.score,
       combo: nextUpgrades.combo,
-      sweetStart: nextUpgrades.sweet_start,
+      fruitBatch: nextUpgrades.sweet_start,
+      tools,
     };
+  };
+
+  const buyTool = (id: ToolId) => {
+    const definition = TOOLS.find((item) => item.id === id);
+    if (!definition) return;
+    const currentLevel = tools[id];
+    if (currentLevel >= definition.maxLevel) return;
+    const discount = 1 - upgrades.pack * 0.06;
+    const cost = Math.max(
+      1,
+      Math.round((definition.costs[currentLevel] * discount) / 5) * 5,
+    );
+    if (coins < cost) return;
+    const nextTools = { ...tools, [id]: currentLevel + 1 };
+    localStorage.setItem("fruit-king-tools", JSON.stringify(nextTools));
+    setTools(nextTools);
+    persistCoins(coins - cost);
+    setShopPulse((value) => value + 1);
+    gameUpgrades.current = { ...gameUpgrades.current, tools: nextTools };
   };
 
   const handleReady = useCallback((controls: GameControls | null) => {
@@ -589,10 +634,9 @@ export default function App() {
       ? Math.min(FRUITS.length - 1, snapshot.maxFruitTier + 5)
       : LEVELS[level].target;
   const helpChain = FRUITS.slice(helpChainStart, helpChainEnd + 1);
-  const greenhouseGrowth = Object.values(upgrades).reduce(
-    (total, value) => total + value,
-    0,
-  );
+  const greenhouseGrowth =
+    Object.values(upgrades).reduce((total, value) => total + value, 0) +
+    Object.values(tools).reduce((total, value) => total + value, 0);
   const isRelicReward =
     mode === "expedition" &&
     result?.status === "won" &&
@@ -616,7 +660,7 @@ export default function App() {
           <h1>
             叠个<span>果王</span>
           </h1>
-          <p className="tagline">点三张，落果雨，碰两颗，合成果王！</p>
+          <p className="tagline">点三张，中央落果，弹射合成果王！</p>
           <div className="mode-switch" aria-label="选择游戏模式">
             {(Object.keys(MODE_INFO) as GameMode[]).map((item) => (
               <button
@@ -690,7 +734,7 @@ export default function App() {
                     ? target.name
                     : mode === "endless"
                       ? "最高分"
-                      : "16 种"}
+                    : `${RELICS.length} 种`}
                 </b>
               </span>
             </div>
@@ -723,7 +767,7 @@ export default function App() {
             <button className="brand-button" onClick={backHome}>
               叠个<span>果王</span>
             </button>
-            <p>三张消除，果雨合成。</p>
+            <p>三张消除，中央落果。</p>
             <div className="brief-chain">
               {FRUITS.slice(
                 Math.max(0, LEVELS[level].target - 3),
@@ -940,7 +984,34 @@ export default function App() {
                           <span>甜度盾</span>
                           <em>×{snapshot.shieldLeft}</em>
                         </button>
+                        <button
+                          disabled={!snapshot.harvestLeft}
+                          onClick={() =>
+                            useTool((controls) => controls.harvest())
+                          }
+                        >
+                          <i>🌾</i>
+                          <span>丰收</span>
+                          <em>×{snapshot.harvestLeft}</em>
+                        </button>
+                        <button
+                          disabled={!snapshot.quakeLeft}
+                          onClick={() =>
+                            useTool((controls) => controls.quake())
+                          }
+                        >
+                          <i>🪇</i>
+                          <span>震荡</span>
+                          <em>×{snapshot.quakeLeft}</em>
+                        </button>
                       </div>
+                      {Object.values(tools).every(
+                        (levelNow) => levelNow === 0,
+                      ) ? (
+                        <p className="toolbox-empty">
+                          道具需在果园温室购买，未配置的道具不会进入本局。
+                        </p>
+                      ) : null}
                     </>
                   ) : null}
                   {gamePanel === "help" ? (
@@ -952,13 +1023,14 @@ export default function App() {
                         <i>›</i>
                         <span>三张入槽</span>
                         <i>›</i>
-                        <span>随机果雨</span>
+                        <span>中央落果</span>
                         <i>›</i>
                         <span>同果合成</span>
                       </div>
                       <div className="help-rules">
-                        <span>每次随机落下 1～3 果</span>
-                        <span>果压越高，多果雨越常见</span>
+                        <span>默认每次生成 1 果</span>
+                        <span>温室培育可提升至 5 果</span>
+                        <span>点击水果可向上弹射</span>
                       </div>
                       <h3>合成路径</h3>
                       <div className="help-chain">
@@ -1052,7 +1124,7 @@ export default function App() {
                   </div>
                   <h2>
                     {isRelicReward
-                      ? "选择一件奇物"
+                      ? "选择一项构筑强化"
                       : mode === "expedition" && result.status === "won"
                         ? "Rogue 通关！"
                         : mode === "endless"
@@ -1272,6 +1344,39 @@ export default function App() {
                       onClick={() => buyUpgrade(item.id)}
                     >
                       {maxed ? "已满级" : `🪙 ${cost}`}
+                    </button>
+                  </div>
+                );
+              })}
+            </div>
+            <div className="shop-section-head">
+              <span>道具补给</span>
+              <small>购买后每局携带 · 未购买不出现</small>
+            </div>
+            <div className="supply-grid">
+              {TOOLS.map((item) => {
+                const levelNow = tools[item.id];
+                const maxed = levelNow >= item.maxLevel;
+                const rawCost = maxed ? 0 : item.costs[levelNow];
+                const cost = Math.max(
+                  1,
+                  Math.round((rawCost * (1 - upgrades.pack * 0.06)) / 5) * 5,
+                );
+                return (
+                  <div className="supply-card" key={item.id}>
+                    <i>{item.icon}</i>
+                    <span>
+                      <b>{item.name}</b>
+                      <small>{item.description}</small>
+                      <em>
+                        每局 ×{levelNow} · 上限 {item.maxLevel}
+                      </em>
+                    </span>
+                    <button
+                      disabled={maxed || coins < cost}
+                      onClick={() => buyTool(item.id)}
+                    >
+                      {maxed ? "已配满" : `🪙 ${cost}`}
                     </button>
                   </div>
                 );

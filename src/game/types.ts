@@ -1,4 +1,4 @@
-import type { GameMode, RelicId } from "./modes";
+import type { GameMode, RelicId, ToolId } from "./modes";
 
 export type GameStatus = "playing" | "won" | "lost";
 
@@ -22,6 +22,8 @@ export type GameSnapshot = {
   ripenLeft: number;
   splitLeft: number;
   shieldLeft: number;
+  harvestLeft: number;
+  quakeLeft: number;
   wave: number;
   mode: GameMode;
   relics: RelicId[];
@@ -43,14 +45,14 @@ export type GameCallbacks = {
 };
 
 export type GameUpgrades = {
-  pack?: number;
   fever?: number;
   danger?: number;
-  sun?: number;
+  launch?: number;
   magnet?: number;
   score?: number;
   combo?: number;
-  sweetStart?: number;
+  fruitBatch?: number;
+  tools?: Partial<Record<ToolId, number>>;
 };
 
 export type GameOptions = {
@@ -74,6 +76,8 @@ export type GameControls = {
   ripen: () => void;
   split: () => void;
   shield: () => void;
+  harvest: () => void;
+  quake: () => void;
   pause: () => void;
   resume: () => void;
   destroy: () => void;
