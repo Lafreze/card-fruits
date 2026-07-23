@@ -210,7 +210,7 @@ export const RELICS: RelicDefinition[] = [
     id: "shock_core",
     icon: "⚙️",
     name: "冲击果核",
-    description: "中央落果的冲击与同果牵引等级 +1。",
+    description: "落果冲击与同果牵引等级 +1。",
     tone: "pink",
     rarity: "uncommon",
     archetype: "属性·合成",

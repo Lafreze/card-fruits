@@ -456,6 +456,14 @@ export function fruitBatchCount(
   );
 }
 
+export function dropLaneX(
+  lane: -1 | 0 | 1,
+  center = 215,
+  laneGap = 92,
+) {
+  return center + lane * laneGap;
+}
+
 export function canMergeAfterLanding(
   firstLandedAt: number | undefined,
   secondLandedAt: number | undefined,

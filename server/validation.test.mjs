@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import fs from "node:fs";
 import test from "node:test";
 import { cleanUsername, finishRunSchema, startRunSchema } from "./validation.mjs";
 
@@ -33,6 +34,15 @@ test("accepts the expanded late-game fruit tiers", () => {
     fruitTier: 22,
   });
   assert.equal(parsed.success, true);
+});
+
+test("database accepts every server-validated fruit tier", () => {
+  const schema = fs.readFileSync(
+    new URL("../database/schema.sql", import.meta.url),
+    "utf8",
+  );
+  assert.match(schema, /fruit_tier BETWEEN 0 AND 32/);
+  assert.doesNotMatch(schema, /fruit_tier BETWEEN 0 AND 20/);
 });
 
 test("normalizes username whitespace", () => {

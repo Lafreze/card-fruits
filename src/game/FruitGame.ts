@@ -13,6 +13,7 @@ import {
   buildFusionPairs,
   buildPlayableDeal,
   canMergeAfterLanding,
+  dropLaneX,
   fruitBatchCount,
   rotatedRectanglesOverlap,
   scatterStackSlots,
@@ -253,6 +254,7 @@ export class FruitGame implements GameControls {
   private paused = false;
   private destroyed = false;
   private winPending = false;
+  private dropLane: -1 | 0 | 1 = 0;
 
   private constructor(options: number | GameOptions, callbacks: GameCallbacks) {
     const config: GameOptions =
@@ -405,7 +407,7 @@ export class FruitGame implements GameControls {
     if (this.mode === "story" && this.levelIndex === 0) {
       this.setTimer(
         () =>
-          this.callbacks.onToast("三消从中央落果 · 点击水果可以弹射", "cyan"),
+          this.callbacks.onToast("三消后可选落点 · 点击水果可以弹射", "cyan"),
         360,
       );
     }
@@ -614,7 +616,7 @@ export class FruitGame implements GameControls {
       .fill({ color: 0xffffff, alpha: 0.001 });
     dropTarget.eventMode = "static";
     dropTarget.cursor = "grab";
-    // 所有水果从中央生成；点击任意水果会向同级伙伴方向弹射，主动解除死角。
+    // 点击任意水果会向同级伙伴方向弹射，主动解除死角。
     dropTarget.on("pointerdown", (event: FederatedPointerEvent) => {
       if (this.status !== "playing" || this.paused) return;
       this.pokeFruit(event.global.x, event.global.y);
@@ -775,6 +777,8 @@ export class FruitGame implements GameControls {
       this.levelIndex < 2,
     );
     const { tiers, openingSlots: protectedOpeningSlots } = deal;
+    let disruptiveSpecials = 0;
+    const disruptiveLimit = Math.max(1, Math.floor(cardCount * 0.16));
 
     tiers.forEach((tier, index) => {
       const slot = slots[index];
@@ -782,7 +786,7 @@ export class FruitGame implements GameControls {
       const y = slot.y;
       const protectedOpening = protectedOpeningSlots.has(index);
       const specialRate = Math.min(
-        0.52,
+        this.mode === "story" ? 0.3 : 0.52,
         definition.specialRate +
           (this.mode === "endless" ? this.wave * 0.018 : 0) +
           (this.mode === "expedition" ? this.wave * 0.012 : 0) +
@@ -817,6 +821,13 @@ export class FruitGame implements GameControls {
           Math.random() < 0.5
         )
           special = "normal";
+        if (["frozen", "bomb", "vine"].includes(special)) {
+          if (disruptiveSpecials >= disruptiveLimit) {
+            special = kindRoll < 0.8 ? "sugar" : "harvest";
+          } else {
+            disruptiveSpecials += 1;
+          }
+        }
       }
       const locked = special === "frozen" && slot.layer < maxLayer;
       if (special === "frozen" && !locked) special = "normal";
@@ -1150,7 +1161,7 @@ export class FruitGame implements GameControls {
       if (shade) {
         shade.visible = !usable;
         // 被遮挡牌保留水果轮廓与纸边，层级清楚但不会与可点牌争夺焦点。
-        shade.alpha = covered ? 0.7 : 0.48;
+        shade.alpha = covered ? 0.58 : 0.42;
       }
       if (accessGlow) accessGlow.visible = usable && phaseReady;
       if (resonanceDot)
@@ -1683,7 +1694,7 @@ export class FruitGame implements GameControls {
     this.harvestCharge = 0;
     const startAt = Math.max(this.elapsed + 0.12, this.nextRainReleaseAt + 0.1);
     Array.from({ length: total }).forEach((_, order) => {
-      const x = WORLD.width / 2;
+      const x = dropLaneX(this.dropLane, WORLD.width / 2);
       const view = this.makeRainPreview(tier, total);
       view.position.set(x, WORLD.box.y + 28 - order * 2.5);
       view.zIndex = total - order;
@@ -2868,6 +2879,7 @@ export class FruitGame implements GameControls {
       maxFruitTier: this.maxFruitTier,
       remainingCards: this.cards.filter((card) => card.active).length,
       trayCount: this.tray.length,
+      trayLimit: this.trayLimit,
       dangerProgress: this.dangerProgress,
       undoLeft: this.undoLeft,
       shuffleLeft: this.shuffleLeft,
@@ -2895,6 +2907,7 @@ export class FruitGame implements GameControls {
         this.mode !== "story" && this.mutator.id !== "calm"
           ? this.mutator.description
           : "",
+      dropLane: this.dropLane,
     };
   }
 
@@ -3371,6 +3384,17 @@ export class FruitGame implements GameControls {
     this.magnetLeft -= 1;
     this.callbacks.onToast("引力核启动 · 立即合成！", "pink");
     this.mergeFruits(pair[0], pair[1]);
+    this.emitSnapshot();
+  };
+
+  setDropLane = (lane: -1 | 0 | 1) => {
+    if (this.paused || this.status !== "playing") return;
+    this.dropLane = lane;
+    this.callbacks.onToast(
+      `下次落果 · ${lane < 0 ? "左侧" : lane > 0 ? "右侧" : "中央"}`,
+      "cyan",
+    );
+    this.callbacks.onDropLaneChange?.();
     this.emitSnapshot();
   };
 

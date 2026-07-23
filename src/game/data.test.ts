@@ -6,6 +6,7 @@ import {
   buildPlayableDeal,
   calculateCoinReward,
   canMergeAfterLanding,
+  dropLaneX,
   fruitBatchCount,
   rotatedRectanglesOverlap,
   scatterStackSlots,
@@ -250,6 +251,18 @@ test("greenhouse fruit output is deterministic and capped at three", () => {
   assert.equal(fruitBatchCount(4), 3);
   assert.equal(fruitBatchCount(1, 2), 3);
   assert.equal(fruitBatchCount(-2, -2), 1);
+});
+
+test("drop lanes are symmetric and stay inside the fruit box", () => {
+  assert.deepEqual(
+    ([-1, 0, 1] as const).map((lane) => dropLaneX(lane)),
+    [123, 215, 307],
+  );
+  ([-1, 0, 1] as const).forEach((lane) => {
+    const x = dropLaneX(lane);
+    assert.ok(x - FRUITS.at(-1)!.radius >= WORLD.box.x);
+    assert.ok(x + FRUITS.at(-1)!.radius <= WORLD.box.x + WORLD.box.width);
+  });
 });
 
 test("fruit can only merge after both pieces have landed and settled", () => {

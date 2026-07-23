@@ -136,14 +136,21 @@ app.get("/api/leaderboard", async (req, res) => {
   const mode = ["story", "endless", "expedition"].includes(req.query.mode)
     ? req.query.mode
     : "story";
+  const requestedLevel = Number(req.query.level);
+  const hasStoryLevel =
+    mode === "story" &&
+    Number.isInteger(requestedLevel) &&
+    requestedLevel >= 0 &&
+    requestedLevel <= 99;
   const result = await pool.query(
     `SELECT username, score, level, max_combo AS "maxCombo",
             fruit_tier AS "fruitTier", created_at AS "createdAt"
      FROM scores
      WHERE mode = $1
+       AND ($2::integer IS NULL OR level = $2)
      ORDER BY score DESC, created_at ASC
      LIMIT 20`,
-    [mode],
+    [mode, hasStoryLevel ? requestedLevel : null],
   );
   return res.json({ scores: result.rows });
 });

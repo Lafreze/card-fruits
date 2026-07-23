@@ -15,7 +15,7 @@ CREATE TABLE IF NOT EXISTS scores (
   level INTEGER NOT NULL CHECK (level BETWEEN 0 AND 99),
   mode VARCHAR(16) NOT NULL CHECK (mode IN ('story', 'endless', 'expedition')),
   max_combo INTEGER NOT NULL DEFAULT 0 CHECK (max_combo BETWEEN 0 AND 999),
-  fruit_tier INTEGER NOT NULL DEFAULT 0 CHECK (fruit_tier BETWEEN 0 AND 20),
+  fruit_tier INTEGER NOT NULL DEFAULT 0 CHECK (fruit_tier BETWEEN 0 AND 32),
   duration_ms INTEGER NOT NULL CHECK (duration_ms >= 0),
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
@@ -26,6 +26,9 @@ CREATE INDEX IF NOT EXISTS scores_rank_idx
 CREATE INDEX IF NOT EXISTS scores_recent_idx
   ON scores (created_at DESC);
 
+CREATE INDEX IF NOT EXISTS scores_story_level_rank_idx
+  ON scores (mode, level, score DESC, created_at ASC);
+
 ALTER TABLE game_runs DROP CONSTRAINT IF EXISTS game_runs_mode_check;
 ALTER TABLE game_runs ADD CONSTRAINT game_runs_mode_check
   CHECK (mode IN ('story', 'endless', 'expedition'));
@@ -33,3 +36,7 @@ ALTER TABLE game_runs ADD CONSTRAINT game_runs_mode_check
 ALTER TABLE scores DROP CONSTRAINT IF EXISTS scores_mode_check;
 ALTER TABLE scores ADD CONSTRAINT scores_mode_check
   CHECK (mode IN ('story', 'endless', 'expedition'));
+
+ALTER TABLE scores DROP CONSTRAINT IF EXISTS scores_fruit_tier_check;
+ALTER TABLE scores ADD CONSTRAINT scores_fruit_tier_check
+  CHECK (fruit_tier BETWEEN 0 AND 32);

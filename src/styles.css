@@ -2247,3 +2247,207 @@ input:focus-visible {
     background: #0e0b18;
   }
 }
+
+/* ── 可玩性回归：更清楚的 HUD、首局引导与落点控制 ───────────── */
+.mode-switch button span {
+  display: grid;
+  gap: 1px;
+}
+
+.mode-switch button small {
+  color: #746d82;
+  font-size: 7px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.mode-switch button:disabled {
+  cursor: not-allowed;
+  opacity: 0.52;
+}
+
+.level-track {
+  scroll-snap-type: x proximity;
+  mask-image: linear-gradient(
+    90deg,
+    transparent,
+    #000 12px,
+    #000 calc(100% - 12px),
+    transparent
+  );
+}
+
+.level-dot {
+  scroll-snap-align: center;
+}
+
+.game-hud {
+  grid-template-columns: 0.82fr 1.55fr 0.68fr 0.68fr;
+}
+
+.game-hud.hud-no-tools {
+  grid-template-columns: 0.82fr 1.75fr 0.68fr;
+}
+
+.score-chip small,
+.target-chip small {
+  font-size: clamp(10px, 2.4cqw, 11px);
+  letter-spacing: 0.02em;
+}
+
+.score-chip b {
+  font-size: clamp(14px, 3.5cqw, 16px);
+}
+
+.target-chip strong {
+  font-size: clamp(13px, 3.2cqw, 15px);
+}
+
+.top-action span {
+  font-size: clamp(10px, 2.35cqw, 11px);
+}
+
+.drop-lane-control {
+  position: absolute;
+  z-index: 3;
+  top: 59.4%;
+  left: 50%;
+  width: 58%;
+  display: grid;
+  grid-template-columns: auto repeat(3, 1fr);
+  align-items: center;
+  gap: 4px;
+  transform: translateX(-50%);
+  pointer-events: auto;
+}
+
+.drop-lane-control > span {
+  color: rgba(190, 180, 205, 0.62);
+  font-size: clamp(8px, 1.9cqw, 9px);
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.drop-lane-control button {
+  min-width: 0;
+  height: clamp(24px, 6cqw, 28px);
+  border: 1px solid rgba(190, 164, 225, 0.17);
+  border-radius: 999px;
+  color: #8f859d;
+  background: rgba(22, 17, 31, 0.7);
+  box-shadow: 0 5px 14px rgba(2, 1, 7, 0.22);
+  backdrop-filter: blur(8px);
+  font-size: clamp(9px, 2.1cqw, 10px);
+  font-weight: 850;
+  cursor: pointer;
+}
+
+.drop-lane-control button.active {
+  color: #fff5dc;
+  border-color: rgba(222, 190, 112, 0.5);
+  background: linear-gradient(145deg, #73558f, #4a385f);
+  box-shadow:
+    0 6px 18px rgba(4, 2, 10, 0.38),
+    0 0 0 1px rgba(222, 190, 112, 0.12);
+}
+
+.game-toast {
+  top: 66%;
+  max-width: 88%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.tutorial-coach {
+  position: absolute;
+  z-index: 7;
+  left: 50%;
+  width: min(88%, 360px);
+  min-height: 38px;
+  padding: 8px 9px 8px 12px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  transform: translateX(-50%);
+  border: 1px solid rgba(222, 190, 112, 0.38);
+  border-radius: 15px;
+  color: #f3edf7;
+  background: rgba(20, 15, 29, 0.94);
+  box-shadow:
+    0 13px 30px rgba(2, 1, 7, 0.56),
+    inset 0 1px rgba(255, 255, 255, 0.06);
+  font-size: clamp(10px, 2.5cqw, 12px);
+  font-weight: 800;
+  line-height: 1.35;
+  backdrop-filter: blur(12px);
+}
+
+.tutorial-pick {
+  top: 12%;
+}
+
+.tutorial-tray {
+  top: 12%;
+}
+
+.tutorial-lane {
+  top: 65%;
+}
+
+.tutorial-coach button {
+  flex: 0 0 auto;
+  padding: 5px 7px;
+  border: 0;
+  border-radius: 8px;
+  color: #9e93aa;
+  background: rgba(255, 255, 255, 0.06);
+  font-size: 9px;
+  cursor: pointer;
+}
+
+.special-legend {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 6px;
+}
+
+.special-legend span {
+  padding: 7px 4px;
+  border: 1px solid rgba(182, 156, 216, 0.11);
+  border-radius: 9px;
+  color: #bcb2c8;
+  background: rgba(40, 31, 53, 0.65);
+  font-size: clamp(8px, 1.9cqw, 9px);
+  text-align: center;
+}
+
+.panel-actions {
+  grid-template-columns: repeat(3, 1fr);
+}
+
+.save-box.save-offline {
+  padding: 9px 11px;
+}
+
+.offline-score-note {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.offline-score-note b {
+  color: #d8b66a;
+  font-size: 10px;
+}
+
+.offline-score-note small {
+  color: #8f859d;
+  font-size: 8px;
+}
+
+.coin-reward small {
+  color: #e2c780;
+  font-size: 9px;
+}

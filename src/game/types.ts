@@ -10,6 +10,7 @@ export type GameSnapshot = {
   maxFruitTier: number;
   remainingCards: number;
   trayCount: number;
+  trayLimit: number;
   dangerProgress: number;
   undoLeft: number;
   shuffleLeft: number;
@@ -31,6 +32,7 @@ export type GameSnapshot = {
   feverActive: boolean;
   mutator: string;
   mutatorHint: string;
+  dropLane: -1 | 0 | 1;
 };
 
 export type GameResult = GameSnapshot & {
@@ -42,6 +44,7 @@ export type GameCallbacks = {
   onSnapshot: (snapshot: GameSnapshot) => void;
   onFinish: (result: GameResult) => void;
   onToast: (message: string, tone?: "gold" | "pink" | "cyan") => void;
+  onDropLaneChange?: () => void;
 };
 
 export type GameUpgrades = {
@@ -78,6 +81,7 @@ export type GameControls = {
   shield: () => void;
   harvest: () => void;
   quake: () => void;
+  setDropLane: (lane: -1 | 0 | 1) => void;
   pause: () => void;
   resume: () => void;
   destroy: () => void;

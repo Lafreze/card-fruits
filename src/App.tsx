@@ -29,6 +29,7 @@ import type {
 
 type Screen = "home" | "game";
 type GamePanel = "tools" | "help" | "menu" | null;
+type TutorialStep = "pick" | "tray" | "lane" | null;
 type ToastState = {
   id: number;
   message: string;
@@ -43,6 +44,7 @@ const EMPTY_SNAPSHOT: GameSnapshot = {
   maxFruitTier: 0,
   remainingCards: 0,
   trayCount: 0,
+  trayLimit: 7,
   dangerProgress: 0,
   undoLeft: 0,
   shuffleLeft: 0,
@@ -64,9 +66,16 @@ const EMPTY_SNAPSHOT: GameSnapshot = {
   feverActive: false,
   mutator: "",
   mutatorHint: "",
+  dropLane: 0,
 };
 
 const GREENHOUSE_PLANTS = ["🌱", "🌿", "🌸", "🍓"];
+const MODE_UNLOCK_LEVEL: Partial<Record<GameMode, number>> = {
+  endless: 2,
+  expedition: 4,
+};
+const TUTORIAL_KEY = "fruit-king-tutorial-v2";
+const STARTER_GIFT_KEY = "fruit-king-starter-gift-v1";
 const RELIC_RARITY_LABEL = {
   common: "普通",
   uncommon: "罕见",
@@ -165,6 +174,7 @@ function GameCanvas({
   onSnapshot,
   onFinish,
   onToast,
+  onDropLaneChange,
 }: {
   level: number;
   mode: GameMode;
@@ -177,6 +187,7 @@ function GameCanvas({
   onSnapshot: (snapshot: GameSnapshot) => void;
   onFinish: (result: GameResult) => void;
   onToast: (message: string, tone?: "gold" | "pink" | "cyan") => void;
+  onDropLaneChange: () => void;
 }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
@@ -189,7 +200,7 @@ function GameCanvas({
         Game.create(
           canvasRef.current!,
           { level, mode, wave, relics, startingScore, upgrades },
-          { onSnapshot, onFinish, onToast },
+          { onSnapshot, onFinish, onToast, onDropLaneChange },
         ),
       )
       .then((created) => {
@@ -215,6 +226,7 @@ function GameCanvas({
     onReady,
     onSnapshot,
     onToast,
+    onDropLaneChange,
     relics,
     session,
     upgrades,
@@ -236,6 +248,7 @@ function Leaderboard({
   loading,
   offline,
   mode,
+  level,
   onModeChange,
   onClose,
   onRefresh,
@@ -244,6 +257,7 @@ function Leaderboard({
   loading: boolean;
   offline: boolean;
   mode: GameMode;
+  level: number;
   onModeChange: (mode: GameMode) => void;
   onClose: () => void;
   onRefresh: () => void;
@@ -258,7 +272,11 @@ function Leaderboard({
       <section className="modal-card leaderboard-card">
         <div className="modal-kicker">GLOBAL JUICE LEAGUE</div>
         <h2>果王排行榜</h2>
-        <p className="modal-copy">每一分都来自真实完成的果园挑战。</p>
+        <p className="modal-copy">
+          {mode === "story"
+            ? `第 ${level + 1} 关 · 同关公平排行`
+            : "每一分都来自真实完成的果园挑战。"}
+        </p>
         <div className="leaderboard-tabs">
           {(Object.keys(MODE_INFO) as GameMode[]).map((item) => (
             <button
@@ -352,9 +370,12 @@ export default function App() {
   const [shopOpen, setShopOpen] = useState(false);
   const [shopPulse, setShopPulse] = useState(0);
   const [lastCoinReward, setLastCoinReward] = useState(0);
+  const [lastCoinStarterGift, setLastCoinStarterGift] = useState(false);
   const [gamePanel, setGamePanel] = useState<GamePanel>(null);
+  const [tutorialStep, setTutorialStep] = useState<TutorialStep>(null);
   const controlsRef = useRef<GameControls | null>(null);
   const toastTimer = useRef<number | null>(null);
+  const levelTrackRef = useRef<HTMLDivElement | null>(null);
   // 传给游戏内核的成长加成(对象引用保持稳定,避免重建游戏)
   const gameUpgrades = useRef<GameUpgrades>({
     fever: upgrades.fever,
@@ -426,15 +447,40 @@ export default function App() {
     setUnlocked((current) => Math.max(current, nextUnlocked));
     return nextUnlocked;
   }, []);
-  const handleSnapshot = useCallback(
-    (next: GameSnapshot) => setSnapshot(next),
-    [],
-  );
+  const handleSnapshot = useCallback((next: GameSnapshot) => {
+    setSnapshot(next);
+    setTutorialStep((current) => {
+      if (current === "pick" && next.trayCount > 0) return "tray";
+      if (current === "tray" && next.score > 0) return "lane";
+      return current;
+    });
+  }, []);
+
+  const finishTutorial = useCallback(() => {
+    localStorage.setItem(TUTORIAL_KEY, "done");
+    setTutorialStep(null);
+  }, []);
+
+  const handleDropLaneChange = useCallback(() => {
+    setTutorialStep((current) => {
+      if (current !== "lane") return current;
+      localStorage.setItem(TUTORIAL_KEY, "done");
+      return null;
+    });
+  }, []);
   const handleFinish = useCallback(
     (next: GameResult) => {
       setGamePanel(null);
       setResult(next);
-      const reward = computeCoinReward(next, readUpgrades());
+      const starterGift =
+        next.mode === "story" &&
+        next.status === "won" &&
+        level === 0 &&
+        localStorage.getItem(STARTER_GIFT_KEY) !== "claimed";
+      const reward =
+        computeCoinReward(next, readUpgrades()) + (starterGift ? 60 : 0);
+      if (starterGift) localStorage.setItem(STARTER_GIFT_KEY, "claimed");
+      setLastCoinStarterGift(starterGift);
       setLastCoinReward(reward);
       persistCoins(readCoins() + reward);
       if (next.status === "won") {
@@ -481,6 +527,14 @@ export default function App() {
       setUsername("");
       setRunId(null);
       setGamePanel(null);
+      setLastCoinStarterGift(false);
+      setTutorialStep(
+        targetMode === "story" &&
+          targetLevel === 0 &&
+          localStorage.getItem(TUTORIAL_KEY) !== "done"
+          ? "pick"
+          : null,
+      );
       setScreen("game");
       setSession((value) => value + 1);
       void startRun(
@@ -494,6 +548,8 @@ export default function App() {
   );
 
   const startSelectedMode = () => {
+    const requiredLevel = MODE_UNLOCK_LEVEL[mode] || 0;
+    if (unlocked < requiredLevel) return;
     if (mode === "story") {
       beginGame(level, "story");
       return;
@@ -510,6 +566,7 @@ export default function App() {
     controlsRef.current?.destroy();
     controlsRef.current = null;
     setGamePanel(null);
+    setTutorialStep(null);
     setResult(null);
     setScreen("home");
   };
@@ -519,6 +576,16 @@ export default function App() {
     controlsRef.current.pause();
     setGamePanel(panel);
   };
+
+  useEffect(() => {
+    if (screen !== "home") return;
+    const selected = levelTrackRef.current?.querySelector(".level-dot.selected");
+    selected?.scrollIntoView({
+      behavior: "smooth",
+      block: "nearest",
+      inline: "center",
+    });
+  }, [level, screen, unlocked]);
 
   const closeGamePanel = () => {
     controlsRef.current?.resume();
@@ -563,10 +630,10 @@ export default function App() {
   };
 
   const loadLeaderboard = useCallback(
-    (selectedMode = leaderboardMode) => {
+    (selectedMode = leaderboardMode, selectedLevel = level) => {
       setLeaderboardLoading(true);
       setLeaderboardOffline(false);
-      void getLeaderboard(selectedMode)
+      void getLeaderboard(selectedMode, selectedLevel)
         .then((data) => {
           setLeaderboard(data.scores);
           setLeaderboardOffline(Boolean(data.offline));
@@ -574,18 +641,18 @@ export default function App() {
         .catch(() => setLeaderboardOffline(true))
         .finally(() => setLeaderboardLoading(false));
     },
-    [leaderboardMode],
+    [leaderboardMode, level],
   );
 
   const openLeaderboard = () => {
     setLeaderboardMode(mode);
     setLeaderboardOpen(true);
-    loadLeaderboard(mode);
+    loadLeaderboard(mode, level);
   };
 
   const changeLeaderboardMode = (nextMode: GameMode) => {
     setLeaderboardMode(nextMode);
-    loadLeaderboard(nextMode);
+    loadLeaderboard(nextMode, level);
   };
 
   const submitScore = async () => {
@@ -615,6 +682,21 @@ export default function App() {
     [],
   );
 
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== "Escape") return;
+      if (leaderboardOpen) {
+        setLeaderboardOpen(false);
+      } else if (shopOpen) {
+        setShopOpen(false);
+      } else if (gamePanel) {
+        closeGamePanel();
+      }
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [gamePanel, leaderboardOpen, shopOpen]);
+
   const target = FRUITS[LEVELS[level].target];
   const currentFruit =
     FRUITS[Math.min(snapshot.maxFruitTier, FRUITS.length - 1)];
@@ -637,6 +719,36 @@ export default function App() {
     mode === "expedition" &&
     result?.status === "won" &&
     rewardOptions.length > 0;
+  const toolboxItems = [
+    { id: "undo", icon: "↶", label: "撤回", left: snapshot.undoLeft },
+    { id: "shuffle", icon: "⤨", label: "洗牌", left: snapshot.shuffleLeft },
+    { id: "juice", icon: "🥤", label: "榨汁", left: snapshot.juiceLeft },
+    { id: "hammer", icon: "🔨", label: "清顶", left: snapshot.hammerLeft },
+    { id: "magnet", icon: "🧲", label: "合并", left: snapshot.magnetLeft },
+    { id: "wild", icon: "🍀", label: "万能", left: snapshot.wildLeft },
+    { id: "bubble", icon: "🫧", label: "清槽", left: snapshot.bubbleLeft },
+    { id: "sun", icon: "☀️", label: "净化", left: snapshot.sunLeft },
+    { id: "ripen", icon: "🌱", label: "催熟", left: snapshot.ripenLeft },
+    { id: "split", icon: "✂️", label: "分果", left: snapshot.splitLeft },
+    { id: "shield", icon: "🛡️", label: "甜度盾", left: snapshot.shieldLeft },
+    { id: "harvest", icon: "🌾", label: "丰收", left: snapshot.harvestLeft },
+    { id: "quake", icon: "🪇", label: "震荡", left: snapshot.quakeLeft },
+  ] satisfies Array<{
+    id: ToolId;
+    icon: string;
+    label: string;
+    left: number;
+  }>;
+  const availableToolboxItems = toolboxItems.filter((item) => item.left > 0);
+  const useToolById = (id: ToolId) =>
+    useTool((controls) => {
+      if (id === "sun") controls.sunshine();
+      else controls[id]();
+    });
+  const currentPath =
+    mode === "story" && currentFruit !== target
+      ? `${currentFruit.emoji} → ${target.emoji}`
+      : `${target.emoji} ×1`;
 
   return (
     <main className="app-shell">
@@ -656,18 +768,29 @@ export default function App() {
           <h1>
             叠个<span>果王</span>
           </h1>
-          <p className="tagline">点三张，中央落果，弹射合成果王！</p>
+          <p className="tagline">点三张，自选落点，弹射合成果王！</p>
           <div className="mode-switch" aria-label="选择游戏模式">
-            {(Object.keys(MODE_INFO) as GameMode[]).map((item) => (
-              <button
-                key={item}
-                className={mode === item ? "active" : ""}
-                onClick={() => setMode(item)}
-              >
-                <i>{MODE_INFO[item].icon}</i>
-                <span>{MODE_INFO[item].name}</span>
-              </button>
-            ))}
+            {(Object.keys(MODE_INFO) as GameMode[]).map((item) => {
+              const requiredLevel = MODE_UNLOCK_LEVEL[item] || 0;
+              const locked = unlocked < requiredLevel;
+              return (
+                <button
+                  key={item}
+                  className={mode === item ? "active" : ""}
+                  disabled={locked}
+                  title={
+                    locked ? `完成第 ${requiredLevel} 关后解锁` : undefined
+                  }
+                  onClick={() => setMode(item)}
+                >
+                  <i>{locked ? "🔒" : MODE_INFO[item].icon}</i>
+                  <span>
+                    {MODE_INFO[item].name}
+                    {locked ? <small>第 {requiredLevel} 关解锁</small> : null}
+                  </span>
+                </button>
+              );
+            })}
           </div>
           <div className="mode-card">
             <div className="mode-topline">
@@ -682,7 +805,7 @@ export default function App() {
               </b>
             </div>
             {mode === "story" ? (
-              <div className="level-track">
+              <div className="level-track" ref={levelTrackRef}>
                 {LEVELS.map((item, index) => (
                   <button
                     key={item.name}
@@ -763,7 +886,7 @@ export default function App() {
             <button className="brand-button" onClick={backHome}>
               叠个<span>果王</span>
             </button>
-            <p>三张消除，中央落果。</p>
+            <p>三张消除，自选落点。</p>
             <div className="brief-chain">
               {FRUITS.slice(
                 Math.max(0, LEVELS[level].target - 3),
@@ -797,8 +920,11 @@ export default function App() {
               onSnapshot={handleSnapshot}
               onFinish={handleFinish}
               onToast={handleToast}
+              onDropLaneChange={handleDropLaneChange}
             />
-            <header className="game-hud">
+            <header
+              className={`game-hud ${availableToolboxItems.length ? "" : "hud-no-tools"}`}
+            >
               <div className="score-chip">
                 <small>分数</small>
                 <b>{formatScore(snapshot.score)}</b>
@@ -809,30 +935,24 @@ export default function App() {
                     ? "最高水果"
                     : mode === "expedition"
                       ? `远征 ${wave}/8`
-                      : `目标 · 当前 ${currentFruit.emoji}`}
+                      : `剩余 ${snapshot.remainingCards} 张 · 槽 ${snapshot.trayCount}/${snapshot.trayLimit}`}
                 </small>
                 <strong>
                   {mode === "endless"
                     ? `${currentFruit.emoji} ${currentFruit.name}`
-                    : `${target.emoji} ×1`}
+                    : currentPath}
                 </strong>
               </div>
-              <button
-                className="top-action"
-                onClick={() => openGamePanel("tools")}
-                aria-label="打开道具箱"
-              >
-                <i>✦</i>
-                <span>道具</span>
-              </button>
-              <button
-                className="top-action"
-                onClick={() => openGamePanel("help")}
-                aria-label="打开玩法说明"
-              >
-                <i>?</i>
-                <span>说明</span>
-              </button>
+              {availableToolboxItems.length ? (
+                <button
+                  className="top-action"
+                  onClick={() => openGamePanel("tools")}
+                  aria-label={`打开道具箱，${availableToolboxItems.length} 种可用`}
+                >
+                  <i>✦</i>
+                  <span>道具</span>
+                </button>
+              ) : null}
               <button
                 className="top-action"
                 onClick={() => openGamePanel("menu")}
@@ -842,6 +962,21 @@ export default function App() {
                 <span>菜单</span>
               </button>
             </header>
+            <div className="drop-lane-control" aria-label="选择下次落果位置">
+              <span>下次落点</span>
+              {([-1, 0, 1] as const).map((lane) => (
+                <button
+                  key={lane}
+                  className={snapshot.dropLane === lane ? "active" : ""}
+                  aria-label={
+                    lane < 0 ? "落在左侧" : lane > 0 ? "落在右侧" : "落在中央"
+                  }
+                  onClick={() => controlsRef.current?.setDropLane(lane)}
+                >
+                  {lane < 0 ? "左" : lane > 0 ? "右" : "中"}
+                </button>
+              ))}
+            </div>
             <div
               className={`combo-pill ${snapshot.combo >= 3 ? "hot" : ""}`}
               aria-hidden={snapshot.combo < 2}
@@ -859,6 +994,21 @@ export default function App() {
                 {toast.message}
               </button>
             ) : null}
+            {tutorialStep ? (
+              <div
+                className={`tutorial-coach tutorial-${tutorialStep}`}
+                role="status"
+              >
+                <span>
+                  {tutorialStep === "pick"
+                    ? "① 点有金边的亮牌，先收集相同水果"
+                    : tutorialStep === "tray"
+                      ? "② 凑齐三张，卡槽会自动消除并落果"
+                      : "③ 选择左、中、右，决定下一颗水果落点"}
+                </span>
+                <button onClick={finishTutorial}>跳过</button>
+              </div>
+            ) : null}
             {gamePanel && !result ? (
               <div className="game-panel-layer" role="dialog" aria-modal="true">
                 <section className={`game-panel-card panel-${gamePanel}`}>
@@ -873,141 +1023,21 @@ export default function App() {
                     <>
                       <small>TOOL BOX</small>
                       <h2>道具箱</h2>
-                      <div className="toolbox-grid" aria-label="所有道具">
-                        <button
-                          disabled={!snapshot.undoLeft}
-                          onClick={() => useTool((controls) => controls.undo())}
-                        >
-                          <i>↶</i>
-                          <span>撤回</span>
-                          <em>×{snapshot.undoLeft}</em>
-                        </button>
-                        <button
-                          disabled={!snapshot.shuffleLeft}
-                          onClick={() =>
-                            useTool((controls) => controls.shuffle())
-                          }
-                        >
-                          <i>⤨</i>
-                          <span>洗牌</span>
-                          <em>×{snapshot.shuffleLeft}</em>
-                        </button>
-                        <button
-                          disabled={!snapshot.juiceLeft}
-                          onClick={() =>
-                            useTool((controls) => controls.juice())
-                          }
-                        >
-                          <i>🥤</i>
-                          <span>榨汁</span>
-                          <em>×{snapshot.juiceLeft}</em>
-                        </button>
-                        <button
-                          disabled={!snapshot.hammerLeft}
-                          onClick={() =>
-                            useTool((controls) => controls.hammer())
-                          }
-                        >
-                          <i>🔨</i>
-                          <span>清顶</span>
-                          <em>×{snapshot.hammerLeft}</em>
-                        </button>
-                        <button
-                          disabled={!snapshot.magnetLeft}
-                          onClick={() =>
-                            useTool((controls) => controls.magnet())
-                          }
-                        >
-                          <i>🧲</i>
-                          <span>合并</span>
-                          <em>×{snapshot.magnetLeft}</em>
-                        </button>
-                        <button
-                          disabled={!snapshot.wildLeft}
-                          onClick={() => useTool((controls) => controls.wild())}
-                        >
-                          <i>🍀</i>
-                          <span>万能</span>
-                          <em>×{snapshot.wildLeft}</em>
-                        </button>
-                        <button
-                          disabled={!snapshot.bubbleLeft}
-                          onClick={() =>
-                            useTool((controls) => controls.bubble())
-                          }
-                        >
-                          <i>🫧</i>
-                          <span>清槽</span>
-                          <em>×{snapshot.bubbleLeft}</em>
-                        </button>
-                        <button
-                          disabled={!snapshot.sunLeft}
-                          onClick={() =>
-                            useTool((controls) => controls.sunshine())
-                          }
-                        >
-                          <i>☀️</i>
-                          <span>净化</span>
-                          <em>×{snapshot.sunLeft}</em>
-                        </button>
-                        <button
-                          disabled={!snapshot.ripenLeft}
-                          onClick={() =>
-                            useTool((controls) => controls.ripen())
-                          }
-                        >
-                          <i>🌱</i>
-                          <span>催熟</span>
-                          <em>×{snapshot.ripenLeft}</em>
-                        </button>
-                        <button
-                          disabled={!snapshot.splitLeft}
-                          onClick={() =>
-                            useTool((controls) => controls.split())
-                          }
-                        >
-                          <i>✂️</i>
-                          <span>分果</span>
-                          <em>×{snapshot.splitLeft}</em>
-                        </button>
-                        <button
-                          disabled={!snapshot.shieldLeft}
-                          onClick={() =>
-                            useTool((controls) => controls.shield())
-                          }
-                        >
-                          <i>🛡️</i>
-                          <span>甜度盾</span>
-                          <em>×{snapshot.shieldLeft}</em>
-                        </button>
-                        <button
-                          disabled={!snapshot.harvestLeft}
-                          onClick={() =>
-                            useTool((controls) => controls.harvest())
-                          }
-                        >
-                          <i>🌾</i>
-                          <span>丰收</span>
-                          <em>×{snapshot.harvestLeft}</em>
-                        </button>
-                        <button
-                          disabled={!snapshot.quakeLeft}
-                          onClick={() =>
-                            useTool((controls) => controls.quake())
-                          }
-                        >
-                          <i>🪇</i>
-                          <span>震荡</span>
-                          <em>×{snapshot.quakeLeft}</em>
-                        </button>
+                      <div className="toolbox-grid" aria-label="本局可用道具">
+                        {availableToolboxItems.map((item) => (
+                          <button
+                            key={item.id}
+                            onClick={() => useToolById(item.id)}
+                          >
+                            <i>{item.icon}</i>
+                            <span>{item.label}</span>
+                            <em>×{item.left}</em>
+                          </button>
+                        ))}
                       </div>
-                      {Object.values(tools).every(
-                        (levelNow) => levelNow === 0,
-                      ) ? (
-                        <p className="toolbox-empty">
-                          道具需在果园温室购买，未配置的道具不会进入本局。
-                        </p>
-                      ) : null}
+                      <p className="toolbox-empty">
+                        这里只显示本局可用道具，用完后会自动收起。
+                      </p>
                     </>
                   ) : null}
                   {gamePanel === "help" ? (
@@ -1019,7 +1049,7 @@ export default function App() {
                         <i>›</i>
                         <span>三张入槽</span>
                         <i>›</i>
-                        <span>中央落果</span>
+                        <span>选择落点</span>
                         <i>›</i>
                         <span>同果合成</span>
                       </div>
@@ -1027,7 +1057,17 @@ export default function App() {
                         <span>默认每次生成 1 果</span>
                         <span>温室培育最高 3 果</span>
                         <span>水果落稳后才会合成</span>
-                        <span>点击水果可向上弹射</span>
+                        <span>点击水果会弹向同级伙伴</span>
+                      </div>
+                      <h3>特殊牌角标</h3>
+                      <div className="special-legend">
+                        <span>❄ 冰冻</span>
+                        <span>● 炸弹</span>
+                        <span>✦ 藤蔓</span>
+                        <span>ϟ 甜度</span>
+                        <span>穗 丰收</span>
+                        <span>◇ 棱镜</span>
+                        <span>↟ 季风</span>
                       </div>
                       <h3>合成路径</h3>
                       <div className="help-chain">
@@ -1078,6 +1118,9 @@ export default function App() {
                         继续游戏
                       </button>
                       <div className="panel-actions">
+                        <button onClick={() => setGamePanel("help")}>
+                          ? 玩法说明
+                        </button>
                         <button
                           onClick={() => {
                             setGamePanel(null);
@@ -1159,6 +1202,7 @@ export default function App() {
                   </div>
                   <div className="coin-reward">
                     🪙 +{formatScore(lastCoinReward)} 果币已存入温室
+                    {lastCoinStarterGift ? <small> · 含新手礼 60</small> : null}
                   </div>
                   {isRelicReward ? (
                     <div className="relic-choices">
@@ -1181,10 +1225,15 @@ export default function App() {
                       ))}
                     </div>
                   ) : (
-                    <div className="save-box">
+                    <div className={`save-box ${!runId ? "save-offline" : ""}`}>
                       {saveState === "saved" ? (
                         <div className="saved-message">
                           ✓ 战绩已进入全球排行榜
+                        </div>
+                      ) : !runId ? (
+                        <div className="offline-score-note">
+                          <b>战绩保存在本机</b>
+                          <small>排行榜暂时离线，不影响继续闯关。</small>
                         </div>
                       ) : (
                         <>
@@ -1216,11 +1265,6 @@ export default function App() {
                               {saveState === "saving" ? "保存中" : "保存"}
                             </button>
                           </div>
-                          {!runId ? (
-                            <small className="save-note">
-                              排行榜连接中断，本局仍可继续挑战。
-                            </small>
-                          ) : null}
                           {saveError ? (
                             <small className="save-error">{saveError}</small>
                           ) : null}
@@ -1403,9 +1447,10 @@ export default function App() {
           loading={leaderboardLoading}
           offline={leaderboardOffline}
           mode={leaderboardMode}
+          level={level}
           onModeChange={changeLeaderboardMode}
           onClose={() => setLeaderboardOpen(false)}
-          onRefresh={loadLeaderboard}
+          onRefresh={() => loadLeaderboard(leaderboardMode, level)}
         />
       ) : null}
     </main>

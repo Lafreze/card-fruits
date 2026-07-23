@@ -39,8 +39,14 @@ export async function saveScore(payload: {
   });
 }
 
-export async function getLeaderboard(mode: GameMode = "story") {
+export async function getLeaderboard(
+  mode: GameMode = "story",
+  level?: number,
+) {
+  const query = new URLSearchParams({ mode });
+  if (mode === "story" && Number.isInteger(level))
+    query.set("level", String(level));
   return api<{ scores: LeaderboardEntry[]; offline?: boolean }>(
-    `/api/leaderboard?mode=${mode}`,
+    `/api/leaderboard?${query.toString()}`,
   );
 }
