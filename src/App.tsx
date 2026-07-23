@@ -7,6 +7,7 @@ import {
 } from "./api";
 import { FRUITS, LEVELS } from "./game/data";
 import type { FruitGame } from "./game/FruitGame";
+import { calculateCoinReward } from "./game/logic";
 import {
   MODE_INFO,
   RELICS,
@@ -136,21 +137,16 @@ function readTools(): ToolLevels {
   return empty;
 }
 
-// 结算果币:分数 + 进度里程,受果币磁铁升级与果币雨奇物加成
+// 结算果币使用对数分数曲线，避免高阶水果的指数得分跳过长期养成。
 function computeCoinReward(result: GameResult, upgrades: UpgradeLevels) {
-  const progress =
-    result.mode === "endless"
-      ? result.wave * 12
-      : result.mode === "expedition"
-        ? result.wave * 18
-        : 0;
-  const base =
-    Math.floor(result.score / 800) +
-    progress +
-    (result.status === "won" ? 30 : 10);
-  const bonus =
-    (1 + 0.2 * upgrades.coin) * (result.relics.includes("gold_rain") ? 1.5 : 1);
-  return Math.max(1, Math.round(base * bonus));
+  return calculateCoinReward({
+    score: result.score,
+    mode: result.mode,
+    wave: result.wave,
+    won: result.status === "won",
+    coinLevel: upgrades.coin,
+    goldRain: result.relics.includes("gold_rain"),
+  });
 }
 
 function formatScore(value: number) {
@@ -1029,7 +1025,8 @@ export default function App() {
                       </div>
                       <div className="help-rules">
                         <span>默认每次生成 1 果</span>
-                        <span>温室培育可提升至 5 果</span>
+                        <span>温室培育最高 3 果</span>
+                        <span>水果落稳后才会合成</span>
                         <span>点击水果可向上弹射</span>
                       </div>
                       <h3>合成路径</h3>
@@ -1317,13 +1314,20 @@ export default function App() {
                 </div>
               ) : null}
             </div>
+            <div className="shop-section-head greenhouse-section-head">
+              <span>长期培育</span>
+              <small>收益放缓 · 每级更有分量</small>
+            </div>
             <div className="upgrade-list">
               {UPGRADES.map((item) => {
                 const levelNow = upgrades[item.id];
                 const maxed = levelNow >= item.maxLevel;
                 const cost = maxed ? 0 : item.costs[levelNow];
                 return (
-                  <div className="upgrade-row" key={item.id}>
+                  <div
+                    className={`upgrade-row ${item.id === "sweet_start" ? "upgrade-featured" : ""}`}
+                    key={item.id}
+                  >
                     <i>{item.icon}</i>
                     <span className="upgrade-info">
                       <b>

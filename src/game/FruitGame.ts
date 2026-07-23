@@ -12,6 +12,7 @@ import { FRUITS, LEVELS, WORLD } from "./data";
 import {
   buildFusionPairs,
   buildPlayableDeal,
+  canMergeAfterLanding,
   fruitBatchCount,
   scatterStackSlots,
 } from "./logic";
@@ -106,6 +107,8 @@ type FusionEcho = {
 type FruitPluginState = {
   tier: number;
   birth: number;
+  landedAt?: number;
+  landingPulseUntil?: number;
   noMergeUntil?: number;
   splitGroup?: number;
   splitUntil?: number;
@@ -301,7 +304,7 @@ export class FruitGame implements GameControls {
     this.magnetMultiplier *= 1 + 0.12 * Math.min(3, upgrades.magnet || 0);
     this.scoreMultiplier *= 1 + 0.06 * Math.min(3, upgrades.score || 0);
     this.comboWindowBonus = 0.2 * Math.min(3, upgrades.combo || 0);
-    this.fruitBatchLevel = Math.min(4, upgrades.fruitBatch || 0);
+    this.fruitBatchLevel = Math.min(2, upgrades.fruitBatch || 0);
     this.launchMultiplier *= 1 + 0.15 * Math.min(3, upgrades.launch || 0);
     if (this.mode !== "story") this.mutator = rollMutator(this.wave);
     this.callbacks = callbacks;
@@ -390,6 +393,7 @@ export class FruitGame implements GameControls {
     this.createCards();
     this.drawTray();
     Events.on(this.engine, "collisionStart", this.onCollision);
+    Events.on(this.engine, "collisionActive", this.onCollision);
     this.app.ticker.add(this.tick);
     if (import.meta.env.DEV)
       (window as unknown as { __game?: FruitGame }).__game = this;
@@ -1167,8 +1171,18 @@ export class FruitGame implements GameControls {
       this.callbacks.onToast("⚡ 甜度 +10", "gold");
     }
     if (boostsHarvest) {
-      this.harvestCharge = Math.min(4, this.harvestCharge + 1);
-      this.callbacks.onToast("🌾 丰收牌 · 下次三消 +1 果", "gold");
+      if (
+        fruitBatchCount(
+          this.fruitBatchLevel,
+          this.fruitBatchBonus + this.harvestCharge,
+        ) >= 3
+      ) {
+        this.gainFever(10);
+        this.callbacks.onToast("🌾 满产转化 · 甜度 +10", "gold");
+      } else {
+        this.harvestCharge = Math.min(2, this.harvestCharge + 1);
+        this.callbacks.onToast("🌾 丰收牌 · 下次三消 +1 果", "gold");
+      }
     }
     if (special === "prism") {
       this.prismCharge = 1;
@@ -1261,6 +1275,8 @@ export class FruitGame implements GameControls {
       this.registerCombo();
       this.gainFever(14);
       if (this.hasRelic("honey_glaze")) this.gainFever(6);
+      if (this.hasRelic("harvest_gene") && this.fruitBatchLevel >= 2)
+        this.gainFever(8);
       const points = Math.round(
         (tier + 1) *
           90 *
@@ -1658,7 +1674,7 @@ export class FruitGame implements GameControls {
       this.nextRainReleaseAt = releaseAt;
     });
     if (total > 1)
-      this.callbacks.onToast(`🌾 温室丰收 ×${total}`, total >= 4 ? "gold" : "cyan");
+      this.callbacks.onToast(`🌾 温室丰收 ×${total}`, total >= 3 ? "gold" : "cyan");
     this.updateCardAccess();
     haptic(total === 3 ? [12, 22, 12, 22, 20] : [10, 24, 12]);
   }
@@ -1668,8 +1684,8 @@ export class FruitGame implements GameControls {
     const glow = new Graphics()
       .circle(0, 0, 24)
       .fill({
-        color: total >= 4 ? 0xd4ac55 : FRUITS[tier].glow,
-        alpha: total >= 4 ? 0.14 : 0.1,
+        color: total >= 3 ? 0xd4ac55 : FRUITS[tier].glow,
+        alpha: total >= 3 ? 0.14 : 0.1,
       });
     glow.filters = [new BlurFilter({ strength: 7 })];
     const emoji = new Text({
@@ -1687,12 +1703,12 @@ export class FruitGame implements GameControls {
     emoji.anchor.set(0.5);
     emoji.position.set(0, -1);
     view.addChild(glow, emoji);
-    for (let index = 0; index < 5; index += 1) {
+    for (let index = 0; index < 3; index += 1) {
       const pip = new Graphics().circle(0, 0, 1.8).fill({
         color: 0xd8b766,
         alpha: index < total ? 0.82 : 0.14,
       });
-      pip.position.set((index - 2) * 6, 20);
+      pip.position.set((index - 1) * 7, 20);
       view.addChild(pip);
     }
     view.alpha = 0;
@@ -1757,6 +1773,39 @@ export class FruitGame implements GameControls {
     return fruit.body.plugin as FruitPluginState;
   }
 
+  private fruitHasLanded(fruit: FruitNode) {
+    return this.fruitPlugin(fruit).landedAt !== undefined;
+  }
+
+  private markFruitLanded(fruit: FruitNode) {
+    const plugin = this.fruitPlugin(fruit);
+    if (plugin.landedAt !== undefined) return false;
+    plugin.landedAt = this.elapsed;
+    plugin.landingPulseUntil = this.elapsed + 0.22;
+    Body.setAngularVelocity(fruit.body, fruit.body.angularVelocity * 0.72);
+    this.ring(
+      fruit.body.position.x,
+      fruit.body.position.y,
+      FRUITS[fruit.tier].glow,
+      0.32,
+    );
+    this.burst(
+      fruit.body.position.x,
+      fruit.body.position.y + this.fruitRadius(fruit.tier) * 0.45,
+      FRUITS[fruit.tier].glow,
+      4,
+    );
+    return true;
+  }
+
+  private fruitsCanMerge(first: FruitNode, second: FruitNode) {
+    return canMergeAfterLanding(
+      this.fruitPlugin(first).landedAt,
+      this.fruitPlugin(second).landedAt,
+      this.elapsed,
+    );
+  }
+
   private activeBondTarget(fruit: FruitNode) {
     const plugin = this.fruitPlugin(fruit);
     if (!plugin.linkTargetId || Number(plugin.linkUntil || 0) <= this.elapsed)
@@ -1764,6 +1813,8 @@ export class FruitGame implements GameControls {
     const target = this.fruits.get(plugin.linkTargetId);
     if (
       !target ||
+      !this.fruitHasLanded(fruit) ||
+      !this.fruitHasLanded(target) ||
       target.tier !== fruit.tier ||
       this.merging.has(target.body.id) ||
       this.fruitsShareSplitGroup(fruit, target)
@@ -1778,6 +1829,7 @@ export class FruitGame implements GameControls {
       .filter(
         (fruit) =>
           fruit.tier === tier &&
+          this.fruitHasLanded(fruit) &&
           !this.merging.has(fruit.body.id) &&
           !this.fruitMergeCoolingDown(fruit),
       )
@@ -1822,8 +1874,10 @@ export class FruitGame implements GameControls {
     this.fusionPairStates.delete(
       this.fusionPairKey(first.body.id, second.body.id),
     );
-    this.ring(first.body.position.x, first.body.position.y, 0xd8a94f, 0.5);
-    this.ring(second.body.position.x, second.body.position.y, 0xd8a94f, 0.5);
+    if (this.fruitHasLanded(first) && this.fruitHasLanded(second)) {
+      this.ring(first.body.position.x, first.body.position.y, 0xd8a94f, 0.5);
+      this.ring(second.body.position.x, second.body.position.y, 0xd8a94f, 0.5);
+    }
   }
 
   // 三消先标亮箱内同果；中央批次落下后自动与最近的同级水果建立唯一配对。
@@ -1831,6 +1885,7 @@ export class FruitGame implements GameControls {
     const matches = [...this.fruits.values()].filter(
       (fruit) =>
         fruit.tier === tier &&
+        this.fruitHasLanded(fruit) &&
         !this.merging.has(fruit.body.id) &&
         !this.fruitMergeCoolingDown(fruit),
     );
@@ -2017,12 +2072,43 @@ export class FruitGame implements GameControls {
 
   private onCollision = (event: Matter.IEventCollision<Matter.Engine>) => {
     if (this.status !== "playing") return;
+    const fruitContacts: Array<[FruitNode, FruitNode]> = [];
+    const touched = new Set<FruitNode>();
+
     for (const pair of event.pairs) {
       const nodeA = this.fruits.get(pair.bodyA.id);
       const nodeB = this.fruits.get(pair.bodyB.id);
-      if (nodeA) this.triggerDropImpact(nodeA);
-      if (nodeB) this.triggerDropImpact(nodeB);
-      if (!nodeA || !nodeB || nodeA.tier !== nodeB.tier) continue;
+      if (nodeA) {
+        touched.add(nodeA);
+        if (pair.bodyB.label === "floor") this.markFruitLanded(nodeA);
+      }
+      if (nodeB) {
+        touched.add(nodeB);
+        if (pair.bodyA.label === "floor") this.markFruitLanded(nodeB);
+      }
+      if (nodeA && nodeB) fruitContacts.push([nodeA, nodeB]);
+    }
+
+    // 先标记接触地板的水果，再沿当前接触链向上传递“已落地”状态。
+    // 两颗都还在空中的水果即使碰撞，也不会在这里获得合成资格。
+    let propagated = true;
+    while (propagated) {
+      propagated = false;
+      fruitContacts.forEach(([first, second]) => {
+        if (this.fruitHasLanded(first) && !this.fruitHasLanded(second))
+          propagated = this.markFruitLanded(second) || propagated;
+        else if (this.fruitHasLanded(second) && !this.fruitHasLanded(first))
+          propagated = this.markFruitLanded(first) || propagated;
+      });
+    }
+
+    touched.forEach((fruit) => {
+      if (this.fruitHasLanded(fruit)) this.triggerDropImpact(fruit);
+    });
+
+    for (const [nodeA, nodeB] of fruitContacts) {
+      if (nodeA.tier !== nodeB.tier || !this.fruitsCanMerge(nodeA, nodeB))
+        continue;
       if (
         this.fruitMergeCoolingDown(nodeA) ||
         this.fruitMergeCoolingDown(nodeB) ||
@@ -2033,13 +2119,14 @@ export class FruitGame implements GameControls {
         if (this.mode === "endless") this.rainbowClear(nodeA, nodeB);
         continue;
       }
-      if (this.merging.has(pair.bodyA.id) || this.merging.has(pair.bodyB.id))
+      if (this.merging.has(nodeA.body.id) || this.merging.has(nodeB.body.id))
         continue;
       this.mergeFruits(nodeA, nodeB);
     }
   };
 
   private mergeFruits(first: FruitNode, second: FruitNode) {
+    if (!this.fruitsCanMerge(first, second)) return;
     this.merging.add(first.body.id);
     this.merging.add(second.body.id);
     this.fruitFocusUntil = Math.max(this.fruitFocusUntil, this.elapsed + 0.52);
@@ -2283,17 +2370,24 @@ export class FruitGame implements GameControls {
     this.fruits.forEach((fruit) => {
       fruit.view.position.copyFrom(fruit.body.position);
       fruit.view.rotation = fruit.body.angle;
+      const plugin = this.fruitPlugin(fruit);
       if (fruit.view.scale.x < 0.99) {
         const next = Math.min(1, fruit.view.scale.x + 0.11 * delta);
         fruit.view.scale.set(next);
+      } else if (Number(plugin.landingPulseUntil || 0) > this.elapsed) {
+        const remaining =
+          (Number(plugin.landingPulseUntil) - this.elapsed) / 0.22;
+        const pulse = Math.sin((1 - remaining) * Math.PI);
+        fruit.view.scale.set(1 + pulse * 0.075, 1 - pulse * 0.09);
+      } else if (fruit.view.scale.x !== 1 || fruit.view.scale.y !== 1) {
+        fruit.view.scale.set(1);
       }
-      const plugin = this.fruitPlugin(fruit);
       const resonanceHalo = fruit.view.getChildByLabel("resonance-halo");
       if (resonanceHalo) {
         const resonating =
           Number(plugin.linkUntil || 0) > this.elapsed ||
           Number(plugin.resonanceUntil || 0) > this.elapsed;
-        resonanceHalo.visible = resonating;
+        resonanceHalo.visible = resonating && this.fruitHasLanded(fruit);
         resonanceHalo.alpha = 0.5 + Math.sin(this.elapsed * 7.2) * 0.28;
         resonanceHalo.rotation = -fruit.body.angle + this.elapsed * 0.35;
       }
@@ -2411,6 +2505,7 @@ export class FruitGame implements GameControls {
     const available = [...this.fruits.values()].filter(
       (fruit) =>
         !this.merging.has(fruit.body.id) &&
+        this.fruitHasLanded(fruit) &&
         !this.fruitMergeCoolingDown(fruit) &&
         fruit.tier < FRUITS.length - 1,
     );
@@ -2459,9 +2554,7 @@ export class FruitGame implements GameControls {
       state.lastDistance = distance;
       this.fusionPairStates.set(key, state);
 
-      const firstAge = this.elapsed - this.fruitPlugin(first).birth;
-      const secondAge = this.elapsed - this.fruitPlugin(second).birth;
-      if (firstAge < 0.24 || secondAge < 0.24) continue;
+      if (!this.fruitsCanMerge(first, second)) continue;
       const bondPower = plan.bonded
         ? Math.max(
             1,
@@ -3127,9 +3220,19 @@ export class FruitGame implements GameControls {
     if (this.paused || this.status !== "playing" || this.harvestLeft <= 0)
       return;
     this.harvestLeft -= 1;
-    this.harvestCharge = Math.min(4, this.harvestCharge + 1);
     this.burst(WORLD.width / 2, WORLD.tray.y + 24, 0xe2c36b, 22);
-    this.callbacks.onToast("🌾 丰收剂 · 下一次三消额外 +1 果", "gold");
+    if (
+      fruitBatchCount(
+        this.fruitBatchLevel,
+        this.fruitBatchBonus + this.harvestCharge,
+      ) >= 3
+    ) {
+      this.gainFever(12);
+      this.callbacks.onToast("🌾 满产转化 · 甜度 +12", "gold");
+    } else {
+      this.harvestCharge = Math.min(2, this.harvestCharge + 1);
+      this.callbacks.onToast("🌾 丰收剂 · 下一次三消额外 +1 果", "gold");
+    }
     haptic([12, 22, 16]);
     this.emitSnapshot();
   };
@@ -3153,7 +3256,9 @@ export class FruitGame implements GameControls {
   magnet = () => {
     if (this.paused || this.status !== "playing" || this.magnetLeft <= 0)
       return;
-    const fruits = [...this.fruits.values()];
+    const fruits = [...this.fruits.values()].filter((fruit) =>
+      this.fruitHasLanded(fruit),
+    );
     let pair: [FruitNode, FruitNode] | null = null;
     let shortest = Number.POSITIVE_INFINITY;
     for (let first = 0; first < fruits.length; first += 1) {
@@ -3174,7 +3279,7 @@ export class FruitGame implements GameControls {
       }
     }
     if (!pair) {
-      this.callbacks.onToast("果箱里还没有同级水果", "cyan");
+      this.callbacks.onToast("还没有两颗已落稳的同级水果", "cyan");
       return;
     }
     this.magnetLeft -= 1;
@@ -3205,6 +3310,7 @@ export class FruitGame implements GameControls {
     this.timers.forEach((id) => window.clearTimeout(id));
     this.timers.clear();
     Events.off(this.engine, "collisionStart", this.onCollision);
+    Events.off(this.engine, "collisionActive", this.onCollision);
     this.app.ticker.remove(this.tick);
     if (import.meta.env.DEV)
       delete (window as unknown as { __game?: FruitGame }).__game;

@@ -4,6 +4,8 @@ import { FRUITS, LEVELS, WORLD, type LayoutBlock } from "./data.ts";
 import {
   buildFusionPairs,
   buildPlayableDeal,
+  calculateCoinReward,
+  canMergeAfterLanding,
   fruitBatchCount,
   scatterStackSlots,
   simulateTray,
@@ -222,13 +224,60 @@ test("every generated stack contains a verified low-risk clear route", () => {
   });
 });
 
-test("greenhouse fruit output is deterministic and capped at five", () => {
+test("greenhouse fruit output is deterministic and capped at three", () => {
   assert.equal(fruitBatchCount(), 1);
   assert.equal(fruitBatchCount(1), 2);
-  assert.equal(fruitBatchCount(3), 4);
-  assert.equal(fruitBatchCount(4), 5);
-  assert.equal(fruitBatchCount(4, 1), 5);
+  assert.equal(fruitBatchCount(2), 3);
+  assert.equal(fruitBatchCount(4), 3);
+  assert.equal(fruitBatchCount(1, 2), 3);
   assert.equal(fruitBatchCount(-2, -2), 1);
+});
+
+test("fruit can only merge after both pieces have landed and settled", () => {
+  assert.equal(canMergeAfterLanding(undefined, 0.2, 1), false);
+  assert.equal(canMergeAfterLanding(0.2, undefined, 1), false);
+  assert.equal(canMergeAfterLanding(0.94, 0.8, 1), false);
+  assert.equal(canMergeAfterLanding(0.9, 0.8, 1), true);
+});
+
+test("coin rewards grow slowly even when score grows exponentially", () => {
+  assert.equal(
+    calculateCoinReward({
+      score: 0,
+      mode: "story",
+      wave: 1,
+      won: false,
+    }),
+    2,
+  );
+  assert.equal(
+    calculateCoinReward({
+      score: 10_000,
+      mode: "story",
+      wave: 1,
+      won: true,
+    }),
+    20,
+  );
+  assert.ok(
+    calculateCoinReward({
+      score: 10_000_000,
+      mode: "story",
+      wave: 1,
+      won: true,
+    }) <= 32,
+  );
+  assert.equal(
+    calculateCoinReward({
+      score: 10_000,
+      mode: "story",
+      wave: 1,
+      won: true,
+      coinLevel: 3,
+      goldRain: true,
+    }),
+    34,
+  );
 });
 
 test("fusion planning keeps one partner per fruit and prioritizes card bonds", () => {
@@ -291,8 +340,8 @@ test("fruit scale and roguelike catalog stay balanced", () => {
   const harvestUpgrade = UPGRADES.find(
     (upgrade) => upgrade.id === "sweet_start",
   );
-  assert.equal(harvestUpgrade?.maxLevel, 4);
-  assert.deepEqual(harvestUpgrade?.costs, [850, 2200, 5200, 12000]);
+  assert.equal(harvestUpgrade?.maxLevel, 2);
+  assert.deepEqual(harvestUpgrade?.costs, [850, 2800]);
   assert.ok(
     Array.from({ length: 40 }, () => rollMutator(2)).every(
       (item) => item.id !== "calm",

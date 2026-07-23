@@ -392,8 +392,51 @@ export function fruitBatchCount(
 ) {
   return Math.max(
     1,
-    Math.min(5, 1 + Math.floor(greenhouseLevel) + Math.floor(bonus)),
+    Math.min(3, 1 + Math.floor(greenhouseLevel) + Math.floor(bonus)),
   );
+}
+
+export function canMergeAfterLanding(
+  firstLandedAt: number | undefined,
+  secondLandedAt: number | undefined,
+  elapsed: number,
+  settleDelay = 0.08,
+) {
+  return (
+    firstLandedAt !== undefined &&
+    secondLandedAt !== undefined &&
+    elapsed - firstLandedAt >= settleDelay &&
+    elapsed - secondLandedAt >= settleDelay
+  );
+}
+
+export function calculateCoinReward({
+  score,
+  mode,
+  wave,
+  won,
+  coinLevel = 0,
+  goldRain = false,
+}: {
+  score: number;
+  mode: "story" | "endless" | "expedition";
+  wave: number;
+  won: boolean;
+  coinLevel?: number;
+  goldRain?: boolean;
+}) {
+  // 分数随高阶水果指数增长，果币改用对数曲线，避免后期一局跳过整段养成。
+  const scoreCoins = Math.min(
+    24,
+    Math.floor(Math.log10(Math.max(0, score) + 1) * 3),
+  );
+  const progress =
+    mode === "endless" ? wave * 3 : mode === "expedition" ? wave * 5 : 0;
+  const base = scoreCoins + progress + (won ? 8 : 2);
+  const bonus =
+    (1 + 0.12 * Math.max(0, Math.min(3, coinLevel))) *
+    (goldRain ? 1.25 : 1);
+  return Math.max(1, Math.round(base * bonus));
 }
 
 /**

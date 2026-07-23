@@ -165,7 +165,7 @@ export const RELICS: RelicDefinition[] = [
     id: "gold_rain",
     icon: "🪙",
     name: "果币雨",
-    description: "结算果币收益提高 50%。",
+    description: "结算果币收益提高 25%。",
     tone: "gold",
     rarity: "common",
     archetype: "收益",
@@ -183,7 +183,7 @@ export const RELICS: RelicDefinition[] = [
     id: "harvest_gene",
     icon: "🧬",
     name: "丰收基因",
-    description: "每次三消额外生成 1 颗水果，最多仍为 5 颗。",
+    description: "每次三消额外生成 1 颗水果，满产时转为狂热能量。",
     tone: "gold",
     rarity: "rare",
     archetype: "属性·产量",
@@ -437,8 +437,8 @@ export const UPGRADES: UpgradeDefinition[] = [
     id: "sweet_start",
     icon: "🌾",
     name: "丰收培育",
-    maxLevel: 4,
-    costs: [850, 2200, 5200, 12000],
+    maxLevel: 2,
+    costs: [850, 2800],
     describe: (level) =>
       level
         ? `每次三消固定生成 ${level + 1} 颗水果`
@@ -450,7 +450,7 @@ export const UPGRADES: UpgradeDefinition[] = [
     name: "果币磁铁",
     maxLevel: 3,
     costs: [680, 1900, 4300],
-    describe: (level) => (level ? `结算果币 +${level * 20}%` : "未装备"),
+    describe: (level) => (level ? `结算果币 +${level * 12}%` : "未装备"),
   },
   {
     id: "sun",
