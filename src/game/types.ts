@@ -22,6 +22,7 @@ export type GameSnapshot = {
   sunLeft: number;
   ripenLeft: number;
   splitLeft: number;
+  bombLeft: number;
   shieldLeft: number;
   harvestLeft: number;
   quakeLeft: number;
@@ -78,6 +79,7 @@ export type GameControls = {
   sunshine: () => void;
   ripen: () => void;
   split: () => void;
+  bomb: () => void;
   shield: () => void;
   harvest: () => void;
   quake: () => void;

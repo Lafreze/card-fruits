@@ -148,10 +148,11 @@ input:focus-visible {
   place-items: center;
   width: 44px;
   height: 44px;
-  font-size: 26px;
-  border-radius: 50%;
-  background: #ffffff;
-  box-shadow: var(--card-shadow-soft);
+  font-size: 30px;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  filter: drop-shadow(0 10px 13px rgba(4, 2, 9, 0.52));
   animation: fruitFloat 3s ease-in-out infinite;
 }
 .fruit-a {
@@ -546,6 +547,144 @@ input:focus-visible {
     box-shadow 0.16s ease,
     background 0.16s ease;
 }
+
+.quick-tool-dock {
+  position: absolute;
+  z-index: 4;
+  right: 7px;
+  right: max(5px, 1.65cqw);
+  width: 43px;
+  width: clamp(38px, 10cqw, 43px);
+  display: grid;
+  justify-items: center;
+  gap: 4px;
+  gap: 0.9cqw;
+  padding: 6px 4px;
+  padding: 1.4cqw 0.9cqw;
+  border: 1px solid rgba(195, 169, 226, 0.18);
+  border-radius: 15px;
+  border-radius: 3.5cqw;
+  background: linear-gradient(
+    160deg,
+    rgba(35, 27, 47, 0.92),
+    rgba(13, 11, 20, 0.88)
+  );
+  box-shadow:
+    0 12px 30px rgba(2, 1, 7, 0.42),
+    inset 0 1px rgba(255, 255, 255, 0.065);
+  backdrop-filter: blur(12px) saturate(1.1);
+}
+
+.card-tool-dock {
+  top: 112px;
+  top: 26cqw;
+}
+
+.fruit-tool-dock {
+  top: 575px;
+  top: 133.7cqw;
+  border-color: rgba(118, 205, 224, 0.2);
+  background: linear-gradient(
+    160deg,
+    rgba(25, 39, 52, 0.92),
+    rgba(10, 17, 25, 0.9)
+  );
+}
+
+.quick-tool-dock > small {
+  color: #91859f;
+  font-size: 7px;
+  font-size: clamp(6px, 1.6cqw, 7px);
+  font-weight: 900;
+  letter-spacing: 0.08em;
+}
+
+.quick-tool-dock button {
+  position: relative;
+  width: 34px;
+  width: clamp(32px, 7.9cqw, 34px);
+  height: 36px;
+  height: clamp(35px, 8.4cqw, 36px);
+  padding: 2px 0 1px;
+  display: grid;
+  place-items: center;
+  gap: 0;
+  border: 1px solid rgba(210, 188, 238, 0.14);
+  border-radius: 10px;
+  border-radius: 2.3cqw;
+  color: #eee8f4;
+  background: rgba(55, 43, 70, 0.72);
+  box-shadow:
+    inset 0 1px rgba(255, 255, 255, 0.08),
+    0 5px 12px rgba(3, 1, 8, 0.3);
+  cursor: pointer;
+  transition:
+    transform 0.16s ease,
+    border-color 0.16s ease,
+    filter 0.16s ease;
+}
+
+.fruit-tool-dock button {
+  background: rgba(34, 62, 75, 0.72);
+  border-color: rgba(133, 224, 237, 0.15);
+}
+
+.quick-tool-dock button:active {
+  transform: scale(0.9);
+  filter: brightness(1.25);
+}
+
+.quick-tool-dock button:disabled {
+  opacity: 0.3;
+  filter: grayscale(0.7);
+  cursor: default;
+}
+
+.quick-tool-dock i {
+  font-size: 15px;
+  font-size: clamp(14px, 3.5cqw, 15px);
+  font-style: normal;
+  line-height: 1;
+}
+
+.quick-tool-dock button span {
+  font-size: 6px;
+  font-size: clamp(6px, 1.38cqw, 6.5px);
+  font-weight: 850;
+  line-height: 1;
+}
+
+.quick-tool-dock em {
+  position: absolute;
+  top: -3px;
+  right: -3px;
+  min-width: 13px;
+  height: 13px;
+  padding: 0 3px;
+  display: grid;
+  place-items: center;
+  border-radius: 7px;
+  color: #1b1424;
+  background: #dfc177;
+  box-shadow: 0 3px 8px rgba(3, 1, 8, 0.35);
+  font-size: 7px;
+  font-size: clamp(7px, 1.6cqw, 8px);
+  font-style: normal;
+  font-weight: 950;
+}
+
+.fruit-tool-dock em {
+  color: #0d2029;
+  background: #8eddeb;
+}
+
+@media (hover: hover) {
+  .quick-tool-dock button:hover:not(:disabled) {
+    transform: translateX(-2px);
+    border-color: rgba(231, 207, 255, 0.42);
+    filter: brightness(1.18);
+  }
+}
 .score-chip,
 .target-chip {
   padding: 7px 9px;
@@ -860,6 +999,20 @@ input:focus-visible {
   grid-template-columns: 1fr 1fr;
   gap: 7px;
   gap: 1.6cqw;
+}
+.zone-tool-legend {
+  display: grid;
+  gap: 6px;
+}
+.zone-tool-legend span {
+  padding: 8px 10px;
+  border: 1px solid rgba(185, 159, 218, 0.12);
+  border-radius: 10px;
+  color: var(--ink-soft);
+  background: rgba(39, 31, 52, 0.58);
+  font-size: 9px;
+  font-size: 2.1cqw;
+  text-align: left;
 }
 .help-rules span {
   padding: 8px 5px;
@@ -2022,15 +2175,9 @@ input:focus-visible {
 }
 
 .orbit-fruit {
-  background: linear-gradient(
-    145deg,
-    rgba(43, 34, 57, 0.96),
-    rgba(19, 15, 28, 0.98)
-  );
-  border: 1px solid rgba(183, 157, 221, 0.2);
-  box-shadow:
-    0 14px 34px rgba(2, 1, 6, 0.5),
-    inset 0 1px rgba(255, 255, 255, 0.07);
+  border: 0;
+  background: transparent;
+  box-shadow: none;
 }
 
 .eyebrow {

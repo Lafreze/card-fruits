@@ -47,18 +47,19 @@ const EMPTY_SNAPSHOT: GameSnapshot = {
   trayLimit: 7,
   dangerProgress: 0,
   undoLeft: 0,
-  shuffleLeft: 0,
+  shuffleLeft: 1,
   juiceLeft: 0,
-  hammerLeft: 0,
+  hammerLeft: 1,
   magnetLeft: 0,
   wildLeft: 0,
   bubbleLeft: 0,
-  sunLeft: 0,
+  sunLeft: 1,
   ripenLeft: 0,
   splitLeft: 0,
-  shieldLeft: 0,
+  bombLeft: 1,
+  shieldLeft: 1,
   harvestLeft: 0,
-  quakeLeft: 0,
+  quakeLeft: 1,
   wave: 1,
   mode: "story",
   relics: [],
@@ -76,6 +77,12 @@ const MODE_UNLOCK_LEVEL: Partial<Record<GameMode, number>> = {
 };
 const TUTORIAL_KEY = "fruit-king-tutorial-v2";
 const STARTER_GIFT_KEY = "fruit-king-starter-gift-v1";
+const CARD_QUICK_TOOL_IDS = new Set<ToolId>(["shuffle", "hammer", "sun"]);
+const FRUIT_QUICK_TOOL_IDS = new Set<ToolId>(["bomb", "shield", "quake"]);
+const BASE_TOOL_IDS = new Set<ToolId>([
+  ...CARD_QUICK_TOOL_IDS,
+  ...FRUIT_QUICK_TOOL_IDS,
+]);
 const RELIC_RARITY_LABEL = {
   common: "普通",
   uncommon: "罕见",
@@ -282,7 +289,6 @@ function Leaderboard({
   loading,
   offline,
   mode,
-  level,
   onModeChange,
   onClose,
   onRefresh,
@@ -291,7 +297,6 @@ function Leaderboard({
   loading: boolean;
   offline: boolean;
   mode: GameMode;
-  level: number;
   onModeChange: (mode: GameMode) => void;
   onClose: () => void;
   onRefresh: () => void;
@@ -308,8 +313,8 @@ function Leaderboard({
         <h2>果王排行榜</h2>
         <p className="modal-copy">
           {mode === "story"
-            ? `第 ${level + 1} 关 · 同关公平排行`
-            : "每一分都来自真实完成的果园挑战。"}
+            ? "全关卡玩家进度排行 · 每位玩家展示最佳战绩"
+            : "每位玩家展示最佳战绩，不再被重复记录挤满。"}
         </p>
         <div className="leaderboard-tabs">
           {(Object.keys(MODE_INFO) as GameMode[]).map((item) => (
@@ -669,10 +674,10 @@ export default function App() {
   };
 
   const loadLeaderboard = useCallback(
-    (selectedMode = leaderboardMode, selectedLevel = level) => {
+    (selectedMode = leaderboardMode) => {
       setLeaderboardLoading(true);
       setLeaderboardOffline(false);
-      void getLeaderboard(selectedMode, selectedLevel)
+      void getLeaderboard(selectedMode)
         .then((data) => {
           setLeaderboard(data.scores);
           setLeaderboardOffline(Boolean(data.offline));
@@ -680,18 +685,18 @@ export default function App() {
         .catch(() => setLeaderboardOffline(true))
         .finally(() => setLeaderboardLoading(false));
     },
-    [leaderboardMode, level],
+    [leaderboardMode],
   );
 
   const openLeaderboard = () => {
     setLeaderboardMode(mode);
     setLeaderboardOpen(true);
-    loadLeaderboard(mode, level);
+    loadLeaderboard(mode);
   };
 
   const changeLeaderboardMode = (nextMode: GameMode) => {
     setLeaderboardMode(nextMode);
-    loadLeaderboard(nextMode, level);
+    loadLeaderboard(nextMode);
   };
 
   const submitScore = async () => {
@@ -769,16 +774,28 @@ export default function App() {
     { id: "sun", icon: "☀️", label: "净化", left: snapshot.sunLeft },
     { id: "ripen", icon: "🌱", label: "催熟", left: snapshot.ripenLeft },
     { id: "split", icon: "✂️", label: "分果", left: snapshot.splitLeft },
-    { id: "shield", icon: "🛡️", label: "甜度盾", left: snapshot.shieldLeft },
+    { id: "bomb", icon: "💣", label: "炸弹", left: snapshot.bombLeft },
+    { id: "shield", icon: "🧊", label: "冰冻", left: snapshot.shieldLeft },
     { id: "harvest", icon: "🌾", label: "丰收", left: snapshot.harvestLeft },
-    { id: "quake", icon: "🪇", label: "震荡", left: snapshot.quakeLeft },
+    { id: "quake", icon: "⚙️", label: "搅拌", left: snapshot.quakeLeft },
   ] satisfies Array<{
     id: ToolId;
     icon: string;
     label: string;
     left: number;
   }>;
-  const availableToolboxItems = toolboxItems.filter((item) => item.left > 0);
+  const cardQuickTools = toolboxItems.filter((item) =>
+    CARD_QUICK_TOOL_IDS.has(item.id),
+  );
+  const fruitQuickTools = toolboxItems.filter((item) =>
+    FRUIT_QUICK_TOOL_IDS.has(item.id),
+  );
+  const availableToolboxItems = toolboxItems.filter(
+    (item) =>
+      item.left > 0 &&
+      !CARD_QUICK_TOOL_IDS.has(item.id) &&
+      !FRUIT_QUICK_TOOL_IDS.has(item.id),
+  );
   const useToolById = (id: ToolId) =>
     useTool((controls) => {
       if (id === "sun") controls.sunshine();
@@ -1019,6 +1036,44 @@ export default function App() {
                 <span>菜单</span>
               </button>
             </header>
+            <div
+              className="quick-tool-dock card-tool-dock"
+              aria-label="牌桌区道具"
+            >
+              <small>牌桌</small>
+              {cardQuickTools.map((item) => (
+                <button
+                  key={item.id}
+                  disabled={item.left <= 0}
+                  onClick={() => useToolById(item.id)}
+                  aria-label={`${item.label}，剩余 ${item.left} 次`}
+                  title={item.label}
+                >
+                  <i>{item.icon}</i>
+                  <span>{item.label}</span>
+                  <em>×{item.left}</em>
+                </button>
+              ))}
+            </div>
+            <div
+              className="quick-tool-dock fruit-tool-dock"
+              aria-label="水果合成区道具"
+            >
+              <small>果箱</small>
+              {fruitQuickTools.map((item) => (
+                <button
+                  key={item.id}
+                  disabled={item.left <= 0}
+                  onClick={() => useToolById(item.id)}
+                  aria-label={`${item.label}，剩余 ${item.left} 次`}
+                  title={item.label}
+                >
+                  <i>{item.icon}</i>
+                  <span>{item.label}</span>
+                  <em>×{item.left}</em>
+                </button>
+              ))}
+            </div>
             <div className="drop-lane-control" aria-label="选择下次落果位置">
               <span>下次落点</span>
               {([-1, 0, 1] as const).map((lane) => (
@@ -1115,6 +1170,11 @@ export default function App() {
                         <span>温室培育最高 3 果</span>
                         <span>水果落稳后才会合成</span>
                         <span>点击水果会弹向同级伙伴</span>
+                      </div>
+                      <h3>区域道具</h3>
+                      <div className="zone-tool-legend">
+                        <span>牌桌 · 🎲 洗牌 / 🔨 清顶 / ☀️ 净化</span>
+                        <span>果箱 · 💣 炸弹 / 🧊 冰冻 / ⚙️ 搅拌</span>
                       </div>
                       <h3>特殊牌角标</h3>
                       <div className="special-legend">
@@ -1467,6 +1527,7 @@ export default function App() {
             <div className="supply-grid">
               {TOOLS.map((item) => {
                 const levelNow = tools[item.id];
+                const baseUses = BASE_TOOL_IDS.has(item.id) ? 1 : 0;
                 const maxed = levelNow >= item.maxLevel;
                 const rawCost = maxed ? 0 : item.costs[levelNow];
                 const cost = Math.max(
@@ -1480,7 +1541,8 @@ export default function App() {
                       <b>{item.name}</b>
                       <small>{item.description}</small>
                       <em>
-                        每局 ×{levelNow} · 上限 {item.maxLevel}
+                        每局 ×{levelNow + baseUses}
+                        {baseUses ? ` · 含基础 ${baseUses} 次` : ""}
                       </em>
                     </span>
                     <button
@@ -1510,10 +1572,9 @@ export default function App() {
           loading={leaderboardLoading}
           offline={leaderboardOffline}
           mode={leaderboardMode}
-          level={level}
           onModeChange={changeLeaderboardMode}
           onClose={() => setLeaderboardOpen(false)}
-          onRefresh={() => loadLeaderboard(leaderboardMode, level)}
+          onRefresh={() => loadLeaderboard(leaderboardMode)}
         />
       ) : null}
     </main>

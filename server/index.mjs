@@ -136,21 +136,29 @@ app.get("/api/leaderboard", async (req, res) => {
   const mode = ["story", "endless", "expedition"].includes(req.query.mode)
     ? req.query.mode
     : "story";
-  const requestedLevel = Number(req.query.level);
-  const hasStoryLevel =
-    mode === "story" &&
-    Number.isInteger(requestedLevel) &&
-    requestedLevel >= 0 &&
-    requestedLevel <= 99;
   const result = await pool.query(
-    `SELECT username, score, level, max_combo AS "maxCombo",
+    `WITH personal_bests AS (
+       SELECT username, score, level, max_combo, fruit_tier, created_at,
+              ROW_NUMBER() OVER (
+                PARTITION BY LOWER(username)
+                ORDER BY
+                  CASE WHEN mode = 'story' THEN level END DESC,
+                  score DESC,
+                  created_at ASC
+              ) AS personal_rank
+       FROM scores
+       WHERE mode = $1
+     )
+     SELECT username, score, level, max_combo AS "maxCombo",
             fruit_tier AS "fruitTier", created_at AS "createdAt"
-     FROM scores
-     WHERE mode = $1
-       AND ($2::integer IS NULL OR level = $2)
-     ORDER BY score DESC, created_at ASC
-     LIMIT 20`,
-    [mode, hasStoryLevel ? requestedLevel : null],
+     FROM personal_bests
+     WHERE personal_rank = 1
+     ORDER BY
+       CASE WHEN $1 = 'story' THEN level END DESC,
+       score DESC,
+       created_at ASC
+     LIMIT 50`,
+    [mode],
   );
   return res.json({ scores: result.rows });
 });

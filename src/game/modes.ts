@@ -481,6 +481,7 @@ export type ToolId =
   | "sun"
   | "ripen"
   | "split"
+  | "bomb"
   | "shield"
   | "harvest"
   | "quake";
@@ -537,12 +538,20 @@ export const TOOLS: ToolDefinition[] = [
     description: "收起两张散牌，凑满三张仍会转果",
   },
   {
+    id: "bomb",
+    icon: "💣",
+    name: "果箱炸弹",
+    maxLevel: 2,
+    costs: [260, 760],
+    description: "炸掉最拥挤处的低阶水果，快速腾出空间",
+  },
+  {
     id: "shield",
-    icon: "🛡️",
-    name: "甜度盾",
+    icon: "🧊",
+    name: "冰冻喷雾",
     maxLevel: 2,
     costs: [240, 660],
-    description: "短时间冻结警戒进度",
+    description: "冻结果箱物理与警戒线 6 秒",
   },
   {
     id: "magnet",
@@ -586,11 +595,11 @@ export const TOOLS: ToolDefinition[] = [
   },
   {
     id: "quake",
-    icon: "🪇",
-    name: "震荡铃",
+    icon: "⚙️",
+    name: "果箱搅拌机",
     maxLevel: 2,
     costs: [360, 980],
-    description: "将箱内所有水果向上弹开",
+    description: "旋转搅动所有水果，拆开死角并创造碰撞",
   },
   {
     id: "harvest",

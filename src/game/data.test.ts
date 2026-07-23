@@ -351,7 +351,7 @@ test("fruit scale and roguelike catalog stay balanced", () => {
   assert.equal(MUTATORS.length, 7);
   assert.ok(MUTATORS.every((mutator) => mutator.description.length > 0));
   assert.equal(UPGRADES.length, 10);
-  assert.equal(TOOLS.length, 13);
+  assert.equal(TOOLS.length, 14);
   assert.equal(new Set(TOOLS.map((tool) => tool.id)).size, TOOLS.length);
   assert.ok(
     TOOLS.every(
