@@ -1946,7 +1946,7 @@ input:focus-visible {
 .target-chip,
 .top-action {
   color: #d6cfdd;
-  border-color: rgba(186, 159, 221, 0.2);
+  border-color: transparent;
   background:
     linear-gradient(145deg, rgba(31, 25, 43, 0.94), rgba(17, 14, 25, 0.96));
   box-shadow:

@@ -616,7 +616,7 @@ export default function App() {
           <h1>
             叠个<span>果王</span>
           </h1>
-          <p className="tagline">点三张，掉一颗，碰两颗，合成果王！</p>
+          <p className="tagline">点三张，落果雨，碰两颗，合成果王！</p>
           <div className="mode-switch" aria-label="选择游戏模式">
             {(Object.keys(MODE_INFO) as GameMode[]).map((item) => (
               <button
@@ -723,7 +723,7 @@ export default function App() {
             <button className="brand-button" onClick={backHome}>
               叠个<span>果王</span>
             </button>
-            <p>三张消除，两颗合成。</p>
+            <p>三张消除，果雨合成。</p>
             <div className="brief-chain">
               {FRUITS.slice(
                 Math.max(0, LEVELS[level].target - 3),
@@ -952,13 +952,13 @@ export default function App() {
                         <i>›</i>
                         <span>三张入槽</span>
                         <i>›</i>
-                        <span>水果掉落</span>
+                        <span>随机果雨</span>
                         <i>›</i>
                         <span>同果合成</span>
                       </div>
                       <div className="help-rules">
-                        <span>金星牌：下一果压 +1</span>
-                        <span>三果位：预判物理连锁</span>
+                        <span>每次随机落下 1～3 果</span>
+                        <span>果压越高，多果雨越常见</span>
                       </div>
                       <h3>合成路径</h3>
                       <div className="help-chain">

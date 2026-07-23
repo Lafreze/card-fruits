@@ -347,38 +347,17 @@ export function simulateTray(sequence: number[]) {
   return { remaining: tray, maxSize };
 }
 
-export function evaluateDropPlacement(
-  chosenX: number,
-  partnerX: number | undefined,
-  fruitRadius: number,
+export function rollFruitRainCount(
+  random: () => number,
+  power = 1,
 ) {
-  // 三果位的最大半间距约 56px；容差覆盖最近果位，同时仍能区分错道。
-  const tolerance = Math.max(58, fruitRadius * 1.65);
-  const distance =
-    partnerX === undefined ? Number.POSITIVE_INFINITY : Math.abs(chosenX - partnerX);
-  return {
-    precision: distance <= tolerance,
-    distance,
-    tolerance,
-  };
-}
-
-export function forecastFusionChain(
-  existingTiers: readonly number[],
-  incomingTier: number,
-  maxTier: number,
-) {
-  const counts = new Array(maxTier + 1).fill(0);
-  existingTiers.forEach((tier) => {
-    if (tier >= 0 && tier <= maxTier) counts[tier] += 1;
-  });
-  let finalTier = Math.max(0, Math.min(maxTier, incomingTier));
-  let merges = 0;
-  while (finalTier < maxTier && counts[finalTier] % 2 === 1) {
-    merges += 1;
-    finalTier += 1;
-  }
-  return { merges, finalTier };
+  const safePower = Math.max(1, Math.min(3, Math.floor(power)));
+  const roll = Math.max(0, Math.min(0.999_999, random()));
+  const tripleChance = 0.12 + (safePower - 1) * 0.06;
+  const doubleChance = 0.38 + (safePower - 1) * 0.04;
+  if (roll < tripleChance) return 3;
+  if (roll < tripleChance + doubleChance) return 2;
+  return 1;
 }
 
 /**

@@ -4,8 +4,7 @@ import { FRUITS, LEVELS, WORLD, type LayoutBlock } from "./data.ts";
 import {
   buildFusionPairs,
   buildPlayableDeal,
-  evaluateDropPlacement,
-  forecastFusionChain,
+  rollFruitRainCount,
   scatterStackSlots,
   simulateTray,
   slotIsCovered,
@@ -222,33 +221,13 @@ test("every generated stack contains a verified low-risk clear route", () => {
   });
 });
 
-test("three drop gates cover the nearest partner without accepting a wrong lane", () => {
-  assert.equal(evaluateDropPlacement(120, 175, 10).precision, true);
-  assert.equal(evaluateDropPlacement(120, 179, 10).precision, false);
-  assert.equal(evaluateDropPlacement(200, 260, 40).precision, true);
-  assert.equal(
-    evaluateDropPlacement(200, undefined, 40).precision,
-    false,
-  );
-});
-
-test("fusion forecast follows the incoming fruit through deterministic pairs", () => {
-  assert.deepEqual(forecastFusionChain([], 0, 6), {
-    merges: 0,
-    finalTier: 0,
-  });
-  assert.deepEqual(forecastFusionChain([0], 0, 6), {
-    merges: 1,
-    finalTier: 1,
-  });
-  assert.deepEqual(forecastFusionChain([0, 1, 2], 0, 6), {
-    merges: 3,
-    finalTier: 3,
-  });
-  assert.deepEqual(forecastFusionChain([6], 6, 6), {
-    merges: 0,
-    finalTier: 6,
-  });
+test("fruit rain always yields one to three drops and power improves the odds", () => {
+  assert.equal(rollFruitRainCount(() => 0.05, 1), 3);
+  assert.equal(rollFruitRainCount(() => 0.2, 1), 2);
+  assert.equal(rollFruitRainCount(() => 0.75, 1), 1);
+  assert.equal(rollFruitRainCount(() => 0.22, 3), 3);
+  assert.equal(rollFruitRainCount(() => 0.65, 3), 2);
+  assert.equal(rollFruitRainCount(() => 0.95, 3), 1);
 });
 
 test("fusion planning keeps one partner per fruit and prioritizes card bonds", () => {

@@ -32,6 +32,10 @@ export const sounds = {
     note(520, 0.13, "triangle", 0.065);
     note(780, 0.16, "triangle", 0.05, 0.055);
   },
+  rain: (count: number) => {
+    for (let index = 0; index < count; index += 1)
+      note(360 + index * 95, 0.11, "sine", 0.035, index * 0.045);
+  },
   merge: (tier: number) => {
     const root = 210 + tier * 28;
     note(root, 0.2, "sine", 0.075);
