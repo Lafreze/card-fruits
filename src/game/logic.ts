@@ -465,7 +465,8 @@ export function endlessSeedTier(wave: number, fruitCount: number) {
 
 export function fusionRevealScale(progress: number) {
   const reveal = Math.max(0, Math.min(1, progress));
-  return 0.42 + reveal * 0.58 + Math.sin(reveal * Math.PI) * 0.1;
+  const eased = 1 - (1 - reveal) ** 3;
+  return 0.72 + eased * 0.28;
 }
 
 export function storyHarvestComplete({

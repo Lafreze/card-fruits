@@ -382,7 +382,7 @@ export const MODE_INFO: Record<
   story: {
     icon: "🗺️",
     name: "闯关模式",
-    tagline: "26 关，逐关合成果王",
+    tagline: "36 关，逐关合成果王",
   },
   endless: {
     icon: "∞",
@@ -440,6 +440,10 @@ export type WaveMutator = {
   bomb?: boolean;
   magnet?: number;
   danger?: number;
+  tray?: number;
+  harvest?: number;
+  gravity?: number;
+  launch?: number;
 };
 
 export const MUTATORS: WaveMutator[] = [
@@ -489,6 +493,31 @@ export const MUTATORS: WaveMutator[] = [
     description: "警戒时间 -0.5 秒 · 得分 +35%",
     danger: -0.5,
     score: 1.35,
+  },
+  {
+    id: "harvest",
+    name: "丰收潮",
+    icon: "🌾",
+    description: "每次三消多掉 1 颗水果 · 得分 +8%",
+    harvest: 1,
+    score: 1.08,
+  },
+  {
+    id: "wide_tray",
+    name: "宽篮节",
+    icon: "🧺",
+    description: "卡槽容量 +1 · 得分 +12%",
+    tray: 1,
+    score: 1.12,
+  },
+  {
+    id: "pinball",
+    name: "弹弹果园",
+    icon: "🎯",
+    description: "低重力与强弹射 · 得分 +18%",
+    gravity: 0.78,
+    launch: 1.35,
+    score: 1.18,
   },
 ];
 

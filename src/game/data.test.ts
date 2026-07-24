@@ -107,7 +107,7 @@ test("rotated card coverage follows the visible footprint", () => {
 });
 
 test("all story levels have valid, playable layouts", () => {
-  assert.equal(LEVELS.length, 26);
+  assert.equal(LEVELS.length, 36);
 
   LEVELS.forEach((level, index) => {
     const slots = expandLayout(level.layout);
@@ -299,7 +299,12 @@ test("fusion reveal stays gentle and story harvest can finish by clear or full t
   const revealScales = Array.from({ length: 101 }, (_, index) =>
     fusionRevealScale(index / 100),
   );
-  assert.ok(Math.max(...revealScales) <= 1.1);
+  assert.ok(Math.max(...revealScales) <= 1);
+  assert.ok(
+    revealScales.every(
+      (scale, index) => index === 0 || scale >= revealScales[index - 1],
+    ),
+  );
   assert.equal(fusionRevealScale(1), 1);
 
   assert.equal(
@@ -480,10 +485,29 @@ test("fusion planning keeps one partner per fruit and prioritizes card bonds", (
 });
 
 test("fruit scale and roguelike catalog stay balanced", () => {
-  assert.equal(FRUITS.length, 29);
+  assert.equal(FRUITS.length, 39);
   assert.deepEqual(
-    FRUITS.slice(-8).map((fruit) => fruit.name),
-    ["西瓜", "石榴", "木瓜", "菠萝蜜", "山竹", "杨桃", "柚子", "黄金果王"],
+    FRUITS.slice(-18).map((fruit) => fruit.name),
+    [
+      "西瓜",
+      "石榴",
+      "木瓜",
+      "菠萝蜜",
+      "山竹",
+      "杨桃",
+      "柚子",
+      "无花果",
+      "莲雾",
+      "荔枝",
+      "番石榴",
+      "枇杷",
+      "释迦",
+      "蛇皮果",
+      "面包果",
+      "可可果",
+      "酸角",
+      "黄金果王",
+    ],
   );
   FRUITS.forEach((fruit, index) => {
     assert.ok(fruit.radius <= 41, `${fruit.name} 不应重新撑满果箱`);
@@ -506,13 +530,30 @@ test("fruit scale and roguelike catalog stay balanced", () => {
     FRUITS.find((fruit) => fruit.name === "西瓜")?.icon,
     "/fruits/watermelon-whole.webp",
   );
-  ["石榴", "木瓜", "菠萝蜜", "山竹", "杨桃", "柚子"].forEach((name) =>
+  [
+    "石榴",
+    "木瓜",
+    "菠萝蜜",
+    "山竹",
+    "杨桃",
+    "柚子",
+    "无花果",
+    "莲雾",
+    "荔枝",
+    "番石榴",
+    "枇杷",
+    "释迦",
+    "蛇皮果",
+    "面包果",
+    "可可果",
+    "酸角",
+  ].forEach((name) =>
     assert.ok(FRUITS.find((fruit) => fruit.name === name)?.icon),
   );
   assert.equal(new Set(RELICS.map((relic) => relic.id)).size, RELICS.length);
   assert.equal(RELICS.length, 36);
   assert.ok(RELICS.some((relic) => relic.rarity === "rare"));
-  assert.equal(MUTATORS.length, 7);
+  assert.equal(MUTATORS.length, 10);
   assert.ok(MUTATORS.every((mutator) => mutator.description.length > 0));
   assert.equal(UPGRADES.length, 12);
   assert.equal(TOOLS.length, 16);

@@ -15,7 +15,7 @@ export const finishRunSchema = z.object({
     .regex(/^[\p{L}\p{N}_\-· ]+$/u, "用户名含有不支持的字符"),
   score: z.number().int().min(0).max(1_000_000_000),
   maxCombo: z.number().int().min(0).max(999),
-  fruitTier: z.number().int().min(0).max(32),
+  fruitTier: z.number().int().min(0).max(48),
 });
 
 export function cleanUsername(value) {

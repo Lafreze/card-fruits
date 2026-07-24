@@ -122,6 +122,8 @@ type FruitPluginState = {
   landingPulseUntil?: number;
   collisionPulseUntil?: number;
   collisionPulseStrength?: number;
+  spawnedByMerge?: boolean;
+  visualSettleUntil?: number;
   noMergeUntil?: number;
   splitGroup?: number;
   splitUntil?: number;
@@ -336,7 +338,13 @@ export class FruitGame implements GameControls {
     this.greenhouseSeedCount = Math.min(2, upgrades.seedStart || 0);
     this.trayLimit += Math.min(2, upgrades.trayCapacity || 0);
     this.launchMultiplier *= 1 + 0.15 * Math.min(3, upgrades.launch || 0);
-    if (this.mode !== "story") this.mutator = rollMutator(this.wave);
+    if (this.mode !== "story") {
+      this.mutator = rollMutator(this.wave);
+      this.trayLimit += this.mutator.tray || 0;
+      this.fruitBatchBonus += this.mutator.harvest || 0;
+      this.launchMultiplier *= this.mutator.launch || 1;
+      this.engine.gravity.y *= this.mutator.gravity || 1;
+    }
     this.callbacks = callbacks;
   }
 
@@ -2079,7 +2087,14 @@ export class FruitGame implements GameControls {
     const plugin = this.fruitPlugin(fruit);
     if (plugin.landedAt !== undefined) return false;
     plugin.landedAt = this.elapsed;
-    plugin.landingPulseUntil = this.elapsed + 0.22;
+    if (plugin.spawnedByMerge) {
+      delete plugin.spawnedByMerge;
+      plugin.visualSettleUntil = this.elapsed + 0.28;
+      delete plugin.landingPulseUntil;
+      delete plugin.collisionPulseUntil;
+    } else {
+      plugin.landingPulseUntil = this.elapsed + 0.22;
+    }
     Body.setAngularVelocity(fruit.body, fruit.body.angularVelocity * 0.72);
     this.ring(
       fruit.body.position.x,
@@ -2416,6 +2431,11 @@ export class FruitGame implements GameControls {
 
     [nodeA, nodeB].filter(Boolean).forEach((fruit) => {
       const plugin = this.fruitPlugin(fruit!);
+      if (
+        plugin.spawnedByMerge ||
+        Number(plugin.visualSettleUntil || 0) > this.elapsed
+      )
+        return;
       plugin.collisionPulseUntil = this.elapsed + 0.12 + strength * 0.08;
       plugin.collisionPulseStrength = Math.max(
         Number(plugin.collisionPulseStrength || 0),
@@ -2594,14 +2614,13 @@ export class FruitGame implements GameControls {
         );
       }, 610);
     }
-    const fusionIcon = (fruitTier: number, fontScale = 1) => {
+    const fusionIcon = (fruitTier: number) => {
       const icon = this.makeFruitIcon(
         fruitTier,
         Math.max(
           18,
           this.fruitRadius(fruitTier) *
-            (FRUITS[fruitTier].icon ? 1.82 : 1.72) *
-            fontScale,
+            (FRUITS[fruitTier].icon ? 1.82 : 1.72),
         ),
         true,
       );
@@ -2610,7 +2629,7 @@ export class FruitGame implements GameControls {
     };
     const echoA = fusionIcon(first.tier);
     const echoB = fusionIcon(second.tier);
-    const result = fusionIcon(tier, 1.04);
+    const result = fusionIcon(tier);
     echoA.position.set(fromA.x, fromA.y);
     echoB.position.set(fromB.x, fromB.y);
     result.position.set(x, y - 4);
@@ -2674,6 +2693,9 @@ export class FruitGame implements GameControls {
         echo.center.y - 5,
       );
       if (result) {
+        const plugin = this.fruitPlugin(result);
+        plugin.spawnedByMerge = true;
+        plugin.visualSettleUntil = this.elapsed + 0.28;
         Body.setVelocity(result.body, { x: echo.velocityX, y: -2.45 });
         this.focusedFruitIds.add(result.body.id);
       }
@@ -2825,7 +2847,12 @@ export class FruitGame implements GameControls {
       fruit.view.position.copyFrom(fruit.body.position);
       fruit.view.rotation = fruit.body.angle;
       const plugin = this.fruitPlugin(fruit);
-      if (fruit.view.scale.x < 0.99) {
+      if (
+        plugin.spawnedByMerge ||
+        Number(plugin.visualSettleUntil || 0) > this.elapsed
+      ) {
+        fruit.view.scale.set(1);
+      } else if (fruit.view.scale.x < 0.99) {
         const next = Math.min(1, fruit.view.scale.x + 0.11 * delta);
         fruit.view.scale.set(next);
       } else if (Number(plugin.collisionPulseUntil || 0) > this.elapsed) {

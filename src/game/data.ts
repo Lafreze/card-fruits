@@ -26,7 +26,7 @@ export type LevelDefinition = {
   layout: LayoutBlock[];
 };
 
-// 29 级合成链:后期加入山竹、杨桃和柚子，黄金果王仍为终点。
+// 39 级合成链:高等级水果保持接近尺寸，黄金果王仍为最终终点。
 export const FRUITS: FruitDefinition[] = [
   { name: "蓝莓", emoji: "🫐", radius: 8, color: 0x5c7cfa, glow: 0xa5b4ff },
   { name: "橄榄", emoji: "🫒", radius: 9, color: 0x718c3a, glow: 0xc7df85 },
@@ -130,6 +130,86 @@ export const FRUITS: FruitDefinition[] = [
     radius: 40.875,
     color: 0xc7d85b,
     glow: 0xf2f5a4,
+  },
+  {
+    name: "无花果",
+    emoji: "",
+    icon: "/fruits/fig.webp",
+    radius: 40.886,
+    color: 0x7b2f72,
+    glow: 0xe4a5d8,
+  },
+  {
+    name: "莲雾",
+    emoji: "",
+    icon: "/fruits/wax-apple.webp",
+    radius: 40.897,
+    color: 0xe53935,
+    glow: 0xff9b97,
+  },
+  {
+    name: "荔枝",
+    emoji: "",
+    icon: "/fruits/lychee.webp",
+    radius: 40.908,
+    color: 0xeb5b67,
+    glow: 0xffb1b8,
+  },
+  {
+    name: "番石榴",
+    emoji: "",
+    icon: "/fruits/guava.webp",
+    radius: 40.919,
+    color: 0xa6cf3c,
+    glow: 0xe1f58a,
+  },
+  {
+    name: "枇杷",
+    emoji: "",
+    icon: "/fruits/loquat.webp",
+    radius: 40.93,
+    color: 0xf5a623,
+    glow: 0xffd37a,
+  },
+  {
+    name: "释迦",
+    emoji: "",
+    icon: "/fruits/sugar-apple.webp",
+    radius: 40.941,
+    color: 0xa8c86c,
+    glow: 0xe3f2b5,
+  },
+  {
+    name: "蛇皮果",
+    emoji: "",
+    icon: "/fruits/salak.webp",
+    radius: 40.952,
+    color: 0xa94d28,
+    glow: 0xe89a72,
+  },
+  {
+    name: "面包果",
+    emoji: "",
+    icon: "/fruits/breadfruit.webp",
+    radius: 40.963,
+    color: 0x84a83f,
+    glow: 0xcfe88d,
+  },
+  {
+    name: "可可果",
+    emoji: "",
+    icon: "/fruits/cacao-pod.webp",
+    radius: 40.974,
+    color: 0xe76128,
+    glow: 0xffac75,
+  },
+  {
+    name: "酸角",
+    emoji: "",
+    icon: "/fruits/tamarind.webp",
+    radius: 40.985,
+    color: 0xb86f32,
+    glow: 0xe7b482,
   },
   {
     name: "黄金果王",
@@ -397,7 +477,7 @@ const GOLDEN_SANCTUM = [
   B(6, 251, 244, 3, 1),
 ];
 
-// 后期三关改为三张一层的高塔：层内始终有足够间距，跨层遮挡则形成
+// 后期关卡改为三张一层的高塔：层内始终有足够间距，跨层遮挡则形成
 // 稳定、清晰的逐层揭牌节奏。层心上下错开，避免视觉上像一摞死板直线。
 function crownTower(rows: number) {
   return Array.from({ length: rows }, (_, layer) =>
@@ -410,7 +490,17 @@ const JACKFRUIT_GROVE = crownTower(26);
 const MANGOSTEEN_CROWN = crownTower(27);
 const STARFRUIT_SKYWAY = crownTower(28);
 const POMELO_HORIZON = crownTower(29);
-const KING_ASCENSION = crownTower(30);
+const FIG_COURT = crownTower(30);
+const WAX_APPLE_RAINFOREST = crownTower(31);
+const LYCHEE_LIGHTS = crownTower(32);
+const GUAVA_OASIS = crownTower(33);
+const LOQUAT_VALLEY = crownTower(34);
+const SUGAR_APPLE_CASTLE = crownTower(35);
+const SALAK_DUNES = crownTower(36);
+const BREADFRUIT_ISLAND = crownTower(37);
+const CACAO_REALM = crownTower(38);
+const TAMARIND_BRIDGE = crownTower(39);
+const KING_ASCENSION = crownTower(40);
 
 // 把一颗目标果递归拆成与卡位数量相同的果实组，保持总合成质量严格守恒。
 // 因此普通关卡不会再靠几组高阶牌提前结束，玩家需要处理绝大多数牌才能达成目标。
@@ -611,10 +701,80 @@ export const LEVELS: LevelDefinition[] = [
     layout: POMELO_HORIZON,
   },
   {
-    name: "果王圣殿",
+    name: "无花果秘庭",
     target: 28,
     cards: ladderCards(28, 90),
     specialRate: 0.48,
+    layout: FIG_COURT,
+  },
+  {
+    name: "莲雾雨林",
+    target: 29,
+    cards: ladderCards(29, 93),
+    specialRate: 0.49,
+    layout: WAX_APPLE_RAINFOREST,
+  },
+  {
+    name: "荔枝灯海",
+    target: 30,
+    cards: ladderCards(30, 96),
+    specialRate: 0.5,
+    layout: LYCHEE_LIGHTS,
+  },
+  {
+    name: "番石榴绿洲",
+    target: 31,
+    cards: ladderCards(31, 99),
+    specialRate: 0.51,
+    layout: GUAVA_OASIS,
+  },
+  {
+    name: "枇杷金谷",
+    target: 32,
+    cards: ladderCards(32, 102),
+    specialRate: 0.52,
+    layout: LOQUAT_VALLEY,
+  },
+  {
+    name: "释迦星堡",
+    target: 33,
+    cards: ladderCards(33, 105),
+    specialRate: 0.53,
+    layout: SUGAR_APPLE_CASTLE,
+  },
+  {
+    name: "蛇皮果沙丘",
+    target: 34,
+    cards: ladderCards(34, 108),
+    specialRate: 0.54,
+    layout: SALAK_DUNES,
+  },
+  {
+    name: "面包果巨岛",
+    target: 35,
+    cards: ladderCards(35, 111),
+    specialRate: 0.55,
+    layout: BREADFRUIT_ISLAND,
+  },
+  {
+    name: "可可秘境",
+    target: 36,
+    cards: ladderCards(36, 114),
+    specialRate: 0.56,
+    layout: CACAO_REALM,
+  },
+  {
+    name: "酸角长桥",
+    target: 37,
+    cards: ladderCards(37, 117),
+    specialRate: 0.57,
+    layout: TAMARIND_BRIDGE,
+  },
+  {
+    name: "果王圣殿",
+    target: 38,
+    cards: ladderCards(38, 120),
+    specialRate: 0.58,
     layout: KING_ASCENSION,
   },
 ];
