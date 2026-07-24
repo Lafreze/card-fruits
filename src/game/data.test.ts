@@ -14,6 +14,7 @@ import {
   fruitBatchCount,
   fusionRevealScale,
   fruitMergeScore,
+  fruitVisualDiameter,
   rotatedRectanglesOverlap,
   scatterStackSlots,
   simulateTray,
@@ -107,7 +108,7 @@ test("rotated card coverage follows the visible footprint", () => {
 });
 
 test("all story levels have valid, playable layouts", () => {
-  assert.equal(LEVELS.length, 36);
+  assert.equal(LEVELS.length, 47);
 
   LEVELS.forEach((level, index) => {
     const slots = expandLayout(level.layout);
@@ -306,6 +307,7 @@ test("fusion reveal stays gentle and story harvest can finish by clear or full t
     ),
   );
   assert.equal(fusionRevealScale(1), 1);
+  assert.ok(fruitVisualDiameter(40, true) < fruitVisualDiameter(40, false));
 
   assert.equal(
     storyHarvestComplete({
@@ -485,27 +487,21 @@ test("fusion planning keeps one partner per fruit and prioritizes card bonds", (
 });
 
 test("fruit scale and roguelike catalog stay balanced", () => {
-  assert.equal(FRUITS.length, 39);
+  assert.equal(FRUITS.length, 50);
   assert.deepEqual(
-    FRUITS.slice(-18).map((fruit) => fruit.name),
+    FRUITS.slice(-12).map((fruit) => fruit.name),
     [
-      "西瓜",
-      "石榴",
-      "木瓜",
-      "菠萝蜜",
-      "山竹",
-      "杨桃",
-      "柚子",
-      "无花果",
-      "莲雾",
-      "荔枝",
-      "番石榴",
-      "枇杷",
-      "释迦",
-      "蛇皮果",
-      "面包果",
-      "可可果",
-      "酸角",
+      "柿子",
+      "李子",
+      "金桔",
+      "百香果",
+      "龙眼",
+      "杨梅",
+      "人参果",
+      "蛋黄果",
+      "刺角瓜",
+      "佛手柑",
+      "仙人掌果",
       "黄金果王",
     ],
   );
@@ -547,6 +543,17 @@ test("fruit scale and roguelike catalog stay balanced", () => {
     "面包果",
     "可可果",
     "酸角",
+    "柿子",
+    "李子",
+    "金桔",
+    "百香果",
+    "龙眼",
+    "杨梅",
+    "人参果",
+    "蛋黄果",
+    "刺角瓜",
+    "佛手柑",
+    "仙人掌果",
   ].forEach((name) =>
     assert.ok(FRUITS.find((fruit) => fruit.name === name)?.icon),
   );

@@ -15,7 +15,7 @@ CREATE TABLE IF NOT EXISTS scores (
   level INTEGER NOT NULL CHECK (level BETWEEN 0 AND 99),
   mode VARCHAR(16) NOT NULL CHECK (mode IN ('story', 'endless', 'expedition')),
   max_combo INTEGER NOT NULL DEFAULT 0 CHECK (max_combo BETWEEN 0 AND 999),
-  fruit_tier INTEGER NOT NULL DEFAULT 0 CHECK (fruit_tier BETWEEN 0 AND 48),
+  fruit_tier INTEGER NOT NULL DEFAULT 0 CHECK (fruit_tier BETWEEN 0 AND 64),
   duration_ms INTEGER NOT NULL CHECK (duration_ms >= 0),
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
@@ -39,4 +39,4 @@ ALTER TABLE scores ADD CONSTRAINT scores_mode_check
 
 ALTER TABLE scores DROP CONSTRAINT IF EXISTS scores_fruit_tier_check;
 ALTER TABLE scores ADD CONSTRAINT scores_fruit_tier_check
-  CHECK (fruit_tier BETWEEN 0 AND 48);
+  CHECK (fruit_tier BETWEEN 0 AND 64);

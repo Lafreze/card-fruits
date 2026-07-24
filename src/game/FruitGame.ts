@@ -22,6 +22,7 @@ import {
   fruitBatchCount,
   fusionRevealScale,
   fruitMergeScore,
+  fruitVisualDiameter,
   rotatedRectanglesOverlap,
   scatterStackSlots,
   storyHarvestComplete,
@@ -2305,7 +2306,7 @@ export class FruitGame implements GameControls {
     resonanceHalo.visible = false;
     const fruitIcon = this.makeFruitIcon(
       tier,
-      Math.max(18, radius * (definition.icon ? 1.82 : 1.72)),
+      fruitVisualDiameter(radius, Boolean(definition.icon)),
       true,
     );
     fruitIcon.position.set(0, 1);
@@ -2617,10 +2618,9 @@ export class FruitGame implements GameControls {
     const fusionIcon = (fruitTier: number) => {
       const icon = this.makeFruitIcon(
         fruitTier,
-        Math.max(
-          18,
-          this.fruitRadius(fruitTier) *
-            (FRUITS[fruitTier].icon ? 1.82 : 1.72),
+        fruitVisualDiameter(
+          this.fruitRadius(fruitTier),
+          Boolean(FRUITS[fruitTier].icon),
         ),
         true,
       );

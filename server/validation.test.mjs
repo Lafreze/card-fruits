@@ -31,7 +31,7 @@ test("accepts the expanded late-game fruit tiers", () => {
     username: "Fruit Master",
     score: 880000,
     maxCombo: 12,
-    fruitTier: 38,
+    fruitTier: 49,
   });
   assert.equal(parsed.success, true);
 });
@@ -41,7 +41,7 @@ test("database accepts every server-validated fruit tier", () => {
     new URL("../database/schema.sql", import.meta.url),
     "utf8",
   );
-  assert.match(schema, /fruit_tier BETWEEN 0 AND 48/);
+  assert.match(schema, /fruit_tier BETWEEN 0 AND 64/);
   assert.doesNotMatch(schema, /fruit_tier BETWEEN 0 AND 20/);
 });
 

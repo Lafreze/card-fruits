@@ -469,6 +469,10 @@ export function fusionRevealScale(progress: number) {
   return 0.72 + eased * 0.28;
 }
 
+export function fruitVisualDiameter(radius: number, usesImage: boolean) {
+  return Math.max(18, radius * (usesImage ? 1.58 : 1.72));
+}
+
 export function storyHarvestComplete({
   targetAchieved,
   remainingCards,
@@ -600,7 +604,8 @@ export function fruitMergeScore({
   wave?: number;
 }) {
   const safeTier = Math.max(1, tier);
-  const fruitValue = 260 * (safeTier + 1) ** 2.05;
+  // 50 级链需要持续奖励升级，但指数过高会让末段分数压倒连击与关卡表现。
+  const fruitValue = 260 * (safeTier + 1) ** 1.86;
   return Math.round(
     fruitValue *
       comboScoreMultiplier(combo) *

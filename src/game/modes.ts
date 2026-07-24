@@ -382,7 +382,7 @@ export const MODE_INFO: Record<
   story: {
     icon: "🗺️",
     name: "闯关模式",
-    tagline: "36 关，逐关合成果王",
+    tagline: "47 关，逐关合成果王",
   },
   endless: {
     icon: "∞",

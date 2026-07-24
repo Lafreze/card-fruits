@@ -26,7 +26,7 @@ export type LevelDefinition = {
   layout: LayoutBlock[];
 };
 
-// 39 级合成链:高等级水果保持接近尺寸，黄金果王仍为最终终点。
+// 50 级合成链:高等级水果保持接近尺寸，黄金果王仍为最终终点。
 export const FRUITS: FruitDefinition[] = [
   { name: "蓝莓", emoji: "🫐", radius: 8, color: 0x5c7cfa, glow: 0xa5b4ff },
   { name: "橄榄", emoji: "🫒", radius: 9, color: 0x718c3a, glow: 0xc7df85 },
@@ -135,7 +135,7 @@ export const FRUITS: FruitDefinition[] = [
     name: "无花果",
     emoji: "",
     icon: "/fruits/fig.webp",
-    radius: 40.886,
+    radius: 40.88,
     color: 0x7b2f72,
     glow: 0xe4a5d8,
   },
@@ -143,7 +143,7 @@ export const FRUITS: FruitDefinition[] = [
     name: "莲雾",
     emoji: "",
     icon: "/fruits/wax-apple.webp",
-    radius: 40.897,
+    radius: 40.885,
     color: 0xe53935,
     glow: 0xff9b97,
   },
@@ -151,7 +151,7 @@ export const FRUITS: FruitDefinition[] = [
     name: "荔枝",
     emoji: "",
     icon: "/fruits/lychee.webp",
-    radius: 40.908,
+    radius: 40.89,
     color: 0xeb5b67,
     glow: 0xffb1b8,
   },
@@ -159,7 +159,7 @@ export const FRUITS: FruitDefinition[] = [
     name: "番石榴",
     emoji: "",
     icon: "/fruits/guava.webp",
-    radius: 40.919,
+    radius: 40.895,
     color: 0xa6cf3c,
     glow: 0xe1f58a,
   },
@@ -167,7 +167,7 @@ export const FRUITS: FruitDefinition[] = [
     name: "枇杷",
     emoji: "",
     icon: "/fruits/loquat.webp",
-    radius: 40.93,
+    radius: 40.9,
     color: 0xf5a623,
     glow: 0xffd37a,
   },
@@ -175,7 +175,7 @@ export const FRUITS: FruitDefinition[] = [
     name: "释迦",
     emoji: "",
     icon: "/fruits/sugar-apple.webp",
-    radius: 40.941,
+    radius: 40.905,
     color: 0xa8c86c,
     glow: 0xe3f2b5,
   },
@@ -183,7 +183,7 @@ export const FRUITS: FruitDefinition[] = [
     name: "蛇皮果",
     emoji: "",
     icon: "/fruits/salak.webp",
-    radius: 40.952,
+    radius: 40.91,
     color: 0xa94d28,
     glow: 0xe89a72,
   },
@@ -191,7 +191,7 @@ export const FRUITS: FruitDefinition[] = [
     name: "面包果",
     emoji: "",
     icon: "/fruits/breadfruit.webp",
-    radius: 40.963,
+    radius: 40.915,
     color: 0x84a83f,
     glow: 0xcfe88d,
   },
@@ -199,7 +199,7 @@ export const FRUITS: FruitDefinition[] = [
     name: "可可果",
     emoji: "",
     icon: "/fruits/cacao-pod.webp",
-    radius: 40.974,
+    radius: 40.92,
     color: 0xe76128,
     glow: 0xffac75,
   },
@@ -207,9 +207,97 @@ export const FRUITS: FruitDefinition[] = [
     name: "酸角",
     emoji: "",
     icon: "/fruits/tamarind.webp",
-    radius: 40.985,
+    radius: 40.925,
     color: 0xb86f32,
     glow: 0xe7b482,
+  },
+  {
+    name: "柿子",
+    emoji: "",
+    icon: "/fruits/persimmon.webp",
+    radius: 40.931,
+    color: 0xf47b20,
+    glow: 0xffbd78,
+  },
+  {
+    name: "李子",
+    emoji: "",
+    icon: "/fruits/plum.webp",
+    radius: 40.937,
+    color: 0x6f3aa8,
+    glow: 0xc0a0ef,
+  },
+  {
+    name: "金桔",
+    emoji: "",
+    icon: "/fruits/kumquat.webp",
+    radius: 40.943,
+    color: 0xf6a10a,
+    glow: 0xffd36c,
+  },
+  {
+    name: "百香果",
+    emoji: "",
+    icon: "/fruits/passion-fruit.webp",
+    radius: 40.949,
+    color: 0x8b2f62,
+    glow: 0xd895bc,
+  },
+  {
+    name: "龙眼",
+    emoji: "",
+    icon: "/fruits/longan.webp",
+    radius: 40.955,
+    color: 0xc79142,
+    glow: 0xefd09a,
+  },
+  {
+    name: "杨梅",
+    emoji: "",
+    icon: "/fruits/yangmei.webp",
+    radius: 40.961,
+    color: 0xb8183f,
+    glow: 0xf47a96,
+  },
+  {
+    name: "人参果",
+    emoji: "",
+    icon: "/fruits/pepino-melon.webp",
+    radius: 40.967,
+    color: 0xe8c766,
+    glow: 0xf9e6a0,
+  },
+  {
+    name: "蛋黄果",
+    emoji: "",
+    icon: "/fruits/canistel.webp",
+    radius: 40.973,
+    color: 0xe9a814,
+    glow: 0xffdb73,
+  },
+  {
+    name: "刺角瓜",
+    emoji: "",
+    icon: "/fruits/kiwano.webp",
+    radius: 40.979,
+    color: 0xf27a15,
+    glow: 0xffb762,
+  },
+  {
+    name: "佛手柑",
+    emoji: "",
+    icon: "/fruits/buddhas-hand.webp",
+    radius: 40.985,
+    color: 0xe8c414,
+    glow: 0xffed79,
+  },
+  {
+    name: "仙人掌果",
+    emoji: "",
+    icon: "/fruits/prickly-pear.webp",
+    radius: 40.991,
+    color: 0xd82768,
+    glow: 0xff8fb3,
   },
   {
     name: "黄金果王",
@@ -500,7 +588,18 @@ const SALAK_DUNES = crownTower(36);
 const BREADFRUIT_ISLAND = crownTower(37);
 const CACAO_REALM = crownTower(38);
 const TAMARIND_BRIDGE = crownTower(39);
-const KING_ASCENSION = crownTower(40);
+const PERSIMMON_COURT = crownTower(40);
+const PLUM_NIGHT = crownTower(41);
+const KUMQUAT_LIGHTS = crownTower(42);
+const PASSION_MAZE = crownTower(43);
+const LONGAN_MOON = crownTower(44);
+const YANGMEI_CROWN = crownTower(45);
+const PEPINO_GARDEN = crownTower(46);
+const CANISTEL_VAULT = crownTower(47);
+const KIWANO_FORT = crownTower(48);
+const BUDDHAS_HAND_TEMPLE = crownTower(49);
+const PRICKLY_PEAR_MIRAGE = crownTower(50);
+const KING_ASCENSION = crownTower(51);
 
 // 把一颗目标果递归拆成与卡位数量相同的果实组，保持总合成质量严格守恒。
 // 因此普通关卡不会再靠几组高阶牌提前结束，玩家需要处理绝大多数牌才能达成目标。
@@ -771,10 +870,87 @@ export const LEVELS: LevelDefinition[] = [
     layout: TAMARIND_BRIDGE,
   },
   {
-    name: "果王圣殿",
+    name: "柿子丹庭",
     target: 38,
     cards: ladderCards(38, 120),
     specialRate: 0.58,
+    layout: PERSIMMON_COURT,
+  },
+  {
+    name: "李子夜湾",
+    target: 39,
+    cards: ladderCards(39, 123),
+    specialRate: 0.58,
+    layout: PLUM_NIGHT,
+  },
+  {
+    name: "金桔灯塔",
+    target: 40,
+    cards: ladderCards(40, 126),
+    specialRate: 0.59,
+    layout: KUMQUAT_LIGHTS,
+  },
+  {
+    name: "百香迷宫",
+    target: 41,
+    cards: ladderCards(41, 129),
+    specialRate: 0.59,
+    layout: PASSION_MAZE,
+  },
+  {
+    name: "龙眼月轮",
+    target: 42,
+    cards: ladderCards(42, 132),
+    specialRate: 0.6,
+    layout: LONGAN_MOON,
+  },
+  {
+    name: "杨梅星冠",
+    target: 43,
+    cards: ladderCards(43, 135),
+    specialRate: 0.6,
+    layout: YANGMEI_CROWN,
+  },
+  {
+    name: "人参果园",
+    target: 44,
+    cards: ladderCards(44, 138),
+    specialRate: 0.61,
+    layout: PEPINO_GARDEN,
+  },
+  {
+    name: "蛋黄宝库",
+    target: 45,
+    cards: ladderCards(45, 141),
+    specialRate: 0.61,
+    layout: CANISTEL_VAULT,
+  },
+  {
+    name: "刺角要塞",
+    target: 46,
+    cards: ladderCards(46, 144),
+    specialRate: 0.62,
+    layout: KIWANO_FORT,
+  },
+  {
+    name: "佛手金殿",
+    target: 47,
+    cards: ladderCards(47, 147),
+    specialRate: 0.62,
+    layout: BUDDHAS_HAND_TEMPLE,
+  },
+  {
+    name: "仙果蜃景",
+    target: 48,
+    cards: ladderCards(48, 150),
+    specialRate: 0.63,
+    layout: PRICKLY_PEAR_MIRAGE,
+  },
+  {
+    name: "果王圣殿",
+    target: 49,
+    cards: ladderCards(49, 153),
+    specialRate: 0.64,
     layout: KING_ASCENSION,
   },
 ];
