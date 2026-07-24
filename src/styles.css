@@ -1552,7 +1552,7 @@ input:focus-visible {
   font-variant-numeric: tabular-nums;
 }
 .greenhouse-stage {
-  height: 132px;
+  height: 166px;
   position: relative;
   overflow: hidden;
   margin: 3px 0 14px;
@@ -1628,13 +1628,16 @@ input:focus-visible {
   left: 12px;
   right: 12px;
   bottom: 12px;
-  display: flex;
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 7px 9px;
   align-items: flex-end;
-  justify-content: space-around;
 }
 .greenhouse-plant {
-  width: 45px;
-  height: 54px;
+  width: 100%;
+  max-width: 45px;
+  height: 48px;
+  justify-self: center;
   position: relative;
   display: flex;
   align-items: flex-end;

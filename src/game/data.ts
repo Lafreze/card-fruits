@@ -26,7 +26,7 @@ export type LevelDefinition = {
   layout: LayoutBlock[];
 };
 
-// 26 级合成链:后期加入石榴、木瓜和菠萝蜜，黄金果王仍为终点。
+// 29 级合成链:后期加入山竹、杨桃和柚子，黄金果王仍为终点。
 export const FRUITS: FruitDefinition[] = [
   { name: "蓝莓", emoji: "🫐", radius: 8, color: 0x5c7cfa, glow: 0xa5b4ff },
   { name: "橄榄", emoji: "🫒", radius: 9, color: 0x718c3a, glow: 0xc7df85 },
@@ -75,7 +75,14 @@ export const FRUITS: FruitDefinition[] = [
   },
   { name: "哈密瓜", emoji: "🍈", radius: 35.5, color: 0x90be6d, glow: 0xc7f9b5 },
   { name: "南瓜", emoji: "🎃", radius: 37, color: 0xe97924, glow: 0xffb56f },
-  { name: "西瓜", emoji: "🍉", radius: 39, color: 0x43aa8b, glow: 0x9bf6cf },
+  {
+    name: "西瓜",
+    emoji: "",
+    icon: "/fruits/watermelon-whole.webp",
+    radius: 39,
+    color: 0x43aa8b,
+    glow: 0x9bf6cf,
+  },
   {
     name: "石榴",
     emoji: "",
@@ -99,6 +106,30 @@ export const FRUITS: FruitDefinition[] = [
     radius: 40.5,
     color: 0xaacc32,
     glow: 0xe4f58b,
+  },
+  {
+    name: "山竹",
+    emoji: "",
+    icon: "/fruits/mangosteen.webp",
+    radius: 40.625,
+    color: 0x6d214f,
+    glow: 0xd59bd8,
+  },
+  {
+    name: "杨桃",
+    emoji: "",
+    icon: "/fruits/starfruit.webp",
+    radius: 40.75,
+    color: 0xf6bd28,
+    glow: 0xffe88a,
+  },
+  {
+    name: "柚子",
+    emoji: "",
+    icon: "/fruits/pomelo.webp",
+    radius: 40.875,
+    color: 0xc7d85b,
+    glow: 0xf2f5a4,
   },
   {
     name: "黄金果王",
@@ -376,7 +407,10 @@ function crownTower(rows: number) {
 
 const PAPAYA_TERRACE = crownTower(25);
 const JACKFRUIT_GROVE = crownTower(26);
-const KING_ASCENSION = crownTower(27);
+const MANGOSTEEN_CROWN = crownTower(27);
+const STARFRUIT_SKYWAY = crownTower(28);
+const POMELO_HORIZON = crownTower(29);
+const KING_ASCENSION = crownTower(30);
 
 // 把一颗目标果递归拆成与卡位数量相同的果实组，保持总合成质量严格守恒。
 // 因此普通关卡不会再靠几组高阶牌提前结束，玩家需要处理绝大多数牌才能达成目标。
@@ -556,10 +590,31 @@ export const LEVELS: LevelDefinition[] = [
     layout: JACKFRUIT_GROVE,
   },
   {
-    name: "果王圣殿",
+    name: "山竹月冕",
     target: 25,
     cards: ladderCards(25, 81),
     specialRate: 0.45,
+    layout: MANGOSTEEN_CROWN,
+  },
+  {
+    name: "杨桃天路",
+    target: 26,
+    cards: ladderCards(26, 84),
+    specialRate: 0.46,
+    layout: STARFRUIT_SKYWAY,
+  },
+  {
+    name: "柚香天际",
+    target: 27,
+    cards: ladderCards(27, 87),
+    specialRate: 0.47,
+    layout: POMELO_HORIZON,
+  },
+  {
+    name: "果王圣殿",
+    target: 28,
+    cards: ladderCards(28, 90),
+    specialRate: 0.48,
     layout: KING_ASCENSION,
   },
 ];

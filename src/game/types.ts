@@ -26,6 +26,8 @@ export type GameSnapshot = {
   shieldLeft: number;
   harvestLeft: number;
   quakeLeft: number;
+  basketLeft: number;
+  syrupLeft: number;
   wave: number;
   mode: GameMode;
   relics: RelicId[];
@@ -56,6 +58,8 @@ export type GameUpgrades = {
   score?: number;
   combo?: number;
   fruitBatch?: number;
+  seedStart?: number;
+  trayCapacity?: number;
   tools?: Partial<Record<ToolId, number>>;
 };
 
@@ -83,6 +87,8 @@ export type GameControls = {
   shield: () => void;
   harvest: () => void;
   quake: () => void;
+  basket: () => void;
+  syrup: () => void;
   setDropLane: (lane: -1 | 0 | 1) => void;
   pause: () => void;
   resume: () => void;

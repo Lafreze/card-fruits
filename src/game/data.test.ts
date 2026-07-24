@@ -67,6 +67,7 @@ function seededRandom(seed: number) {
 
 test("a lower card is locked by even a slight upper overlap", () => {
   const lower = { layer: 0, x: 100, y: 100 };
+  const active = new Set([0, 1]);
   assert.equal(
     isCovered(lower, [lower, { layer: 1, x: 100 + CARD_WIDTH - 1, y: 100 }]),
     true,
@@ -74,6 +75,16 @@ test("a lower card is locked by even a slight upper overlap", () => {
   assert.equal(
     isCovered(lower, [lower, { layer: 1, x: 100 + CARD_WIDTH, y: 100 }]),
     false,
+  );
+  assert.equal(
+    slotIsCovered(0, [lower, { layer: 0, x: 100, y: 100 }], active),
+    false,
+    "同层卡片只并排展示，不能互相锁住",
+  );
+  assert.equal(
+    slotIsCovered(1, [lower, { layer: 1, x: 100, y: 100 }], active),
+    false,
+    "下层卡片不能反向遮挡上层卡片",
   );
 });
 
@@ -96,7 +107,7 @@ test("rotated card coverage follows the visible footprint", () => {
 });
 
 test("all story levels have valid, playable layouts", () => {
-  assert.equal(LEVELS.length, 23);
+  assert.equal(LEVELS.length, 26);
 
   LEVELS.forEach((level, index) => {
     const slots = expandLayout(level.layout);
@@ -173,7 +184,7 @@ test("every generated stack contains a verified low-risk clear route", () => {
     const groups = level.cards.flatMap(({ tier, count }) =>
       Array.from({ length: count / 3 }, () => tier),
     );
-    for (let seed = 1; seed <= 16; seed += 1) {
+    for (let seed = 1; seed <= 32; seed += 1) {
       const original = expandLayout(level.layout);
       const slots = original.map((slot) => ({ ...slot }));
       const random = seededRandom(levelIndex * 100 + seed);
@@ -228,8 +239,24 @@ test("every generated stack contains a verified low-risk clear route", () => {
               Math.abs(first.y - second.y) >= CARD_HEIGHT + 2.5,
             `第 ${levelIndex + 1} 关同层卡片不应互相遮挡`,
           );
-        }
+      }
       const active = new Set(slots.map((_, index) => index));
+      const initiallyCovered = slots.filter((_, slotIndex) =>
+        slotIsCovered(slotIndex, slots, active),
+      ).length;
+      assert.ok(
+        initiallyCovered > 0,
+        `第 ${levelIndex + 1} 关必须存在真实的跨层遮挡`,
+      );
+      const topLayer = Math.max(...slots.map((slot) => slot.layer));
+      slots.forEach((slot, slotIndex) => {
+        if (slot.layer !== topLayer) return;
+        assert.equal(
+          slotIsCovered(slotIndex, slots, active),
+          false,
+          `第 ${levelIndex + 1} 关最高层卡片必须可点`,
+        );
+      });
       deal.route.forEach((slotIndex) => {
         assert.equal(
           slotIsCovered(slotIndex, slots, active),
@@ -453,10 +480,10 @@ test("fusion planning keeps one partner per fruit and prioritizes card bonds", (
 });
 
 test("fruit scale and roguelike catalog stay balanced", () => {
-  assert.equal(FRUITS.length, 26);
+  assert.equal(FRUITS.length, 29);
   assert.deepEqual(
-    FRUITS.slice(-5).map((fruit) => fruit.name),
-    ["西瓜", "石榴", "木瓜", "菠萝蜜", "黄金果王"],
+    FRUITS.slice(-8).map((fruit) => fruit.name),
+    ["西瓜", "石榴", "木瓜", "菠萝蜜", "山竹", "杨桃", "柚子", "黄金果王"],
   );
   FRUITS.forEach((fruit, index) => {
     assert.ok(fruit.radius <= 41, `${fruit.name} 不应重新撑满果箱`);
@@ -474,16 +501,21 @@ test("fruit scale and roguelike catalog stay balanced", () => {
     FRUITS.find((fruit) => fruit.name === "香蕉")?.icon,
     "/fruits/banana-bunch.webp",
   );
-  ["石榴", "木瓜", "菠萝蜜"].forEach((name) =>
+  assert.equal(FRUITS.find((fruit) => fruit.name === "西瓜")?.emoji, "");
+  assert.equal(
+    FRUITS.find((fruit) => fruit.name === "西瓜")?.icon,
+    "/fruits/watermelon-whole.webp",
+  );
+  ["石榴", "木瓜", "菠萝蜜", "山竹", "杨桃", "柚子"].forEach((name) =>
     assert.ok(FRUITS.find((fruit) => fruit.name === name)?.icon),
   );
   assert.equal(new Set(RELICS.map((relic) => relic.id)).size, RELICS.length);
-  assert.equal(RELICS.length, 30);
+  assert.equal(RELICS.length, 36);
   assert.ok(RELICS.some((relic) => relic.rarity === "rare"));
   assert.equal(MUTATORS.length, 7);
   assert.ok(MUTATORS.every((mutator) => mutator.description.length > 0));
-  assert.equal(UPGRADES.length, 10);
-  assert.equal(TOOLS.length, 14);
+  assert.equal(UPGRADES.length, 12);
+  assert.equal(TOOLS.length, 16);
   assert.equal(new Set(TOOLS.map((tool) => tool.id)).size, TOOLS.length);
   assert.ok(
     TOOLS.every(
@@ -500,6 +532,18 @@ test("fruit scale and roguelike catalog stay balanced", () => {
   );
   assert.equal(harvestUpgrade?.maxLevel, 2);
   assert.deepEqual(harvestUpgrade?.costs, [850, 2800]);
+  assert.ok(UPGRADES.some((upgrade) => upgrade.id === "seed_start"));
+  assert.ok(UPGRADES.some((upgrade) => upgrade.id === "tray"));
+  assert.ok(TOOLS.some((tool) => tool.id === "basket"));
+  assert.ok(TOOLS.some((tool) => tool.id === "syrup"));
+  [
+    "orchard_basket",
+    "sugar_kettle",
+    "triple_crown",
+    "meteor_garden",
+    "choice_branch",
+    "fruit_pinata",
+  ].forEach((id) => assert.ok(RELICS.some((relic) => relic.id === id)));
   assert.ok(
     Array.from({ length: 40 }, () => rollMutator(2)).every(
       (item) => item.id !== "calm",
@@ -511,6 +555,7 @@ test("fruit scale and roguelike catalog stay balanced", () => {
     "story",
   ]);
   assert.equal(new Set(pickRelics([], 3).map((relic) => relic.id)).size, 3);
+  assert.equal(new Set(pickRelics([], 4).map((relic) => relic.id)).size, 4);
   assert.ok(
     pickRelics([], 3, 3, () => 0.99).some((relic) => relic.rarity === "rare"),
     "每三关的构筑奖励至少出现一件稀有奇物",

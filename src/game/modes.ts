@@ -30,7 +30,13 @@ export type RelicId =
   | "lucky_dice"
   | "royal_echo"
   | "pinball_peel"
-  | "bubble_party";
+  | "bubble_party"
+  | "orchard_basket"
+  | "sugar_kettle"
+  | "triple_crown"
+  | "meteor_garden"
+  | "choice_branch"
+  | "fruit_pinata";
 
 export type RelicDefinition = {
   id: RelicId;
@@ -313,6 +319,60 @@ export const RELICS: RelicDefinition[] = [
     rarity: "uncommon",
     archetype: "花式·卡槽",
   },
+  {
+    id: "orchard_basket",
+    icon: "🧺",
+    name: "穿层采摘篮",
+    description: "每关获得 1 次采摘篮，直接采收牌堆中的一组三张同果卡。",
+    tone: "gold",
+    rarity: "rare",
+    archetype: "花式·牌组",
+  },
+  {
+    id: "sugar_kettle",
+    icon: "🍯",
+    name: "狂热糖锅",
+    description: "每关获得 1 份甜度糖浆，可快速充能或延长狂热。",
+    tone: "pink",
+    rarity: "uncommon",
+    archetype: "娱乐·狂热",
+  },
+  {
+    id: "triple_crown",
+    icon: "👑",
+    name: "三消王冠",
+    description: "每第 5 次三消，落下的主水果直接提高 1 阶。",
+    tone: "gold",
+    rarity: "rare",
+    archetype: "花式·跃迁",
+  },
+  {
+    id: "meteor_garden",
+    icon: "☄️",
+    name: "流星果园",
+    description: "每第 4 次物理合成触发弹射风暴，并获得 10 点甜度。",
+    tone: "cyan",
+    rarity: "uncommon",
+    archetype: "娱乐·物理",
+  },
+  {
+    id: "choice_branch",
+    icon: "🌳",
+    name: "选择枝杈",
+    description: "之后每次过关的奇物选择从三选一增加为四选一。",
+    tone: "cyan",
+    rarity: "rare",
+    archetype: "构筑·选择",
+  },
+  {
+    id: "fruit_pinata",
+    icon: "🪅",
+    name: "水果彩罐",
+    description: "每点击 10 张卡触发彩罐，获得分数、甜度与彩纸庆典。",
+    tone: "pink",
+    rarity: "common",
+    archetype: "娱乐·庆典",
+  },
 ];
 
 export const MODE_INFO: Record<
@@ -322,7 +382,7 @@ export const MODE_INFO: Record<
   story: {
     icon: "🗺️",
     name: "闯关模式",
-    tagline: "23 关，逐关合成果王",
+    tagline: "26 关，逐关合成果王",
   },
   endless: {
     icon: "∞",
@@ -448,6 +508,8 @@ export type UpgradeId =
   | "score"
   | "combo"
   | "sweet_start"
+  | "seed_start"
+  | "tray"
   | "relic_start";
 
 export type UpgradeDefinition = {
@@ -543,6 +605,23 @@ export const UPGRADES: UpgradeDefinition[] = [
       level ? `点击水果弹射强度 +${level * 15}%` : "未装备",
   },
   {
+    id: "seed_start",
+    icon: "🪴",
+    name: "开局育苗床",
+    maxLevel: 2,
+    costs: [980, 3200],
+    describe: (level) =>
+      level ? `每局开场投放 ${level} 颗低阶果种` : "未装备",
+  },
+  {
+    id: "tray",
+    icon: "🧺",
+    name: "宽口卡槽",
+    maxLevel: 2,
+    costs: [1450, 4600],
+    describe: (level) => (level ? `卡槽永久增加 ${level} 格` : "未装备"),
+  },
+  {
     id: "relic_start",
     icon: "🎁",
     name: "远征福袋",
@@ -566,7 +645,9 @@ export type ToolId =
   | "bomb"
   | "shield"
   | "harvest"
-  | "quake";
+  | "quake"
+  | "basket"
+  | "syrup";
 
 export type ToolDefinition = {
   id: ToolId;
@@ -690,5 +771,21 @@ export const TOOLS: ToolDefinition[] = [
     maxLevel: 2,
     costs: [420, 1200],
     description: "下一次三消额外生成一颗水果",
+  },
+  {
+    id: "basket",
+    icon: "🧺",
+    name: "穿层采摘篮",
+    maxLevel: 2,
+    costs: [520, 1480],
+    description: "直接采收牌堆里一组三张同果卡并转成果实",
+  },
+  {
+    id: "syrup",
+    icon: "🍯",
+    name: "甜度糖浆",
+    maxLevel: 2,
+    costs: [460, 1320],
+    description: "甜度 +45；狂热中使用则延长 2.5 秒",
   },
 ];

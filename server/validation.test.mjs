@@ -31,7 +31,7 @@ test("accepts the expanded late-game fruit tiers", () => {
     username: "Fruit Master",
     score: 880000,
     maxCombo: 12,
-    fruitTier: 25,
+    fruitTier: 28,
   });
   assert.equal(parsed.success, true);
 });

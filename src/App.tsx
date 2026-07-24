@@ -60,6 +60,8 @@ const EMPTY_SNAPSHOT: GameSnapshot = {
   shieldLeft: 1,
   harvestLeft: 0,
   quakeLeft: 1,
+  basketLeft: 0,
+  syrupLeft: 0,
   wave: 1,
   mode: "story",
   relics: [],
@@ -148,6 +150,8 @@ function readUpgrades(): UpgradeLevels {
     score: 0,
     combo: 0,
     sweet_start: 0,
+    seed_start: 0,
+    tray: 0,
     relic_start: 0,
   };
 
@@ -427,6 +431,8 @@ export default function App() {
     score: upgrades.score,
     combo: upgrades.combo,
     fruitBatch: upgrades.sweet_start,
+    seedStart: upgrades.seed_start,
+    trayCapacity: upgrades.tray,
     tools,
   });
 
@@ -455,6 +461,8 @@ export default function App() {
       score: nextUpgrades.score,
       combo: nextUpgrades.combo,
       fruitBatch: nextUpgrades.sweet_start,
+      seedStart: nextUpgrades.seed_start,
+      trayCapacity: nextUpgrades.tray,
       tools,
     };
   };
@@ -528,7 +536,13 @@ export default function App() {
       if (next.status === "won") {
         if (mode === "story") persistUnlocked(level + 1);
         if (mode === "expedition" && next.wave < 8)
-          setRewardOptions(pickRelics(relics, 3, next.wave));
+          setRewardOptions(
+            pickRelics(
+              relics,
+              relics.includes("choice_branch") ? 4 : 3,
+              next.wave,
+            ),
+          );
       }
     },
     [level, mode, persistCoins, persistUnlocked, relics],
@@ -876,6 +890,22 @@ export default function App() {
       category: "boost",
       left: snapshot.harvestLeft,
     },
+    {
+      id: "basket",
+      icon: "🧺",
+      label: "采摘",
+      description: "穿层采收一组三张同果卡",
+      category: "card",
+      left: snapshot.basketLeft,
+    },
+    {
+      id: "syrup",
+      icon: "🍯",
+      label: "糖浆",
+      description: "甜度 +45；狂热中延时",
+      category: "boost",
+      left: snapshot.syrupLeft,
+    },
   ] satisfies Array<{
     id: ToolId;
     icon: string;
@@ -918,7 +948,12 @@ export default function App() {
           <div className="hero-orbit" aria-hidden="true">
             <span className="orbit-fruit fruit-a">🍓</span>
             <span className="orbit-fruit fruit-b">🍋</span>
-            <span className="orbit-fruit fruit-c">🍉</span>
+            <span className="orbit-fruit fruit-c">
+              <FruitIcon
+                fruit={FRUITS.find((fruit) => fruit.name === "西瓜")!}
+                decorative
+              />
+            </span>
             <span className="orbit-fruit fruit-d">🍇</span>
             <div className="crown-core">
               <FruitIcon
