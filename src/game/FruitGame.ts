@@ -21,6 +21,7 @@ import {
   endlessSeedTier,
   fruitBatchCount,
   fusionRevealScale,
+  fusionResultScale,
   fruitMergeScore,
   fruitVisualDiameter,
   rotatedRectanglesOverlap,
@@ -2671,8 +2672,10 @@ export class FruitGame implements GameControls {
         const reveal = Math.min(1, (echo.elapsed - 0.13) / 0.18);
         echo.result.visible = true;
         echo.result.alpha = Math.min(1, reveal * 2.2);
-        // 轻微回弹即可。旧曲线峰值超过 1.5 倍，写实火龙果会突然扑满画面。
-        echo.result.scale.set(fusionRevealScale(reveal));
+        // 绘制素材只做淡入，不参与缩放；Emoji 保留克制的成长动画。
+        echo.result.scale.set(
+          fusionResultScale(reveal, Boolean(FRUITS[echo.tier].icon)),
+        );
         echo.result.rotation = (1 - reveal) * -0.12;
       }
       if (echo.elapsed < 0.32) return true;
@@ -2693,6 +2696,9 @@ export class FruitGame implements GameControls {
         echo.center.y - 5,
       );
       if (result) {
+        // spawnFruit 默认带入场成长；合成结果必须在本帧直接接住预览尺寸，
+        // 否则会先渲染一帧 0.2 倍，再在下一帧突然跳到 1 倍。
+        result.view.scale.set(1);
         const plugin = this.fruitPlugin(result);
         plugin.spawnedByMerge = true;
         plugin.visualSettleUntil = this.elapsed + 0.28;

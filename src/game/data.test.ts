@@ -13,6 +13,7 @@ import {
   endlessSeedTier,
   fruitBatchCount,
   fusionRevealScale,
+  fusionResultScale,
   fruitMergeScore,
   fruitVisualDiameter,
   rotatedRectanglesOverlap,
@@ -307,6 +308,11 @@ test("fusion reveal stays gentle and story harvest can finish by clear or full t
     ),
   );
   assert.equal(fusionRevealScale(1), 1);
+  assert.ok(
+    Array.from({ length: 101 }, (_, index) =>
+      fusionResultScale(index / 100, true),
+    ).every((scale) => scale === 1),
+  );
   assert.ok(fruitVisualDiameter(40, true) < fruitVisualDiameter(40, false));
 
   assert.equal(
