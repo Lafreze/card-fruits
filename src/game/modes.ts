@@ -22,7 +22,15 @@ export type RelicId =
   | "gravity_feather"
   | "shock_core"
   | "wild_graft"
-  | "sugar_shell";
+  | "sugar_shell"
+  | "rainbow_sprout"
+  | "tool_carousel"
+  | "confetti_core"
+  | "fruit_fountain"
+  | "lucky_dice"
+  | "royal_echo"
+  | "pinball_peel"
+  | "bubble_party";
 
 export type RelicDefinition = {
   id: RelicId;
@@ -233,6 +241,78 @@ export const RELICS: RelicDefinition[] = [
     rarity: "common",
     archetype: "属性·生存",
   },
+  {
+    id: "rainbow_sprout",
+    icon: "🌈",
+    name: "彩虹萌芽",
+    description: "每关前 2 次三消，落下的水果直接提高 1 阶。",
+    tone: "pink",
+    rarity: "rare",
+    archetype: "花式·跃迁",
+  },
+  {
+    id: "tool_carousel",
+    icon: "🎠",
+    name: "道具旋转木马",
+    description: "每完成 4 次三消，轮流补充一种基础道具。",
+    tone: "gold",
+    rarity: "uncommon",
+    archetype: "花式·道具",
+  },
+  {
+    id: "confetti_core",
+    icon: "🎊",
+    name: "彩纸果核",
+    description: "每 3 次物理合成触发庆典，甜度 +12 并喷出彩纸。",
+    tone: "pink",
+    rarity: "common",
+    archetype: "娱乐·庆典",
+  },
+  {
+    id: "fruit_fountain",
+    icon: "⛲",
+    name: "水果喷泉",
+    description: "每 4 次三消额外喷出一颗低 1 阶水果。",
+    tone: "cyan",
+    rarity: "uncommon",
+    archetype: "娱乐·产量",
+  },
+  {
+    id: "lucky_dice",
+    icon: "🎲",
+    name: "幸运果骰",
+    description: "每关开局摇出甜度、分数、道具或稀有果种奖励。",
+    tone: "gold",
+    rarity: "common",
+    archetype: "娱乐·随机",
+  },
+  {
+    id: "royal_echo",
+    icon: "👑",
+    name: "王冠回声",
+    description: "每关第一次物理合成会返还一颗合成前水果。",
+    tone: "gold",
+    rarity: "rare",
+    archetype: "花式·复制",
+  },
+  {
+    id: "pinball_peel",
+    icon: "🪩",
+    name: "弹珠果皮",
+    description: "手动弹射更强，并随机向左右偏转，适合花式救球。",
+    tone: "cyan",
+    rarity: "common",
+    archetype: "娱乐·弹射",
+  },
+  {
+    id: "bubble_party",
+    icon: "🫧",
+    name: "泡泡派对",
+    description: "每点击 6 张牌，自动收起卡槽里最孤立的一张。",
+    tone: "pink",
+    rarity: "uncommon",
+    archetype: "花式·卡槽",
+  },
 ];
 
 export const MODE_INFO: Record<
@@ -440,8 +520,10 @@ export const UPGRADES: UpgradeDefinition[] = [
     costs: [850, 2800],
     describe: (level) =>
       level
-        ? `每次三消固定生成 ${level + 1} 颗水果`
-        : "每次三消固定生成 1 颗水果",
+        ? level === 1
+          ? "闯关每 3 次三消额外 +1 果，其他模式固定 +1"
+          : "闯关每 2 次三消额外 +1 果，其他模式固定 +2"
+        : "每次三消生成 1 颗水果",
   },
   {
     id: "coin",

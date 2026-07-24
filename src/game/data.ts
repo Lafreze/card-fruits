@@ -30,50 +30,50 @@ export type LevelDefinition = {
 export const FRUITS: FruitDefinition[] = [
   { name: "蓝莓", emoji: "🫐", radius: 8, color: 0x5c7cfa, glow: 0xa5b4ff },
   { name: "橄榄", emoji: "🫒", radius: 9, color: 0x718c3a, glow: 0xc7df85 },
-  { name: "葡萄", emoji: "🍇", radius: 10.5, color: 0x9b5de5, glow: 0xd8b4fe },
-  { name: "樱桃", emoji: "🍒", radius: 12, color: 0xef476f, glow: 0xff9bb1 },
-  { name: "草莓", emoji: "🍓", radius: 14, color: 0xff4d6d, glow: 0xffb3c1 },
-  { name: "柠檬", emoji: "🍋", radius: 16, color: 0xffd166, glow: 0xffef9f },
-  { name: "猕猴桃", emoji: "🥝", radius: 18, color: 0x8ac926, glow: 0xc5f277 },
-  { name: "番茄", emoji: "🍅", radius: 20, color: 0xf94144, glow: 0xffa3a5 },
+  { name: "葡萄", emoji: "🍇", radius: 10, color: 0x9b5de5, glow: 0xd8b4fe },
+  { name: "樱桃", emoji: "🍒", radius: 11.5, color: 0xef476f, glow: 0xff9bb1 },
+  { name: "草莓", emoji: "🍓", radius: 13, color: 0xff4d6d, glow: 0xffb3c1 },
+  { name: "柠檬", emoji: "🍋", radius: 14.5, color: 0xffd166, glow: 0xffef9f },
+  { name: "猕猴桃", emoji: "🥝", radius: 16, color: 0x8ac926, glow: 0xc5f277 },
+  { name: "番茄", emoji: "🍅", radius: 17.5, color: 0xf94144, glow: 0xffa3a5 },
   {
     name: "牛油果",
     emoji: "🥑",
-    radius: 22.5,
+    radius: 19,
     color: 0x6f9f3d,
     glow: 0xc6f68d,
   },
-  { name: "橙子", emoji: "🍊", radius: 25, color: 0xff9f1c, glow: 0xffc971 },
+  { name: "橙子", emoji: "🍊", radius: 20.5, color: 0xff9f1c, glow: 0xffc971 },
   {
     name: "青苹果",
     emoji: "🍏",
-    radius: 27.5,
+    radius: 22,
     color: 0x78b83f,
     glow: 0xcaf28c,
   },
-  { name: "苹果", emoji: "🍎", radius: 30, color: 0xff595e, glow: 0xff9c9f },
-  { name: "梨", emoji: "🍐", radius: 32.5, color: 0xb8d64f, glow: 0xe9f99c },
-  { name: "桃子", emoji: "🍑", radius: 35, color: 0xff8fab, glow: 0xffc2d1 },
-  { name: "芒果", emoji: "🥭", radius: 38, color: 0xffb703, glow: 0xffd166 },
-  { name: "香蕉", emoji: "🍌", radius: 41, color: 0xffd43b, glow: 0xfff19a },
-  { name: "椰子", emoji: "🥥", radius: 44, color: 0xa9805b, glow: 0xe6cfb0 },
-  { name: "菠萝", emoji: "🍍", radius: 47, color: 0xf7c948, glow: 0xffe69a },
+  { name: "苹果", emoji: "🍎", radius: 23.5, color: 0xff595e, glow: 0xff9c9f },
+  { name: "梨", emoji: "🍐", radius: 25, color: 0xb8d64f, glow: 0xe9f99c },
+  { name: "桃子", emoji: "🍑", radius: 26.5, color: 0xff8fab, glow: 0xffc2d1 },
+  { name: "芒果", emoji: "🥭", radius: 28, color: 0xffb703, glow: 0xffd166 },
+  { name: "香蕉", emoji: "🍌", radius: 29.5, color: 0xffd43b, glow: 0xfff19a },
+  { name: "椰子", emoji: "🥥", radius: 31, color: 0xa9805b, glow: 0xe6cfb0 },
+  { name: "菠萝", emoji: "🍍", radius: 32.5, color: 0xf7c948, glow: 0xffe69a },
   {
     name: "火龙果",
     emoji: "",
     icon: "/fruits/dragon-fruit.webp",
-    radius: 49.5,
+    radius: 34,
     color: 0xe62b76,
     glow: 0xff8fbc,
   },
-  { name: "哈密瓜", emoji: "🍈", radius: 52, color: 0x90be6d, glow: 0xc7f9b5 },
-  { name: "南瓜", emoji: "🎃", radius: 54, color: 0xe97924, glow: 0xffb56f },
-  { name: "西瓜", emoji: "🍉", radius: 57, color: 0x43aa8b, glow: 0x9bf6cf },
+  { name: "哈密瓜", emoji: "🍈", radius: 35.5, color: 0x90be6d, glow: 0xc7f9b5 },
+  { name: "南瓜", emoji: "🎃", radius: 37, color: 0xe97924, glow: 0xffb56f },
+  { name: "西瓜", emoji: "🍉", radius: 39, color: 0x43aa8b, glow: 0x9bf6cf },
   {
     name: "黄金果王",
     emoji: "",
     icon: "/fruits/durian-king.webp",
-    radius: 60,
+    radius: 41,
     color: 0xc9a21f,
     glow: 0xffdc67,
   },
@@ -335,21 +335,26 @@ const GOLDEN_SANCTUM = [
   B(6, 251, 244, 3, 1),
 ];
 
-// 每关都从蓝莓开始，并包含从 0 到目标前一级的完整合成阶梯。
-// 蓝莓至少提供两颗，其余每级至少一颗；多余卡位继续补蓝莓，确保逐级碰撞必达目标。
+// 把一颗目标果递归拆成与卡位数量相同的果实组，保持总合成质量严格守恒。
+// 因此普通关卡不会再靠几组高阶牌提前结束，玩家需要处理绝大多数牌才能达成目标。
 function ladderCards(target: number, totalCards: number) {
-  const minimum = 3 * (target + 1);
-  const extra = totalCards - minimum;
-  if (extra < 0 || extra % 3 !== 0)
-    throw new Error(`关卡卡位 ${totalCards} 无法构成目标 ${target} 的完整阶梯`);
-  const cards = Array.from({ length: target }, (_, tier) => ({
-    tier,
-    count: tier === 0 ? 6 : 3,
-  }));
-  // 冗余三消组轮流分配到各级，避免满屏同一种水果；蓝莓仍至少两组，保证阶梯起步。
-  for (let group = 0; group < extra / 3; group += 1)
-    cards[group % target].count += 3;
-  return cards;
+  const groupCount = totalCards / 3;
+  if (!Number.isInteger(groupCount) || groupCount < 2 || groupCount > 2 ** target)
+    throw new Error(`关卡卡位 ${totalCards} 无法拆分成目标 ${target}`);
+  const groups = [target - 1, target - 1];
+  while (groups.length < groupCount) {
+    const splittable = groups
+      .map((tier, index) => ({ tier, index }))
+      .filter(({ tier }) => tier > 0)
+      .sort((a, b) => a.tier - b.tier || a.index - b.index)[0];
+    if (!splittable) throw new Error(`目标 ${target} 无法继续拆分`);
+    groups.splice(splittable.index, 1, splittable.tier - 1, splittable.tier - 1);
+  }
+  const counts = new Map<number, number>();
+  groups.forEach((tier) => counts.set(tier, (counts.get(tier) || 0) + 3));
+  return [...counts.entries()]
+    .sort(([first], [second]) => first - second)
+    .map(([tier, count]) => ({ tier, count }));
 }
 
 export const LEVELS: LevelDefinition[] = [

@@ -456,6 +456,19 @@ export function fruitBatchCount(
   );
 }
 
+export function storyTargetReady(totalCards: number, remainingCards: number) {
+  const total = Math.max(1, Math.floor(totalCards));
+  const remaining = Math.max(0, Math.floor(remainingCards));
+  return remaining <= Math.floor(total * 0.18);
+}
+
+export function endlessSeedTier(wave: number, fruitCount: number) {
+  const safeWave = Math.max(1, Math.floor(wave));
+  const safeFruitCount = Math.max(1, Math.floor(fruitCount));
+  if (safeWave < 3 || safeFruitCount < 4) return null;
+  return Math.min(safeFruitCount - 3, 2 + Math.floor(safeWave * 0.9));
+}
+
 export function dropLaneX(
   lane: -1 | 0 | 1,
   center = 215,

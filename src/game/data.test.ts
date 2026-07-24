@@ -10,12 +10,14 @@ import {
   comboScoreMultiplier,
   completionScoreBonus,
   dropLaneX,
+  endlessSeedTier,
   fruitBatchCount,
   fruitMergeScore,
   rotatedRectanglesOverlap,
   scatterStackSlots,
   simulateTray,
   slotIsCovered,
+  storyTargetReady,
 } from "./logic.ts";
 import {
   MODE_INFO,
@@ -116,20 +118,24 @@ test("all story levels have valid, playable layouts", () => {
     assert.ok(exposedCount >= 3, `第 ${index + 1} 关开局至少需要三张可点卡`);
     assert.ok(layerCount >= 3, `第 ${index + 1} 关必须有明显堆叠`);
     assert.equal(level.target, index + 3, `第 ${index + 1} 关目标必须逐级 +1`);
-    assert.equal(
-      level.target,
-      maxCardTier + 1,
+    assert.ok(
+      maxCardTier < level.target,
       `第 ${index + 1} 关必须通过碰撞合成目标`,
     );
-    assert.ok(
-      synthesis[level.target] >= 1,
-      `第 ${index + 1} 关水果阶梯不足以合成目标`,
+    assert.equal(
+      synthesis[level.target],
+      1,
+      `第 ${index + 1} 关应刚好合成一个目标果，避免提前结束`,
     );
-    assert.deepEqual(
-      level.cards.map((card) => card.tier),
-      Array.from({ length: level.target }, (_, tier) => tier),
-      `第 ${index + 1} 关必须从蓝莓开始并包含完整合成链`,
+    assert.equal(
+      level.cards.reduce(
+        (mass, card) => mass + (card.count / 3) * 2 ** card.tier,
+        0,
+      ),
+      2 ** level.target,
+      `第 ${index + 1} 关卡片合成质量必须与目标严格守恒`,
     );
+    assert.equal(level.cards[0].tier, 0, `第 ${index + 1} 关必须从蓝莓开始`);
 
     level.cards.forEach((card) => {
       assert.equal(
@@ -251,6 +257,19 @@ test("greenhouse fruit output is deterministic and capped at three", () => {
   assert.equal(fruitBatchCount(4), 3);
   assert.equal(fruitBatchCount(1, 2), 3);
   assert.equal(fruitBatchCount(-2, -2), 1);
+});
+
+test("story harvest pacing and endless high-tier seeds are progressive", () => {
+  assert.equal(storyTargetReady(18, 4), false);
+  assert.equal(storyTargetReady(18, 3), true);
+  assert.equal(storyTargetReady(72, 12), true);
+  assert.equal(storyTargetReady(72, 13), false);
+
+  assert.equal(endlessSeedTier(1, FRUITS.length), null);
+  assert.equal(endlessSeedTier(2, FRUITS.length), null);
+  assert.equal(endlessSeedTier(3, FRUITS.length), 4);
+  assert.ok(endlessSeedTier(10, FRUITS.length)! >= 11);
+  assert.equal(endlessSeedTier(50, FRUITS.length), FRUITS.length - 3);
 });
 
 test("drop lanes are symmetric and stay inside the fruit box", () => {
@@ -399,11 +418,18 @@ test("fruit scale and roguelike catalog stay balanced", () => {
     ["火龙果", "哈密瓜", "南瓜", "西瓜", "黄金果王"],
   );
   FRUITS.forEach((fruit, index) => {
-    assert.ok(fruit.radius <= 60, `${fruit.name} 不应重新撑满果箱`);
-    if (index > 0) assert.ok(fruit.radius > FRUITS[index - 1].radius);
+    assert.ok(fruit.radius <= 41, `${fruit.name} 不应重新撑满果箱`);
+    if (index > 0) {
+      assert.ok(fruit.radius > FRUITS[index - 1].radius);
+      assert.ok(
+        fruit.radius - FRUITS[index - 1].radius <= 2,
+        `${fruit.name} 与前一级尺寸差距过大`,
+      );
+    }
   });
+  assert.ok(FRUITS.at(-1)!.radius / FRUITS[0].radius <= 5.2);
   assert.equal(new Set(RELICS.map((relic) => relic.id)).size, RELICS.length);
-  assert.equal(RELICS.length, 22);
+  assert.equal(RELICS.length, 30);
   assert.ok(RELICS.some((relic) => relic.rarity === "rare"));
   assert.equal(MUTATORS.length, 7);
   assert.ok(MUTATORS.every((mutator) => mutator.description.length > 0));
