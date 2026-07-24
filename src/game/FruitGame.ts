@@ -15,8 +15,11 @@ import {
   buildFusionPairs,
   buildPlayableDeal,
   canMergeAfterLanding,
+  cardMatchScore,
+  completionScoreBonus,
   dropLaneX,
   fruitBatchCount,
+  fruitMergeScore,
   rotatedRectanglesOverlap,
   scatterStackSlots,
 } from "./logic";
@@ -156,15 +159,6 @@ function shuffle<T>(items: T[]) {
     [copy[index], copy[target]] = [copy[target], copy[index]];
   }
   return copy;
-}
-
-function multiplier(combo: number) {
-  if (combo >= 6) return 3;
-  if (combo >= 5) return 2.5;
-  if (combo >= 4) return 2;
-  if (combo >= 3) return 1.5;
-  if (combo >= 2) return 1.25;
-  return 1;
 }
 
 export class FruitGame implements GameControls {
@@ -1374,10 +1368,13 @@ export class FruitGame implements GameControls {
       if (this.hasRelic("harvest_gene") && this.fruitBatchLevel >= 2)
         this.gainFever(8);
       const points = Math.round(
-        (tier + 1) *
-          90 *
-          multiplier(this.combo) *
-          this.effectiveScoreMultiplier(),
+        cardMatchScore({
+          tier,
+          combo: this.combo,
+          mode: this.mode,
+          level: this.levelIndex,
+          wave: this.wave,
+        }) * this.effectiveScoreMultiplier(),
       );
       this.addScore(points, WORLD.width / 2, WORLD.tray.y + 18);
       sounds.match();
@@ -2245,10 +2242,13 @@ export class FruitGame implements GameControls {
     this.registerCombo();
     this.gainFever(7 + tier * 0.6);
     const points = Math.round(
-      110 *
-        2 ** Math.min(tier, 13) *
-        multiplier(this.combo) *
-        this.effectiveScoreMultiplier(),
+      fruitMergeScore({
+        tier,
+        combo: this.combo,
+        mode: this.mode,
+        level: this.levelIndex,
+        wave: this.wave,
+      }) * this.effectiveScoreMultiplier(),
     );
     this.addScore(points, x, y);
     this.burst(x, y, FRUITS[tier].glow, 8 + Math.floor(tier / 2));
@@ -2358,7 +2358,17 @@ export class FruitGame implements GameControls {
     const cleared = this.fruits.size;
     [...this.fruits.values()].forEach((fruit) => this.removeFruit(fruit));
     this.merging.clear();
-    this.score += Math.round(100_000 * this.effectiveScoreMultiplier());
+    this.score += Math.round(
+      fruitMergeScore({
+        tier: FRUITS.length,
+        combo: Math.max(6, this.combo),
+        mode: this.mode,
+        level: this.levelIndex,
+        wave: this.wave,
+      }) *
+        2.2 *
+        this.effectiveScoreMultiplier(),
+    );
     [0xff4f9a, 0xffd85e, 0x45dcff].forEach((color, index) =>
       this.setTimer(
         () => this.ring(x, y, color, 1.4 + index * 0.42),
@@ -2953,11 +2963,15 @@ export class FruitGame implements GameControls {
     this.updateCardAccess();
     this.shake = status === "won" ? 18 : 7;
     if (status === "won") {
-      const bonus = Math.max(
-        0,
-        this.cards.filter((card) => card.active).length * 150 +
-          (this.trayLimit - this.tray.length) * 300,
-      );
+      const bonus = completionScoreBonus({
+        level: this.levelIndex,
+        mode: this.mode,
+        wave: this.wave,
+        remainingCards: this.cards.filter((card) => card.active).length,
+        openTraySlots: this.trayLimit - this.tray.length,
+        maxCombo: this.maxCombo,
+        maxFruitTier: this.maxFruitTier,
+      });
       this.score += bonus;
       this.burst(WORLD.width / 2, WORLD.height / 2, 0xffd60a, 90);
       this.ring(WORLD.width / 2, WORLD.height / 2, 0xffcf5e, 1.6);
@@ -3223,7 +3237,19 @@ export class FruitGame implements GameControls {
         (card.locked || card.special === "frozen" || card.special === "vine"),
     );
     if (obstacles.length === 0) {
-      this.callbacks.onToast("牌堆里没有冰晶或藤蔓", "cyan");
+      this.sunLeft -= 1;
+      this.gainFever(20);
+      this.burst(
+        WORLD.width / 2,
+        WORLD.stack.y + WORLD.stack.height / 2,
+        0xffe878,
+        34,
+      );
+      this.ring(WORLD.width / 2, WORLD.stack.y + 160, 0xfff5b5, 1.12);
+      this.callbacks.onToast("☀️ 阳光充能 · 甜度 +20", "gold");
+      sounds.match();
+      haptic([12, 24, 16]);
+      this.emitSnapshot();
       return;
     }
     this.sunLeft -= 1;

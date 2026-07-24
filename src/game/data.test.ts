@@ -6,8 +6,12 @@ import {
   buildPlayableDeal,
   calculateCoinReward,
   canMergeAfterLanding,
+  cardMatchScore,
+  comboScoreMultiplier,
+  completionScoreBonus,
   dropLaneX,
   fruitBatchCount,
+  fruitMergeScore,
   rotatedRectanglesOverlap,
   scatterStackSlots,
   simulateTray,
@@ -306,6 +310,59 @@ test("coin rewards grow slowly even when score grows exponentially", () => {
     }),
     34,
   );
+});
+
+test("score curve rewards fruit progress, challenge and skill without runaway spikes", () => {
+  assert.equal(comboScoreMultiplier(1), 1);
+  assert.ok(comboScoreMultiplier(6) > comboScoreMultiplier(3));
+  assert.ok(comboScoreMultiplier(30) <= 2.6);
+
+  const earlyMatch = cardMatchScore({
+    tier: 0,
+    combo: 1,
+    mode: "story",
+    level: 0,
+  });
+  const lateMatch = cardMatchScore({
+    tier: 12,
+    combo: 5,
+    mode: "story",
+    level: 15,
+  });
+  assert.ok(lateMatch > earlyMatch * 10);
+
+  const mergeScores = Array.from({ length: FRUITS.length - 1 }, (_, index) =>
+    fruitMergeScore({
+      tier: index + 1,
+      combo: 1,
+      mode: "story",
+      level: 0,
+    }),
+  );
+  mergeScores.forEach((score, index) => {
+    if (index > 0) assert.ok(score > mergeScores[index - 1]);
+  });
+  assert.ok(mergeScores.at(-1)! < mergeScores[0] * 500);
+
+  const cleanFinish = completionScoreBonus({
+    level: 8,
+    mode: "story",
+    wave: 1,
+    remainingCards: 9,
+    openTraySlots: 6,
+    maxCombo: 7,
+    maxFruitTier: 11,
+  });
+  const messyFinish = completionScoreBonus({
+    level: 8,
+    mode: "story",
+    wave: 1,
+    remainingCards: 0,
+    openTraySlots: 1,
+    maxCombo: 2,
+    maxFruitTier: 11,
+  });
+  assert.ok(cleanFinish > messyFinish);
 });
 
 test("fusion planning keeps one partner per fruit and prioritizes card bonds", () => {

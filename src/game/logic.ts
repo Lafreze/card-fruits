@@ -507,6 +507,105 @@ export function calculateCoinReward({
   return Math.max(1, Math.round(base * bonus));
 }
 
+export function comboScoreMultiplier(combo: number) {
+  const safeCombo = Math.max(1, Math.floor(combo));
+  const earlySteps = Math.min(5, safeCombo - 1);
+  const longChainSteps = Math.min(5, Math.max(0, safeCombo - 6));
+  const masterySteps = Math.max(0, safeCombo - 11);
+  return Math.min(
+    2.6,
+    1 + earlySteps * 0.18 + longChainSteps * 0.1 + masterySteps * 0.04,
+  );
+}
+
+export function challengeScoreMultiplier({
+  mode,
+  level,
+  wave = 1,
+}: {
+  mode: "story" | "endless" | "expedition";
+  level: number;
+  wave?: number;
+}) {
+  if (mode === "story") return 1 + Math.max(0, level) * 0.055;
+  if (mode === "endless")
+    return 1 + Math.min(24, Math.max(0, wave - 1)) * 0.035;
+  return 1 + Math.min(7, Math.max(0, wave - 1)) * 0.07;
+}
+
+export function cardMatchScore({
+  tier,
+  combo,
+  mode,
+  level,
+  wave = 1,
+}: {
+  tier: number;
+  combo: number;
+  mode: "story" | "endless" | "expedition";
+  level: number;
+  wave?: number;
+}) {
+  const safeTier = Math.max(0, tier);
+  const fruitValue = 120 + safeTier * 68 + safeTier ** 2 * 10;
+  return Math.round(
+    fruitValue *
+      comboScoreMultiplier(combo) *
+      challengeScoreMultiplier({ mode, level, wave }),
+  );
+}
+
+export function fruitMergeScore({
+  tier,
+  combo,
+  mode,
+  level,
+  wave = 1,
+}: {
+  tier: number;
+  combo: number;
+  mode: "story" | "endless" | "expedition";
+  level: number;
+  wave?: number;
+}) {
+  const safeTier = Math.max(1, tier);
+  const fruitValue = 260 * (safeTier + 1) ** 2.05;
+  return Math.round(
+    fruitValue *
+      comboScoreMultiplier(combo) *
+      challengeScoreMultiplier({ mode, level, wave }),
+  );
+}
+
+export function completionScoreBonus({
+  level,
+  mode,
+  wave,
+  remainingCards,
+  openTraySlots,
+  maxCombo,
+  maxFruitTier,
+}: {
+  level: number;
+  mode: "story" | "endless" | "expedition";
+  wave: number;
+  remainingCards: number;
+  openTraySlots: number;
+  maxCombo: number;
+  maxFruitTier: number;
+}) {
+  const challenge = challengeScoreMultiplier({ mode, level, wave });
+  const clearValue =
+    900 +
+    (Math.max(0, level) + 1) * 520 +
+    Math.max(0, maxFruitTier) * 170;
+  const efficiency =
+    Math.max(0, remainingCards) * 42 +
+    Math.max(0, openTraySlots) * 150 +
+    Math.max(0, maxCombo) * 95;
+  return Math.round((clearValue + efficiency) * challenge);
+}
+
 /**
  * Gives every fruit at most one fusion partner. Explicit card-created bonds
  * win first, then the remaining fruit are paired by shortest distance. This

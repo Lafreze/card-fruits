@@ -77,11 +77,11 @@ const MODE_UNLOCK_LEVEL: Partial<Record<GameMode, number>> = {
 };
 const TUTORIAL_KEY = "fruit-king-tutorial-v2";
 const STARTER_GIFT_KEY = "fruit-king-starter-gift-v1";
-const CARD_QUICK_TOOL_IDS = new Set<ToolId>(["shuffle", "hammer", "sun"]);
-const FRUIT_QUICK_TOOL_IDS = new Set<ToolId>(["bomb", "shield", "quake"]);
+const CARD_BASE_TOOL_IDS = new Set<ToolId>(["shuffle", "hammer", "sun"]);
+const FRUIT_BASE_TOOL_IDS = new Set<ToolId>(["bomb", "shield", "quake"]);
 const BASE_TOOL_IDS = new Set<ToolId>([
-  ...CARD_QUICK_TOOL_IDS,
-  ...FRUIT_QUICK_TOOL_IDS,
+  ...CARD_BASE_TOOL_IDS,
+  ...FRUIT_BASE_TOOL_IDS,
 ]);
 const RELIC_RARITY_LABEL = {
   common: "普通",
@@ -764,38 +764,147 @@ export default function App() {
     result?.status === "won" &&
     rewardOptions.length > 0;
   const toolboxItems = [
-    { id: "undo", icon: "🕰️", label: "撤回", left: snapshot.undoLeft },
-    { id: "shuffle", icon: "🎲", label: "洗牌", left: snapshot.shuffleLeft },
-    { id: "juice", icon: "🥤", label: "榨汁", left: snapshot.juiceLeft },
-    { id: "hammer", icon: "🔨", label: "清顶", left: snapshot.hammerLeft },
-    { id: "magnet", icon: "🧲", label: "合并", left: snapshot.magnetLeft },
-    { id: "wild", icon: "🍀", label: "万能", left: snapshot.wildLeft },
-    { id: "bubble", icon: "🫧", label: "清槽", left: snapshot.bubbleLeft },
-    { id: "sun", icon: "☀️", label: "净化", left: snapshot.sunLeft },
-    { id: "ripen", icon: "🌱", label: "催熟", left: snapshot.ripenLeft },
-    { id: "split", icon: "✂️", label: "分果", left: snapshot.splitLeft },
-    { id: "bomb", icon: "💣", label: "炸弹", left: snapshot.bombLeft },
-    { id: "shield", icon: "🧊", label: "冰冻", left: snapshot.shieldLeft },
-    { id: "harvest", icon: "🌾", label: "丰收", left: snapshot.harvestLeft },
-    { id: "quake", icon: "⚙️", label: "搅拌", left: snapshot.quakeLeft },
+    {
+      id: "undo",
+      icon: "🕰️",
+      label: "撤回",
+      description: "退回上一张普通卡",
+      category: "card",
+      left: snapshot.undoLeft,
+    },
+    {
+      id: "shuffle",
+      icon: "🎲",
+      label: "洗牌",
+      description: "重排并优先露出三消路线",
+      category: "card",
+      left: snapshot.shuffleLeft,
+    },
+    {
+      id: "hammer",
+      icon: "🔨",
+      label: "清顶",
+      description: "自动收取最有用的顶层卡",
+      category: "card",
+      left: snapshot.hammerLeft,
+    },
+    {
+      id: "wild",
+      icon: "🍀",
+      label: "万能",
+      description: "补齐卡槽里最接近的三消",
+      category: "card",
+      left: snapshot.wildLeft,
+    },
+    {
+      id: "bubble",
+      icon: "🫧",
+      label: "清槽",
+      description: "收起两张最难配对的散牌",
+      category: "card",
+      left: snapshot.bubbleLeft,
+    },
+    {
+      id: "sun",
+      icon: "☀️",
+      label: "净化",
+      description: "清障；无障碍时转为狂热充能",
+      category: "card",
+      left: snapshot.sunLeft,
+    },
+    {
+      id: "bomb",
+      icon: "💣",
+      label: "炸弹",
+      description: "清理警戒线附近的低阶水果",
+      category: "fruit",
+      left: snapshot.bombLeft,
+    },
+    {
+      id: "shield",
+      icon: "🧊",
+      label: "冰冻",
+      description: "暂停物理和警戒线 6 秒",
+      category: "fruit",
+      left: snapshot.shieldLeft,
+    },
+    {
+      id: "quake",
+      icon: "⚙️",
+      label: "搅拌",
+      description: "重排果箱，解开堆叠死角",
+      category: "fruit",
+      left: snapshot.quakeLeft,
+    },
+    {
+      id: "juice",
+      icon: "🥤",
+      label: "榨汁",
+      description: "最高阶水果降一级并减压",
+      category: "fruit",
+      left: snapshot.juiceLeft,
+    },
+    {
+      id: "magnet",
+      icon: "🧲",
+      label: "合并",
+      description: "立即合成一对落稳水果",
+      category: "fruit",
+      left: snapshot.magnetLeft,
+    },
+    {
+      id: "ripen",
+      icon: "🌱",
+      label: "催熟",
+      description: "最低阶水果直接升一级",
+      category: "fruit",
+      left: snapshot.ripenLeft,
+    },
+    {
+      id: "split",
+      icon: "✂️",
+      label: "分果",
+      description: "最高阶水果拆成两个低一级水果",
+      category: "fruit",
+      left: snapshot.splitLeft,
+    },
+    {
+      id: "harvest",
+      icon: "🌾",
+      label: "丰收",
+      description: "下一次三消额外生成水果",
+      category: "boost",
+      left: snapshot.harvestLeft,
+    },
   ] satisfies Array<{
     id: ToolId;
     icon: string;
     label: string;
+    description: string;
+    category: "card" | "fruit" | "boost";
     left: number;
   }>;
-  const cardQuickTools = toolboxItems.filter((item) =>
-    CARD_QUICK_TOOL_IDS.has(item.id),
-  );
-  const fruitQuickTools = toolboxItems.filter((item) =>
-    FRUIT_QUICK_TOOL_IDS.has(item.id),
-  );
-  const availableToolboxItems = toolboxItems.filter(
-    (item) =>
-      item.left > 0 &&
-      !CARD_QUICK_TOOL_IDS.has(item.id) &&
-      !FRUIT_QUICK_TOOL_IDS.has(item.id),
-  );
+  const availableToolboxItems = toolboxItems.filter((item) => item.left > 0);
+  const toolGroups = [
+    {
+      id: "card",
+      title: "牌桌工具",
+      hint: "处理牌堆与卡槽",
+      items: toolboxItems.filter((item) => item.category === "card"),
+    },
+    {
+      id: "fruit",
+      title: "果箱工具",
+      hint: "直接改变水果物理",
+      items: toolboxItems.filter((item) => item.category === "fruit"),
+    },
+    {
+      id: "boost",
+      title: "增益工具",
+      hint: "强化下一次三消",
+      items: toolboxItems.filter((item) => item.category === "boost"),
+    },
+  ];
   const useToolById = (id: ToolId) =>
     useTool((controls) => {
       if (id === "sun") controls.sunshine();
@@ -983,9 +1092,7 @@ export default function App() {
               onToast={handleToast}
               onDropLaneChange={handleDropLaneChange}
             />
-            <header
-              className={`game-hud ${availableToolboxItems.length ? "" : "hud-no-tools"}`}
-            >
+            <header className="game-hud">
               <div className="score-chip">
                 <small>分数</small>
                 <b>{formatScore(snapshot.score)}</b>
@@ -1017,16 +1124,17 @@ export default function App() {
                   )}
                 </strong>
               </div>
-              {availableToolboxItems.length ? (
-                <button
-                  className="top-action"
-                  onClick={() => openGamePanel("tools")}
-                  aria-label={`打开道具箱，${availableToolboxItems.length} 种可用`}
-                >
-                  <i>🧰</i>
-                  <span>道具</span>
-                </button>
-              ) : null}
+              <button
+                className="top-action tool-action"
+                onClick={() => openGamePanel("tools")}
+                aria-label={`打开道具栏，${availableToolboxItems.length} 种可用`}
+              >
+                <i>
+                  🧰
+                  <em>{availableToolboxItems.length}</em>
+                </i>
+                <span>道具</span>
+              </button>
               <button
                 className="top-action"
                 onClick={() => openGamePanel("menu")}
@@ -1036,44 +1144,6 @@ export default function App() {
                 <span>菜单</span>
               </button>
             </header>
-            <div
-              className="quick-tool-dock card-tool-dock"
-              aria-label="牌桌区道具"
-            >
-              <small>牌桌</small>
-              {cardQuickTools.map((item) => (
-                <button
-                  key={item.id}
-                  disabled={item.left <= 0}
-                  onClick={() => useToolById(item.id)}
-                  aria-label={`${item.label}，剩余 ${item.left} 次`}
-                  title={item.label}
-                >
-                  <i>{item.icon}</i>
-                  <span>{item.label}</span>
-                  <em>×{item.left}</em>
-                </button>
-              ))}
-            </div>
-            <div
-              className="quick-tool-dock fruit-tool-dock"
-              aria-label="水果合成区道具"
-            >
-              <small>果箱</small>
-              {fruitQuickTools.map((item) => (
-                <button
-                  key={item.id}
-                  disabled={item.left <= 0}
-                  onClick={() => useToolById(item.id)}
-                  aria-label={`${item.label}，剩余 ${item.left} 次`}
-                  title={item.label}
-                >
-                  <i>{item.icon}</i>
-                  <span>{item.label}</span>
-                  <em>×{item.left}</em>
-                </button>
-              ))}
-            </div>
             <div className="drop-lane-control" aria-label="选择下次落果位置">
               <span>下次落点</span>
               {([-1, 0, 1] as const).map((lane) => (
@@ -1133,23 +1203,50 @@ export default function App() {
                   </button>
                   {gamePanel === "tools" ? (
                     <>
-                      <small>TOOL BOX</small>
-                      <h2>道具箱</h2>
-                      <div className="toolbox-grid" aria-label="本局可用道具">
-                        {availableToolboxItems.map((item) => (
-                          <button
-                            key={item.id}
-                            onClick={() => useToolById(item.id)}
-                          >
-                            <i>{item.icon}</i>
-                            <span>{item.label}</span>
-                            <em>×{item.left}</em>
-                          </button>
+                      <small>ORCHARD TOOL BAR</small>
+                      <h2>道具栏</h2>
+                      <p className="toolbox-summary">
+                        <b>{availableToolboxItems.length}</b> 种可用
+                        <span>点击后立即生效</span>
+                      </p>
+                      <div className="tool-groups" aria-label="本局道具栏">
+                        {toolGroups.map((group) => (
+                          <section className="tool-group" key={group.id}>
+                            <header>
+                              <span>
+                                <b>{group.title}</b>
+                                <small>{group.hint}</small>
+                              </span>
+                              <em>
+                                {
+                                  group.items.filter((item) => item.left > 0)
+                                    .length
+                                }
+                                /{group.items.length}
+                              </em>
+                            </header>
+                            <div className="toolbox-grid">
+                              {group.items.map((item) => (
+                                <button
+                                  key={item.id}
+                                  disabled={item.left <= 0}
+                                  onClick={() => useToolById(item.id)}
+                                  aria-label={`${item.label}，${item.description}，剩余 ${item.left} 次`}
+                                >
+                                  <i>{item.icon}</i>
+                                  <span>
+                                    <b>{item.label}</b>
+                                    <small>{item.description}</small>
+                                  </span>
+                                  <em>
+                                    {item.left > 0 ? `×${item.left}` : "未配置"}
+                                  </em>
+                                </button>
+                              ))}
+                            </div>
+                          </section>
                         ))}
                       </div>
-                      <p className="toolbox-empty">
-                        这里只显示本局可用道具，用完后会自动收起。
-                      </p>
                     </>
                   ) : null}
                   {gamePanel === "help" ? (
