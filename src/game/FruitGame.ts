@@ -23,6 +23,7 @@ import {
   fusionRevealScale,
   fusionResultScale,
   fruitMergeScore,
+  fruitSpawnScale,
   fruitVisualDiameter,
   rotatedRectanglesOverlap,
   scatterStackSlots,
@@ -2089,13 +2090,17 @@ export class FruitGame implements GameControls {
     const plugin = this.fruitPlugin(fruit);
     if (plugin.landedAt !== undefined) return false;
     plugin.landedAt = this.elapsed;
+    const usesImage = Boolean(FRUITS[fruit.tier].icon);
     if (plugin.spawnedByMerge) {
       delete plugin.spawnedByMerge;
       plugin.visualSettleUntil = this.elapsed + 0.28;
       delete plugin.landingPulseUntil;
       delete plugin.collisionPulseUntil;
-    } else {
+    } else if (!usesImage) {
       plugin.landingPulseUntil = this.elapsed + 0.22;
+    } else {
+      delete plugin.landingPulseUntil;
+      delete plugin.collisionPulseUntil;
     }
     Body.setAngularVelocity(fruit.body, fruit.body.angularVelocity * 0.72);
     this.ring(
@@ -2312,7 +2317,8 @@ export class FruitGame implements GameControls {
     );
     fruitIcon.position.set(0, 1);
     view.addChild(resonanceHalo, fruitIcon);
-    view.scale.set(0.2);
+    // 绘制图片从生成到落地都保持像素尺寸稳定；动感交给粒子和物理运动。
+    view.scale.set(fruitSpawnScale(Boolean(definition.icon)));
     return view;
   }
 
@@ -2434,6 +2440,7 @@ export class FruitGame implements GameControls {
     [nodeA, nodeB].filter(Boolean).forEach((fruit) => {
       const plugin = this.fruitPlugin(fruit!);
       if (
+        FRUITS[fruit!.tier].icon ||
         plugin.spawnedByMerge ||
         Number(plugin.visualSettleUntil || 0) > this.elapsed
       )
@@ -2454,7 +2461,18 @@ export class FruitGame implements GameControls {
         ? FRUITS[nodeB.tier].glow
         : 0xbda8d8;
     this.ring(x, y, color, 0.2 + strength * 0.22);
-    if (strength >= 0.38) this.burst(x, y, color, 3 + Math.round(strength * 5));
+    if (strength >= 0.38) {
+      this.burst(x, y, color, 3 + Math.round(strength * 5));
+      this.impactSpray(
+        x,
+        y,
+        color,
+        strength,
+        pair.bodyA.velocity.x - pair.bodyB.velocity.x,
+      );
+    }
+    if (strength >= 0.68)
+      this.ring(x, y, 0xfff1b8, 0.14 + strength * 0.16);
     this.shake = Math.max(this.shake, 0.7 + strength * 2.1);
     if (this.elapsed - this.lastCollisionSoundAt >= 0.09) {
       sounds.impact(strength);
@@ -2654,9 +2672,9 @@ export class FruitGame implements GameControls {
       echo.elapsed += seconds;
       const gather = Math.min(1, echo.elapsed / 0.16);
       const eased = 1 - (1 - gather) ** 3;
-      for (const [icon, start, direction] of [
-        [echo.first, echo.fromA, -1],
-        [echo.second, echo.fromB, 1],
+      for (const [icon, start] of [
+        [echo.first, echo.fromA],
+        [echo.second, echo.fromB],
       ] as const) {
         icon.position.set(
           start.x + (echo.center.x - start.x) * eased,
@@ -2664,7 +2682,8 @@ export class FruitGame implements GameControls {
             (echo.center.y - start.y) * eased -
             Math.sin(gather * Math.PI) * 6,
         );
-        icon.rotation = direction * eased * 0.18;
+        // 同级水果只做平移吸附，不在靠近时拧转。
+        icon.rotation = 0;
         icon.scale.set(1 - eased * 0.68);
         icon.alpha = 1 - Math.max(0, gather - 0.72) / 0.28;
       }
@@ -2676,7 +2695,7 @@ export class FruitGame implements GameControls {
         echo.result.scale.set(
           fusionResultScale(reveal, Boolean(FRUITS[echo.tier].icon)),
         );
-        echo.result.rotation = (1 - reveal) * -0.12;
+        echo.result.rotation = 0;
       }
       if (echo.elapsed < 0.32) return true;
       echo.first.destroy();
@@ -2690,6 +2709,23 @@ export class FruitGame implements GameControls {
         18 + echo.tier,
       );
       this.ring(echo.center.x, echo.center.y, FRUITS[echo.tier].glow, 0.9);
+      this.impactSpray(
+        echo.center.x,
+        echo.center.y,
+        FRUITS[echo.tier].glow,
+        Math.min(1, 0.5 + echo.tier * 0.025),
+        echo.velocityX,
+      );
+      this.setTimer(
+        () =>
+          this.ring(
+            echo.center.x,
+            echo.center.y,
+            FRUITS[echo.tier].color,
+            0.48,
+          ),
+        55,
+      );
       const result = this.spawnFruit(
         echo.tier,
         echo.center.x,
@@ -2829,6 +2865,50 @@ export class FruitGame implements GameControls {
     }
   }
 
+  // 碰撞方向决定果汁横向甩动，始终保留向上的清脆飞溅，避免只靠本体缩放表现力度。
+  private impactSpray(
+    x: number,
+    y: number,
+    color: number,
+    strength: number,
+    impactX = 0,
+  ) {
+    const available = Math.max(0, 190 - this.particles.length);
+    const particleCount = Math.min(
+      4 + Math.round(strength * 8),
+      available,
+    );
+    const direction = Math.sign(impactX) || (Math.random() < 0.5 ? -1 : 1);
+    for (let index = 0; index < particleCount; index += 1) {
+      const length = 3.5 + Math.random() * 5.5;
+      const width = 1.2 + Math.random() * 1.9;
+      const droplet = new Graphics()
+        .ellipse(0, 0, length, width)
+        .fill({
+          color: index % 5 === 0 ? 0xfff0ad : color,
+          alpha: 0.88,
+        });
+      droplet.position.set(x, y);
+      this.fxLayer.addChild(droplet);
+      const side = index % 2 === 0 ? 1 : -1;
+      const vx =
+        direction * (0.7 + Math.random() * 2.5) +
+        side * (0.8 + Math.random() * 2.6) * strength;
+      const vy = -(1.5 + Math.random() * (3.2 + strength * 3.8));
+      droplet.rotation = Math.atan2(vy, vx);
+      const life = 0.28 + Math.random() * 0.34;
+      this.particles.push({
+        view: droplet,
+        vx,
+        vy,
+        gravity: 0.14 + Math.random() * 0.08,
+        life,
+        maxLife: life,
+        spin: (Math.random() - 0.5) * 0.11,
+      });
+    }
+  }
+
   // 扩散圈:小半径、细线、短寿命,浅色背景下点到为止
   private ring(x: number, y: number, color: number, size = 1) {
     const ring = new Graphics()
@@ -2853,7 +2933,10 @@ export class FruitGame implements GameControls {
       fruit.view.position.copyFrom(fruit.body.position);
       fruit.view.rotation = fruit.body.angle;
       const plugin = this.fruitPlugin(fruit);
-      if (
+      if (FRUITS[fruit.tier].icon) {
+        // 移动端掉帧也不能跳过动画中间帧后放大：图片水果全生命周期锁定 1 倍。
+        fruit.view.scale.set(1);
+      } else if (
         plugin.spawnedByMerge ||
         Number(plugin.visualSettleUntil || 0) > this.elapsed
       ) {
@@ -3046,6 +3129,9 @@ export class FruitGame implements GameControls {
       const distance = Math.max(0.001, Math.hypot(dx, dy));
       const contactDistance =
         this.fruitRadius(first.tier) + this.fruitRadius(second.tier);
+      // 同级配对在靠近期间消除碰撞带来的角速度，只保留平移和自然落体。
+      Body.setAngularVelocity(first.body, 0);
+      Body.setAngularVelocity(second.body, 0);
       const state = this.fusionPairStates.get(key) || {
         pairedFor: 0,
         stalledFor: 0,
@@ -3117,11 +3203,6 @@ export class FruitGame implements GameControls {
           x: upper.body.velocity.x,
           y: Math.max(0, upper.body.velocity.y) + downward,
         });
-      }
-      if (state.stalledFor > 0.72) {
-        const direction = Math.sign(dx || 1);
-        Body.setAngularVelocity(first.body, direction * 0.09);
-        Body.setAngularVelocity(second.body, -direction * 0.09);
       }
     }
 

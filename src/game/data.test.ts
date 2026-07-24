@@ -15,6 +15,7 @@ import {
   fusionRevealScale,
   fusionResultScale,
   fruitMergeScore,
+  fruitSpawnScale,
   fruitVisualDiameter,
   rotatedRectanglesOverlap,
   scatterStackSlots,
@@ -313,6 +314,8 @@ test("fusion reveal stays gentle and story harvest can finish by clear or full t
       fusionResultScale(index / 100, true),
     ).every((scale) => scale === 1),
   );
+  assert.equal(fruitSpawnScale(true), 1);
+  assert.equal(fruitSpawnScale(false), 0.2);
   assert.ok(fruitVisualDiameter(40, true) < fruitVisualDiameter(40, false));
 
   assert.equal(

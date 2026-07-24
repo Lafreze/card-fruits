@@ -473,6 +473,10 @@ export function fusionResultScale(progress: number, usesImage: boolean) {
   return usesImage ? 1 : fusionRevealScale(progress);
 }
 
+export function fruitSpawnScale(usesImage: boolean) {
+  return usesImage ? 1 : 0.2;
+}
+
 export function fruitVisualDiameter(radius: number, usesImage: boolean) {
   return Math.max(18, radius * (usesImage ? 1.58 : 1.72));
 }

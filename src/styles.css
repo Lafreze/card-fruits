@@ -1909,9 +1909,9 @@ input:focus-visible {
 }
 
 @media (max-width: 800px) {
-  /* 等比 contain 适配:高度取「安全区内可视高度」与「宽度撑满时的等比高度」的较小值,
-     宽度由 aspect-ratio 推出 → 画面不裁切不变形,多余空间上下留边居中 */
+  /* 使用稳定视口高度，地址栏收起/展开时不重新缩放整张游戏画布。 */
   .play-layout {
+    min-height: 100svh;
     padding: env(safe-area-inset-top, 0px) 0 env(safe-area-inset-bottom, 0px);
   }
   .desktop-brief {
@@ -1920,7 +1920,7 @@ input:focus-visible {
   .game-phone {
     height: min(
       calc(
-        100dvh - env(safe-area-inset-top, 0px) -
+        100svh - env(safe-area-inset-top, 0px) -
           env(safe-area-inset-bottom, 0px)
       ),
       calc(100vw * 860 / 430)
