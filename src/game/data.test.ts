@@ -12,12 +12,13 @@ import {
   dropLaneX,
   endlessSeedTier,
   fruitBatchCount,
+  fusionRevealScale,
   fruitMergeScore,
   rotatedRectanglesOverlap,
   scatterStackSlots,
   simulateTray,
   slotIsCovered,
-  storyTargetReady,
+  storyHarvestComplete,
 } from "./logic.ts";
 import {
   MODE_INFO,
@@ -95,7 +96,7 @@ test("rotated card coverage follows the visible footprint", () => {
 });
 
 test("all story levels have valid, playable layouts", () => {
-  assert.equal(LEVELS.length, 20);
+  assert.equal(LEVELS.length, 23);
 
   LEVELS.forEach((level, index) => {
     const slots = expandLayout(level.layout);
@@ -259,17 +260,57 @@ test("greenhouse fruit output is deterministic and capped at three", () => {
   assert.equal(fruitBatchCount(-2, -2), 1);
 });
 
-test("story harvest pacing and endless high-tier seeds are progressive", () => {
-  assert.equal(storyTargetReady(18, 4), false);
-  assert.equal(storyTargetReady(18, 3), true);
-  assert.equal(storyTargetReady(72, 12), true);
-  assert.equal(storyTargetReady(72, 13), false);
-
+test("endless high-tier seeds are progressive", () => {
   assert.equal(endlessSeedTier(1, FRUITS.length), null);
   assert.equal(endlessSeedTier(2, FRUITS.length), null);
   assert.equal(endlessSeedTier(3, FRUITS.length), 4);
   assert.ok(endlessSeedTier(10, FRUITS.length)! >= 11);
   assert.equal(endlessSeedTier(50, FRUITS.length), FRUITS.length - 3);
+});
+
+test("fusion reveal stays gentle and story harvest can finish by clear or full tray", () => {
+  const revealScales = Array.from({ length: 101 }, (_, index) =>
+    fusionRevealScale(index / 100),
+  );
+  assert.ok(Math.max(...revealScales) <= 1.1);
+  assert.equal(fusionRevealScale(1), 1);
+
+  assert.equal(
+    storyHarvestComplete({
+      targetAchieved: true,
+      remainingCards: 0,
+      trayCount: 2,
+      trayLimit: 7,
+    }),
+    true,
+  );
+  assert.equal(
+    storyHarvestComplete({
+      targetAchieved: true,
+      remainingCards: 12,
+      trayCount: 7,
+      trayLimit: 7,
+    }),
+    true,
+  );
+  assert.equal(
+    storyHarvestComplete({
+      targetAchieved: true,
+      remainingCards: 12,
+      trayCount: 6,
+      trayLimit: 7,
+    }),
+    false,
+  );
+  assert.equal(
+    storyHarvestComplete({
+      targetAchieved: false,
+      remainingCards: 0,
+      trayCount: 7,
+      trayLimit: 7,
+    }),
+    false,
+  );
 });
 
 test("drop lanes are symmetric and stay inside the fruit box", () => {
@@ -412,10 +453,10 @@ test("fusion planning keeps one partner per fruit and prioritizes card bonds", (
 });
 
 test("fruit scale and roguelike catalog stay balanced", () => {
-  assert.equal(FRUITS.length, 23);
+  assert.equal(FRUITS.length, 26);
   assert.deepEqual(
     FRUITS.slice(-5).map((fruit) => fruit.name),
-    ["火龙果", "哈密瓜", "南瓜", "西瓜", "黄金果王"],
+    ["西瓜", "石榴", "木瓜", "菠萝蜜", "黄金果王"],
   );
   FRUITS.forEach((fruit, index) => {
     assert.ok(fruit.radius <= 41, `${fruit.name} 不应重新撑满果箱`);
@@ -428,6 +469,14 @@ test("fruit scale and roguelike catalog stay balanced", () => {
     }
   });
   assert.ok(FRUITS.at(-1)!.radius / FRUITS[0].radius <= 5.2);
+  assert.equal(FRUITS.find((fruit) => fruit.name === "香蕉")?.emoji, "");
+  assert.equal(
+    FRUITS.find((fruit) => fruit.name === "香蕉")?.icon,
+    "/fruits/banana-bunch.webp",
+  );
+  ["石榴", "木瓜", "菠萝蜜"].forEach((name) =>
+    assert.ok(FRUITS.find((fruit) => fruit.name === name)?.icon),
+  );
   assert.equal(new Set(RELICS.map((relic) => relic.id)).size, RELICS.length);
   assert.equal(RELICS.length, 30);
   assert.ok(RELICS.some((relic) => relic.rarity === "rare"));

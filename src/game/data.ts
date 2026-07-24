@@ -26,7 +26,7 @@ export type LevelDefinition = {
   layout: LayoutBlock[];
 };
 
-// 23 级合成链:橄榄、青苹果、火龙果和南瓜补齐早中后段，黄金果王仍为终点。
+// 26 级合成链:后期加入石榴、木瓜和菠萝蜜，黄金果王仍为终点。
 export const FRUITS: FruitDefinition[] = [
   { name: "蓝莓", emoji: "🫐", radius: 8, color: 0x5c7cfa, glow: 0xa5b4ff },
   { name: "橄榄", emoji: "🫒", radius: 9, color: 0x718c3a, glow: 0xc7df85 },
@@ -55,7 +55,14 @@ export const FRUITS: FruitDefinition[] = [
   { name: "梨", emoji: "🍐", radius: 25, color: 0xb8d64f, glow: 0xe9f99c },
   { name: "桃子", emoji: "🍑", radius: 26.5, color: 0xff8fab, glow: 0xffc2d1 },
   { name: "芒果", emoji: "🥭", radius: 28, color: 0xffb703, glow: 0xffd166 },
-  { name: "香蕉", emoji: "🍌", radius: 29.5, color: 0xffd43b, glow: 0xfff19a },
+  {
+    name: "香蕉",
+    emoji: "",
+    icon: "/fruits/banana-bunch.webp",
+    radius: 29.5,
+    color: 0xffd43b,
+    glow: 0xfff19a,
+  },
   { name: "椰子", emoji: "🥥", radius: 31, color: 0xa9805b, glow: 0xe6cfb0 },
   { name: "菠萝", emoji: "🍍", radius: 32.5, color: 0xf7c948, glow: 0xffe69a },
   {
@@ -69,6 +76,30 @@ export const FRUITS: FruitDefinition[] = [
   { name: "哈密瓜", emoji: "🍈", radius: 35.5, color: 0x90be6d, glow: 0xc7f9b5 },
   { name: "南瓜", emoji: "🎃", radius: 37, color: 0xe97924, glow: 0xffb56f },
   { name: "西瓜", emoji: "🍉", radius: 39, color: 0x43aa8b, glow: 0x9bf6cf },
+  {
+    name: "石榴",
+    emoji: "",
+    icon: "/fruits/pomegranate.webp",
+    radius: 39.5,
+    color: 0xc9184a,
+    glow: 0xff8fab,
+  },
+  {
+    name: "木瓜",
+    emoji: "",
+    icon: "/fruits/papaya.webp",
+    radius: 40,
+    color: 0xf8961e,
+    glow: 0xffcf70,
+  },
+  {
+    name: "菠萝蜜",
+    emoji: "",
+    icon: "/fruits/jackfruit.webp",
+    radius: 40.5,
+    color: 0xaacc32,
+    glow: 0xe4f58b,
+  },
   {
     name: "黄金果王",
     emoji: "",
@@ -335,6 +366,18 @@ const GOLDEN_SANCTUM = [
   B(6, 251, 244, 3, 1),
 ];
 
+// 后期三关改为三张一层的高塔：层内始终有足够间距，跨层遮挡则形成
+// 稳定、清晰的逐层揭牌节奏。层心上下错开，避免视觉上像一摞死板直线。
+function crownTower(rows: number) {
+  return Array.from({ length: rows }, (_, layer) =>
+    B(layer, 215, 206 + (layer % 3) * 38, 3, 1),
+  );
+}
+
+const PAPAYA_TERRACE = crownTower(25);
+const JACKFRUIT_GROVE = crownTower(26);
+const KING_ASCENSION = crownTower(27);
+
 // 把一颗目标果递归拆成与卡位数量相同的果实组，保持总合成质量严格守恒。
 // 因此普通关卡不会再靠几组高阶牌提前结束，玩家需要处理绝大多数牌才能达成目标。
 function ladderCards(target: number, totalCards: number) {
@@ -492,11 +535,32 @@ export const LEVELS: LevelDefinition[] = [
     layout: WATERMELON_ORBIT,
   },
   {
-    name: "果王圣殿",
+    name: "石榴星冠",
     target: 22,
     cards: ladderCards(22, 72),
     specialRate: 0.41,
     layout: GOLDEN_SANCTUM,
+  },
+  {
+    name: "木瓜晚霞",
+    target: 23,
+    cards: ladderCards(23, 75),
+    specialRate: 0.42,
+    layout: PAPAYA_TERRACE,
+  },
+  {
+    name: "菠萝蜜巨树",
+    target: 24,
+    cards: ladderCards(24, 78),
+    specialRate: 0.43,
+    layout: JACKFRUIT_GROVE,
+  },
+  {
+    name: "果王圣殿",
+    target: 25,
+    cards: ladderCards(25, 81),
+    specialRate: 0.45,
+    layout: KING_ASCENSION,
   },
 ];
 

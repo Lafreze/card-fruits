@@ -20,10 +20,11 @@ import {
   dropLaneX,
   endlessSeedTier,
   fruitBatchCount,
+  fusionRevealScale,
   fruitMergeScore,
   rotatedRectanglesOverlap,
   scatterStackSlots,
-  storyTargetReady,
+  storyHarvestComplete,
 } from "./logic";
 import { haptic, sounds } from "./audio";
 import {
@@ -250,7 +251,6 @@ export class FruitGame implements GameControls {
   private mutatorTag: Text | null = null;
   private secondWindUsed = false;
   private lastPick: CardNode | null = null;
-  private initialCardCount = 0;
   private storyTargetAchieved = false;
   private storyTargetNoticeShown = false;
   private cardMatchCount = 0;
@@ -895,7 +895,6 @@ export class FruitGame implements GameControls {
       (sum, card) => sum + card.count,
       0,
     );
-    this.initialCardCount = cardCount;
     const slots = definition.layout
       .flatMap((block) =>
         Array.from({ length: block.cols * block.rows }, (_, cell) => ({
@@ -2186,15 +2185,19 @@ export class FruitGame implements GameControls {
     )
       return;
     const remainingCards = this.cards.filter((card) => card.active).length;
-    if (!storyTargetReady(this.initialCardCount, remainingCards)) {
+    const trayFilled = this.tray.length >= this.trayLimit;
+    if (
+      !storyHarvestComplete({
+        targetAchieved: this.storyTargetAchieved,
+        remainingCards,
+        trayCount: this.tray.length,
+        trayLimit: this.trayLimit,
+      })
+    ) {
       if (!this.storyTargetNoticeShown) {
         this.storyTargetNoticeShown = true;
-        const needToClear = Math.max(
-          0,
-          remainingCards - Math.floor(this.initialCardCount * 0.18),
-        );
         this.callbacks.onToast(
-          `目标已达成 · 再清理 ${needToClear} 张牌完成采收`,
+          "目标已达成 · 清空牌堆或填满卡槽即可过关",
           "gold",
         );
       }
@@ -2203,7 +2206,13 @@ export class FruitGame implements GameControls {
     this.winPending = true;
     const target = FRUITS[LEVELS[this.levelIndex].target];
     this.setTimer(
-      () => this.finish("won", `${target.name}诞生，牌园采收完成！`),
+      () =>
+        this.finish(
+          "won",
+          trayFilled
+            ? `${target.name}已达成，满槽采收过关！`
+            : `${target.name}已达成，牌园清空！`,
+        ),
       720,
     );
   }
@@ -2567,9 +2576,8 @@ export class FruitGame implements GameControls {
         const reveal = Math.min(1, (echo.elapsed - 0.13) / 0.18);
         echo.result.visible = true;
         echo.result.alpha = Math.min(1, reveal * 2.2);
-        echo.result.scale.set(
-          0.32 + Math.sin(reveal * Math.PI) * 0.88 + reveal * 0.68,
-        );
+        // 轻微回弹即可。旧曲线峰值超过 1.5 倍，写实火龙果会突然扑满画面。
+        echo.result.scale.set(fusionRevealScale(reveal));
         echo.result.rotation = (1 - reveal) * -0.12;
       }
       if (echo.elapsed < 0.32) return true;

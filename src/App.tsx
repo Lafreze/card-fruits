@@ -1103,7 +1103,9 @@ export default function App() {
                     ? "最高水果"
                     : mode === "expedition"
                       ? `远征 ${wave}/8`
-                      : `剩余 ${snapshot.remainingCards} 张 · 槽 ${snapshot.trayCount}/${snapshot.trayLimit}`}
+                      : snapshot.maxFruitTier >= LEVELS[level].target
+                        ? "目标达成 · 清牌或满槽过关"
+                        : `剩余 ${snapshot.remainingCards} 张 · 槽 ${snapshot.trayCount}/${snapshot.trayLimit}`}
                 </small>
                 <strong>
                   {mode === "endless" ? (

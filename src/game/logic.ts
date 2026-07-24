@@ -456,17 +456,34 @@ export function fruitBatchCount(
   );
 }
 
-export function storyTargetReady(totalCards: number, remainingCards: number) {
-  const total = Math.max(1, Math.floor(totalCards));
-  const remaining = Math.max(0, Math.floor(remainingCards));
-  return remaining <= Math.floor(total * 0.18);
-}
-
 export function endlessSeedTier(wave: number, fruitCount: number) {
   const safeWave = Math.max(1, Math.floor(wave));
   const safeFruitCount = Math.max(1, Math.floor(fruitCount));
   if (safeWave < 3 || safeFruitCount < 4) return null;
   return Math.min(safeFruitCount - 3, 2 + Math.floor(safeWave * 0.9));
+}
+
+export function fusionRevealScale(progress: number) {
+  const reveal = Math.max(0, Math.min(1, progress));
+  return 0.42 + reveal * 0.58 + Math.sin(reveal * Math.PI) * 0.1;
+}
+
+export function storyHarvestComplete({
+  targetAchieved,
+  remainingCards,
+  trayCount,
+  trayLimit,
+}: {
+  targetAchieved: boolean;
+  remainingCards: number;
+  trayCount: number;
+  trayLimit: number;
+}) {
+  return (
+    targetAchieved &&
+    (Math.max(0, remainingCards) === 0 ||
+      Math.max(0, trayCount) >= Math.max(1, trayLimit))
+  );
 }
 
 export function dropLaneX(
