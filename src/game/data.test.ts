@@ -9,6 +9,7 @@ import {
   cardMatchScore,
   comboScoreMultiplier,
   completionScoreBonus,
+  conversionFruitScale,
   dropLaneX,
   endlessSeedTier,
   fruitBatchCount,
@@ -17,6 +18,7 @@ import {
   fruitMergeScore,
   fruitSpawnScale,
   fruitVisualDiameter,
+  rainPreviewScale,
   rotatedRectanglesOverlap,
   scatterStackSlots,
   simulateTray,
@@ -316,6 +318,16 @@ test("fusion reveal stays gentle and story harvest can finish by clear or full t
   );
   assert.equal(fruitSpawnScale(true), 1);
   assert.equal(fruitSpawnScale(false), 0.2);
+  assert.ok(
+    Array.from({ length: 101 }, (_, index) =>
+      conversionFruitScale(index / 100, true),
+    ).every((scale) => scale === 1),
+  );
+  assert.ok(
+    Array.from({ length: 101 }, (_, index) =>
+      rainPreviewScale(index / 100, true),
+    ).every((scale) => scale === 1),
+  );
   assert.ok(fruitVisualDiameter(40, true) < fruitVisualDiameter(40, false));
 
   assert.equal(

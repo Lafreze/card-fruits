@@ -17,6 +17,7 @@ import {
   canMergeAfterLanding,
   cardMatchScore,
   completionScoreBonus,
+  conversionFruitScale,
   dropLaneX,
   endlessSeedTier,
   fruitBatchCount,
@@ -25,6 +26,7 @@ import {
   fruitMergeScore,
   fruitSpawnScale,
   fruitVisualDiameter,
+  rainPreviewScale,
   rotatedRectanglesOverlap,
   scatterStackSlots,
   storyHarvestComplete,
@@ -1843,7 +1845,16 @@ export class FruitGame implements GameControls {
       this.fxLayer.addChild(miniCard);
       return miniCard;
     });
-    const fruit = this.makeFruitIcon(tier, FRUITS[tier].icon ? 31 : 26, true);
+    const usesImage = Boolean(FRUITS[tier].icon);
+    const fruit = new Container();
+    const fruitIcon = this.makeFruitIcon(
+      tier,
+      usesImage
+        ? fruitVisualDiameter(this.fruitRadius(tier), true)
+        : 26,
+      true,
+    );
+    fruit.addChild(fruitIcon);
     fruit.position.set(transferX, transferY);
     fruit.visible = false;
     this.fxLayer.addChild(fruit);
@@ -1891,7 +1902,9 @@ export class FruitGame implements GameControls {
         sequence.condensed = true;
         sequence.cards.forEach((card) => card.destroy({ children: true }));
         sequence.fruit.visible = true;
-        sequence.fruit.scale.set(0.45);
+        sequence.fruit.scale.set(
+          conversionFruitScale(0, Boolean(FRUITS[sequence.tier].icon)),
+        );
         this.burst(transferX, transferY, FRUITS[sequence.tier].glow, 24);
         this.ring(transferX, transferY, FRUITS[sequence.tier].glow, 0.75);
       }
@@ -1905,11 +1918,16 @@ export class FruitGame implements GameControls {
           transferX,
           transferY + (WORLD.box.y + 27 - transferY) * eased,
         );
-        sequence.fruit.scale.set(0.45 + Math.sin(progress * Math.PI) * 0.62);
+        sequence.fruit.scale.set(
+          conversionFruitScale(
+            progress,
+            Boolean(FRUITS[sequence.tier].icon),
+          ),
+        );
         sequence.fruit.alpha = 1 - Math.max(0, progress - 0.82) / 0.18;
       }
       if (sequence.elapsed < gatherDuration + 0.38) return true;
-      sequence.fruit.destroy();
+      sequence.fruit.destroy({ children: true });
       this.queueFruitRain(sequence.tier, sequence.power);
       return false;
     });
@@ -2002,6 +2020,7 @@ export class FruitGame implements GameControls {
 
   private makeRainPreview(tier: number, total: number) {
     const view = new Container();
+    const usesImage = Boolean(FRUITS[tier].icon);
     const glow = new Graphics().circle(0, 0, 24).fill({
       color: total >= 3 ? 0xd4ac55 : FRUITS[tier].glow,
       alpha: total >= 3 ? 0.14 : 0.1,
@@ -2009,7 +2028,9 @@ export class FruitGame implements GameControls {
     glow.filters = [new BlurFilter({ strength: 7 })];
     const fruitIcon = this.makeFruitIcon(
       tier,
-      FRUITS[tier].icon ? 29 : 23,
+      usesImage
+        ? fruitVisualDiameter(this.fruitRadius(tier), true)
+        : 23,
       true,
     );
     fruitIcon.position.set(0, -1);
@@ -2023,7 +2044,7 @@ export class FruitGame implements GameControls {
       view.addChild(pip);
     }
     view.alpha = 0;
-    view.scale.set(0.68);
+    view.scale.set(rainPreviewScale(0, usesImage));
     return view;
   }
 
@@ -2036,7 +2057,9 @@ export class FruitGame implements GameControls {
       if (timeLeft > 0) {
         const ready = Math.max(0, Math.min(1, 1 - timeLeft / 0.28));
         drop.view.alpha = 0.3 + ready * 0.7;
-        drop.view.scale.set(0.68 + ready * 0.32);
+        drop.view.scale.set(
+          rainPreviewScale(ready, Boolean(FRUITS[drop.tier].icon)),
+        );
         drop.view.y = WORLD.box.y + 28 - Math.sin(ready * Math.PI) * 7;
         remaining.push(drop);
         return;
@@ -2635,6 +2658,7 @@ export class FruitGame implements GameControls {
       }, 610);
     }
     const fusionIcon = (fruitTier: number) => {
+      const view = new Container();
       const icon = this.makeFruitIcon(
         fruitTier,
         fruitVisualDiameter(
@@ -2643,8 +2667,9 @@ export class FruitGame implements GameControls {
         ),
         true,
       );
-      this.fxLayer.addChild(icon);
-      return icon;
+      view.addChild(icon);
+      this.fxLayer.addChild(view);
+      return view;
     };
     const echoA = fusionIcon(first.tier);
     const echoB = fusionIcon(second.tier);
@@ -2698,9 +2723,9 @@ export class FruitGame implements GameControls {
         echo.result.rotation = 0;
       }
       if (echo.elapsed < 0.32) return true;
-      echo.first.destroy();
-      echo.second.destroy();
-      echo.result.destroy();
+      echo.first.destroy({ children: true });
+      echo.second.destroy({ children: true });
+      echo.result.destroy({ children: true });
       echo.sourceIds.forEach((id) => this.merging.delete(id));
       this.burst(
         echo.center.x,

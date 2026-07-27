@@ -477,6 +477,18 @@ export function fruitSpawnScale(usesImage: boolean) {
   return usesImage ? 1 : 0.2;
 }
 
+export function conversionFruitScale(progress: number, usesImage: boolean) {
+  if (usesImage) return 1;
+  const reveal = Math.max(0, Math.min(1, progress));
+  return 0.45 + Math.sin(reveal * Math.PI) * 0.62;
+}
+
+export function rainPreviewScale(progress: number, usesImage: boolean) {
+  if (usesImage) return 1;
+  const reveal = Math.max(0, Math.min(1, progress));
+  return 0.68 + reveal * 0.32;
+}
+
 export function fruitVisualDiameter(radius: number, usesImage: boolean) {
   return Math.max(18, radius * (usesImage ? 1.58 : 1.72));
 }
