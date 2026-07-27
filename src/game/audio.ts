@@ -1,5 +1,6 @@
 let context: AudioContext | null = null;
 let master: GainNode | null = null;
+let sharedNoise: AudioBuffer | null = null;
 
 function getContext() {
   if (!context) {
@@ -21,6 +22,17 @@ function getContext() {
 function getOutput() {
   getContext();
   return master!;
+}
+
+function getNoiseBuffer(ctx: AudioContext) {
+  if (sharedNoise && sharedNoise.sampleRate === ctx.sampleRate)
+    return sharedNoise;
+  const frameCount = Math.max(1, Math.floor(ctx.sampleRate * 0.14));
+  sharedNoise = ctx.createBuffer(1, frameCount, ctx.sampleRate);
+  const channel = sharedNoise.getChannelData(0);
+  for (let index = 0; index < frameCount; index += 1)
+    channel[index] = Math.random() * 2 - 1;
+  return sharedNoise;
 }
 
 function tone({
@@ -85,17 +97,11 @@ function juiceNoise({
 } = {}) {
   try {
     const ctx = getContext();
-    const frameCount = Math.max(1, Math.floor(ctx.sampleRate * duration));
-    const buffer = ctx.createBuffer(1, frameCount, ctx.sampleRate);
-    const channel = buffer.getChannelData(0);
-    for (let index = 0; index < frameCount; index += 1) {
-      const fade = 1 - index / frameCount;
-      channel[index] = (Math.random() * 2 - 1) * fade ** 1.7;
-    }
     const source = ctx.createBufferSource();
     const filter = ctx.createBiquadFilter();
     const volume = ctx.createGain();
     const start = ctx.currentTime + delay;
+    const buffer = getNoiseBuffer(ctx);
     source.buffer = buffer;
     filter.type = type;
     filter.frequency.setValueAtTime(frequency, start);
@@ -107,7 +113,9 @@ function juiceNoise({
     );
     volume.gain.exponentialRampToValueAtTime(0.0001, start + duration);
     source.connect(filter).connect(volume).connect(getOutput());
-    source.start(start);
+    const availableOffset = Math.max(0, buffer.duration - duration);
+    source.start(start, Math.random() * availableOffset, duration);
+    source.stop(start + duration + 0.01);
   } catch {
     // Keep gameplay silent instead of failing when audio is unavailable.
   }
@@ -165,6 +173,14 @@ function softImpact(strength: number, delay = 0) {
 }
 
 export const sounds = {
+  prepare: () => {
+    try {
+      const ctx = getContext();
+      getNoiseBuffer(ctx);
+    } catch {
+      // Some browsers still require a later gesture; individual sounds retry safely.
+    }
+  },
   tap: () => {
     softPluck(520, 0, 0.018);
     juiceNoise({

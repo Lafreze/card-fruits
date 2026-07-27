@@ -120,6 +120,13 @@ type FusionEcho = {
   elapsed: number;
 };
 
+const MAX_PARTICLES = 120;
+const MAX_RINGS = 28;
+const COLLISION_FEEDBACK_LIMIT = 3;
+const COLLISION_MERGE_LIMIT = 4;
+const ACTIVE_COLLISION_INTERVAL = 0.05;
+const FUSION_ATTRACTION_INTERVAL = 1 / 30;
+
 type FruitPluginState = {
   tier: number;
   birth: number;
@@ -198,6 +205,9 @@ export class FruitGame implements GameControls {
   private fruitFocusUntil = 0;
   private focusedFruitIds = new Set<number>();
   private lastCollisionSoundAt = -1;
+  private lastCollisionHapticAt = -1;
+  private lastActiveCollisionCheckAt = -1;
+  private lastFusionAttractionAt = -1;
   private lastCardPhaseReady = true;
   private merging = new Set<number>();
   private fusionPairStates = new Map<string, FusionPairState>();
@@ -2448,16 +2458,20 @@ export class FruitGame implements GameControls {
     haptic(power >= 3 ? [18, 24, 34] : [10, 18]);
   }
 
-  private playCollisionFeedback(
-    pair: Matter.Pair,
-    nodeA?: FruitNode,
-    nodeB?: FruitNode,
-  ) {
+  private collisionStrength(pair: Matter.Pair) {
     const relativeSpeed = Math.hypot(
       pair.bodyA.velocity.x - pair.bodyB.velocity.x,
       pair.bodyA.velocity.y - pair.bodyB.velocity.y,
     );
-    const strength = Math.max(0, Math.min(1, (relativeSpeed - 0.42) / 4.8));
+    return Math.max(0, Math.min(1, (relativeSpeed - 0.42) / 4.8));
+  }
+
+  private playCollisionFeedback(
+    pair: Matter.Pair,
+    strength: number,
+    nodeA?: FruitNode,
+    nodeB?: FruitNode,
+  ) {
     if (strength <= 0) return;
 
     [nodeA, nodeB].filter(Boolean).forEach((fruit) => {
@@ -2485,7 +2499,6 @@ export class FruitGame implements GameControls {
         : 0xbda8d8;
     this.ring(x, y, color, 0.2 + strength * 0.22);
     if (strength >= 0.38) {
-      this.burst(x, y, color, 3 + Math.round(strength * 5));
       this.impactSpray(
         x,
         y,
@@ -2501,7 +2514,13 @@ export class FruitGame implements GameControls {
       sounds.impact(strength);
       this.lastCollisionSoundAt = this.elapsed;
     }
-    if (strength >= 0.72) haptic(8);
+    if (
+      strength >= 0.72 &&
+      this.elapsed - this.lastCollisionHapticAt >= 0.14
+    ) {
+      haptic(8);
+      this.lastCollisionHapticAt = this.elapsed;
+    }
   }
 
   private processCollision(
@@ -2509,30 +2528,57 @@ export class FruitGame implements GameControls {
     includeImpactFeedback: boolean,
   ) {
     if (this.status !== "playing") return;
-    const fruitContacts: Array<[FruitNode, FruitNode]> = [];
-    const touched = new Set<FruitNode>();
+    const landingContacts: Array<[FruitNode, FruitNode]> = [];
+    const mergeContacts: Array<[FruitNode, FruitNode]> = [];
+    const impactCandidates = new Set<FruitNode>();
+    const feedbackCandidates: Array<{
+      pair: Matter.Pair;
+      strength: number;
+      nodeA?: FruitNode;
+      nodeB?: FruitNode;
+    }> = [];
 
     for (const pair of event.pairs) {
       const nodeA = this.fruits.get(pair.bodyA.id);
       const nodeB = this.fruits.get(pair.bodyB.id);
-      if (includeImpactFeedback) this.playCollisionFeedback(pair, nodeA, nodeB);
+      if (includeImpactFeedback && (nodeA || nodeB)) {
+        const strength = this.collisionStrength(pair);
+        if (strength > 0) {
+          feedbackCandidates.push({ pair, strength, nodeA, nodeB });
+          feedbackCandidates.sort(
+            (first, second) => second.strength - first.strength,
+          );
+          if (feedbackCandidates.length > COLLISION_FEEDBACK_LIMIT)
+            feedbackCandidates.pop();
+        }
+      }
       if (nodeA) {
-        touched.add(nodeA);
         if (pair.bodyB.label === "floor") this.markFruitLanded(nodeA);
+        if (this.fruitPlugin(nodeA).impactPending)
+          impactCandidates.add(nodeA);
       }
       if (nodeB) {
-        touched.add(nodeB);
         if (pair.bodyA.label === "floor") this.markFruitLanded(nodeB);
+        if (this.fruitPlugin(nodeB).impactPending)
+          impactCandidates.add(nodeB);
       }
-      if (nodeA && nodeB) fruitContacts.push([nodeA, nodeB]);
+      if (nodeA && nodeB) {
+        if (!this.fruitHasLanded(nodeA) || !this.fruitHasLanded(nodeB))
+          landingContacts.push([nodeA, nodeB]);
+        if (nodeA.tier === nodeB.tier) mergeContacts.push([nodeA, nodeB]);
+      }
     }
+
+    feedbackCandidates.forEach(({ pair, strength, nodeA, nodeB }) =>
+      this.playCollisionFeedback(pair, strength, nodeA, nodeB),
+    );
 
     // 先标记接触地板的水果，再沿当前接触链向上传递“已落地”状态。
     // 两颗都还在空中的水果即使碰撞，也不会在这里获得合成资格。
     let propagated = true;
     while (propagated) {
       propagated = false;
-      fruitContacts.forEach(([first, second]) => {
+      landingContacts.forEach(([first, second]) => {
         if (this.fruitHasLanded(first) && !this.fruitHasLanded(second))
           propagated = this.markFruitLanded(second) || propagated;
         else if (this.fruitHasLanded(second) && !this.fruitHasLanded(first))
@@ -2540,13 +2586,14 @@ export class FruitGame implements GameControls {
       });
     }
 
-    touched.forEach((fruit) => {
+    impactCandidates.forEach((fruit) => {
       if (this.fruitHasLanded(fruit)) this.triggerDropImpact(fruit);
     });
 
-    for (const [nodeA, nodeB] of fruitContacts) {
-      if (nodeA.tier !== nodeB.tier || !this.fruitsCanMerge(nodeA, nodeB))
-        continue;
+    let processedMerges = 0;
+    for (const [nodeA, nodeB] of mergeContacts) {
+      if (processedMerges >= COLLISION_MERGE_LIMIT) break;
+      if (!this.fruitsCanMerge(nodeA, nodeB)) continue;
       if (
         this.fruitMergeCoolingDown(nodeA) ||
         this.fruitMergeCoolingDown(nodeB) ||
@@ -2554,12 +2601,16 @@ export class FruitGame implements GameControls {
       )
         continue;
       if (nodeA.tier >= FRUITS.length - 1) {
-        if (this.mode === "endless") this.rainbowClear(nodeA, nodeB);
+        if (this.mode === "endless") {
+          this.rainbowClear(nodeA, nodeB);
+          processedMerges += 1;
+        }
         continue;
       }
       if (this.merging.has(nodeA.body.id) || this.merging.has(nodeB.body.id))
         continue;
       this.mergeFruits(nodeA, nodeB);
+      processedMerges += 1;
     }
   }
 
@@ -2570,6 +2621,12 @@ export class FruitGame implements GameControls {
   private onCollisionActive = (
     event: Matter.IEventCollision<Matter.Engine>,
   ) => {
+    if (
+      this.elapsed - this.lastActiveCollisionCheckAt <
+      ACTIVE_COLLISION_INTERVAL
+    )
+      return;
+    this.lastActiveCollisionCheckAt = this.elapsed;
     this.processCollision(event, false);
   };
 
@@ -2860,8 +2917,8 @@ export class FruitGame implements GameControls {
   }
 
   private burst(x: number, y: number, color: number, amount: number) {
-    const available = Math.max(0, 190 - this.particles.length);
-    const particleCount = Math.min(amount, available);
+    const available = Math.max(0, MAX_PARTICLES - this.particles.length);
+    const particleCount = Math.min(Math.max(0, Math.round(amount)), available);
     for (let index = 0; index < particleCount; index += 1) {
       const size = 1.8 + Math.random() * 4.5;
       const shape = new Graphics();
@@ -2898,7 +2955,7 @@ export class FruitGame implements GameControls {
     strength: number,
     impactX = 0,
   ) {
-    const available = Math.max(0, 190 - this.particles.length);
+    const available = Math.max(0, MAX_PARTICLES - this.particles.length);
     const particleCount = Math.min(
       4 + Math.round(strength * 8),
       available,
@@ -2936,6 +2993,7 @@ export class FruitGame implements GameControls {
 
   // 扩散圈:小半径、细线、短寿命,浅色背景下点到为止
   private ring(x: number, y: number, color: number, size = 1) {
+    if (this.rings.length >= MAX_RINGS) return;
     const ring = new Graphics()
       .circle(0, 0, 14)
       .stroke({ color, alpha: 0.7, width: 2.5 / size });
@@ -2997,7 +3055,18 @@ export class FruitGame implements GameControls {
         resonanceHalo.rotation = -fruit.body.angle + this.elapsed * 0.35;
       }
     });
-    if (!fruitFrozen) this.attractMatchingFruits(seconds);
+    if (
+      !fruitFrozen &&
+      this.elapsed - this.lastFusionAttractionAt >=
+        FUSION_ATTRACTION_INTERVAL
+    ) {
+      const attractionSeconds =
+        this.lastFusionAttractionAt < 0
+          ? seconds
+          : Math.min(0.06, this.elapsed - this.lastFusionAttractionAt);
+      this.lastFusionAttractionAt = this.elapsed;
+      this.attractMatchingFruits(attractionSeconds);
+    }
 
     if (this.frostOverlay) {
       const targetAlpha = fruitFrozen

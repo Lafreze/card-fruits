@@ -5,6 +5,7 @@ import {
   startRun,
   type LeaderboardEntry,
 } from "./api";
+import { sounds } from "./game/audio";
 import { FRUITS, LEVELS, type FruitDefinition } from "./game/data";
 import type { FruitGame } from "./game/FruitGame";
 import { calculateCoinReward } from "./game/logic";
@@ -567,6 +568,7 @@ export default function App() {
       targetMode = mode,
       run: { wave?: number; relics?: RelicId[]; score?: number } = {},
     ) => {
+      sounds.prepare();
       const nextWave = run.wave || 1;
       const nextRelics = run.relics || [];
       const nextScore = run.score || 0;
