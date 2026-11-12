@@ -688,7 +688,9 @@ export type ToolId =
   | "basket"
   | "syrup"
   | "insight"
-  | "vortex";
+  | "vortex"
+  | "cushion"
+  | "barometer";
 
 export type ToolDefinition = {
   id: ToolId;
@@ -701,6 +703,22 @@ export type ToolDefinition = {
 
 // 道具购买的是“每局可用次数”，不是一次性消耗品；玩家用果币构筑自己的补给方案。
 export const TOOLS: ToolDefinition[] = [
+  {
+    id: "cushion",
+    icon: "bubble",
+    name: "弹力垫",
+    maxLevel: 2,
+    costs: [260, 720],
+    description: "果箱底部弹跳增强 10 秒，重新创造碰撞",
+  },
+  {
+    id: "barometer",
+    icon: "cloud",
+    name: "天气仪",
+    maxLevel: 2,
+    costs: [220, 640],
+    description: "驱散当前或即将到来的天气，获得一段晴好",
+  },
   {
     id: "insight",
     icon: "compass",

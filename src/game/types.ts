@@ -32,6 +32,9 @@ export type GameSnapshot = {
   syrupLeft: number;
   insightLeft: number;
   vortexLeft: number;
+  cushionLeft: number;
+  barometerLeft: number;
+  cushionSeconds: number;
   insightSeconds: number;
   vortexSeconds: number;
   weather: WeatherSnapshot;
@@ -103,6 +106,8 @@ export type GameControls = {
   syrup: () => void;
   insight: () => void;
   vortex: () => void;
+  cushion: () => void;
+  barometer: () => void;
   setDropLane: (lane: -1 | 0 | 1) => void;
   pause: () => void;
   resume: () => void;

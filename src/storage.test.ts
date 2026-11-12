@@ -99,7 +99,7 @@ test("extreme records and new skill upgrades survive save export and import", as
   });
   storage.setItem(
     "fruit-king-tools",
-    JSON.stringify({ insight: 2, vortex: 1 }),
+    JSON.stringify({ insight: 2, vortex: 1, cushion: 2, barometer: 1 }),
   );
   const backup = exportSave();
   importSave(backup);
@@ -110,5 +110,7 @@ test("extreme records and new skill upgrades survive save export and import", as
   assert.deepEqual(JSON.parse(storage.getItem("fruit-king-tools")!), {
     insight: 2,
     vortex: 1,
+    cushion: 2,
+    barometer: 1,
   });
 });

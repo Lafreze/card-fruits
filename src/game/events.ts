@@ -9,6 +9,7 @@ export const WEATHER_EVENTS = [
     magnet: 1,
     danger: 1,
     score: 1.2,
+    gravity: 1,
     damping: 1,
   },
   {
@@ -21,6 +22,7 @@ export const WEATHER_EVENTS = [
     magnet: 1,
     danger: 1.3,
     score: 1.5,
+    gravity: 1,
     damping: 1,
   },
   {
@@ -33,6 +35,7 @@ export const WEATHER_EVENTS = [
     magnet: 2,
     danger: 1,
     score: 1,
+    gravity: 1,
     damping: 1,
   },
   {
@@ -45,7 +48,34 @@ export const WEATHER_EVENTS = [
     magnet: 0.5,
     danger: 1,
     score: 1.3,
+    gravity: 1,
     damping: 0.985,
+  },
+  {
+    id: "moon",
+    name: "月光轻飘",
+    icon: "spark",
+    hint: "重力减半 · 得分 ×1.2",
+    duration: 12,
+    drift: 0,
+    magnet: 1,
+    danger: 1,
+    score: 1.2,
+    gravity: 0.5,
+    damping: 1,
+  },
+  {
+    id: "tempest",
+    name: "回旋风",
+    icon: "wind",
+    hint: "风向交替 · 得分 ×1.4",
+    duration: 12,
+    drift: 0.32,
+    magnet: 1,
+    danger: 1,
+    score: 1.4,
+    gravity: 1,
+    damping: 1,
   },
 ] as const;
 export type WeatherEvent = (typeof WEATHER_EVENTS)[number];
@@ -97,6 +127,13 @@ export class WeatherCycle {
       // Even after a dropped frame, always give the player three seconds' notice.
       this.nextAt = now + 3;
     }
+  }
+  clear(now: number) {
+    if (!this.active && !this.pending) return false;
+    this.active = null;
+    this.pending = null;
+    this.nextAt = now + this.interval;
+    return true;
   }
   snapshot(now: number): WeatherSnapshot {
     const event = this.active ?? this.pending;

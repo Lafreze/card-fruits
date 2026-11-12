@@ -1,5 +1,7 @@
+import { cardFacesOverlap } from "./geometry.ts";
 export type StackSlot = {
   layer: number;
+  rotation?: number;
   x: number;
   y: number;
 };
@@ -40,8 +42,6 @@ export type StackScatterBounds = {
   cardHeight: number;
 };
 
-const CARD_COVER_WIDTH = 64;
-const CARD_COVER_HEIGHT = 72;
 const COVER_EPSILON = 0.5;
 
 /**
@@ -321,19 +321,21 @@ export function slotIsCovered(
     if (
       otherIndex === index ||
       !active.has(otherIndex) ||
-      other.layer <= slot.layer
-    )
-      return false;
-    const overlapX = Math.max(
-      0,
-      CARD_COVER_WIDTH - Math.abs(other.x - slot.x),
-    );
-    const overlapY = Math.max(
-      0,
-      CARD_COVER_HEIGHT - Math.abs(other.y - slot.y),
-    );
-    return overlapX > COVER_EPSILON && overlapY > COVER_EPSILON;
+      (other.layer < slot.layer || (other.layer === slot.layer && otherIndex < index))
+    ) return false;
+    return cardFacesOverlap(slot, other);
   });
+}
+
+export function ensureExposedOpening(slots: StackSlot[], bounds: StackScatterBounds) {
+  const active = new Set(slots.map((_, index) => index));
+  if (slots.filter((_, index) => !slotIsCovered(index, slots, active)).length >= 3) return;
+  const layer = Math.max(...slots.map(slot => slot.layer)) + 1;
+  const center = (bounds.left + bounds.right) / 2;
+  slots.slice(-3).forEach((slot, index) => {
+    Object.assign(slot, { layer, x: center + (index - 1) * 76, y: bounds.top, rotation: 0 });
+  });
+  slots.sort((a, b) => a.layer - b.layer);
 }
 
 /**
@@ -347,8 +349,10 @@ export function buildRemovalRoute(
 ) {
   const active = new Set(slots.map((_, index) => index));
   const route: number[] = [];
-  const exposed = () =>
-    [...active].filter((index) => !slotIsCovered(index, slots, active));
+  // Geometry is immutable throughout a deal; calculate blockers once.
+  const blockers = slots.map((slot,index) => slots.flatMap((other,j) =>
+    j !== index && (other.layer > slot.layer || (other.layer === slot.layer && j > index)) && cardFacesOverlap(slot,other) ? [j] : []));
+  const exposed = () => [...active].filter(index => !blockers[index].some(j => active.has(j)));
 
   const opening = shuffled(exposed(), random).slice(0, 3);
   if (opening.length < 3)
@@ -490,7 +494,8 @@ export function rainPreviewScale(progress: number, usesImage: boolean) {
 }
 
 export function fruitVisualDiameter(radius: number, usesImage: boolean) {
-  return Math.max(20, radius * (usesImage ? 1.82 : 1.72));
+  // Cartoon assets contain a transparent inset; match the visible fruit to the body.
+  return Math.max(20, radius * (usesImage ? 2.2 : 1.72));
 }
 
 export function storyHarvestComplete({

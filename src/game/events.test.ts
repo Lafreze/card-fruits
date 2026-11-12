@@ -62,3 +62,18 @@ test("insight prioritizes completing the tray and avoids locked or buried altern
   assert.deepEqual(insightTargets(cards.slice(4), []), []);
   assert.deepEqual(insightTargets([], [0, 0]), []);
 });
+
+test("weather instrument clears warnings and active weather without immediately retriggering", () => {
+  const cycle = new WeatherCycle(() => 0, 20);
+  assert.equal(cycle.clear(0), false);
+  cycle.tick(17);
+  assert.equal(cycle.clear(18), true);
+  cycle.tick(20);
+  assert.equal(cycle.snapshot(20), null);
+  cycle.tick(35);
+  cycle.tick(38);
+  assert.ok(cycle.active);
+  assert.equal(cycle.clear(39), true);
+  cycle.tick(40);
+  assert.equal(cycle.snapshot(40), null);
+});

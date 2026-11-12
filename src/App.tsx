@@ -71,6 +71,9 @@ const EMPTY_SNAPSHOT: GameSnapshot = {
   syrupLeft: 0,
   insightLeft: 1,
   vortexLeft: 1,
+  cushionLeft: 1,
+  barometerLeft: 1,
+  cushionSeconds: 0,
   insightSeconds: 0,
   vortexSeconds: 0,
   weather: null,
@@ -102,6 +105,8 @@ const FRUIT_BASE_TOOL_IDS = new Set<ToolId>([
   "shield",
   "quake",
   "vortex",
+  "cushion",
+  "barometer",
 ]);
 const BASE_TOOL_IDS = new Set<ToolId>([
   ...CARD_BASE_TOOL_IDS,
@@ -475,6 +480,7 @@ export default function App() {
   const [lastCoinStarterGift, setLastCoinStarterGift] = useState(false);
   const [gamePanel, setGamePanel] = useState<GamePanel>(null);
   const controlsRef = useRef<GameControls | null>(null);
+  const [gameReady, setGameReady] = useState(false);
   const toastTimer = useRef<number | null>(null);
   const levelTrackRef = useRef<HTMLDivElement | null>(null);
   // 传给游戏内核的成长加成(对象引用保持稳定,避免重建游戏)
@@ -543,6 +549,7 @@ export default function App() {
 
   const handleReady = useCallback((controls: GameControls | null) => {
     controlsRef.current = controls;
+    setGameReady(Boolean(controls));
   }, []);
   const persistUnlocked = useCallback((nextLevel: number) => {
     const safeLevel = Math.max(0, Math.min(nextLevel, LEVELS.length - 1));
@@ -618,7 +625,15 @@ export default function App() {
       targetMode = mode,
       run: { wave?: number; relics?: RelicId[]; score?: number } = {},
     ) => {
+      setGameReady(false);
       if (targetMode === "daily") targetLevel = dailyChallenge().level;
+      if (
+        window.matchMedia("(pointer: coarse)").matches &&
+        !document.fullscreenElement &&
+        document.documentElement.requestFullscreen
+      ) {
+        void document.documentElement.requestFullscreen().catch(() => {});
+      }
       sounds.prepare();
       gameUpgrades.current = {
         fever: upgrades.fever,
@@ -691,6 +706,8 @@ export default function App() {
   };
 
   const backHome = () => {
+    if (document.fullscreenElement)
+      void document.exitFullscreen().catch(() => {});
     controlsRef.current?.destroy();
     controlsRef.current = null;
     setGamePanel(null);
@@ -936,6 +953,25 @@ export default function App() {
     rewardOptions.length > 0;
   const toolboxItems = [
     {
+      id: "cushion",
+      icon: "bubble",
+      label: "弹力垫",
+      description:
+        snapshot.cushionSeconds > 0
+          ? `弹跳中 · ${snapshot.cushionSeconds}s`
+          : "弹跳增强 · 10 秒",
+      category: "fruit",
+      left: snapshot.cushionLeft,
+    },
+    {
+      id: "barometer",
+      icon: "cloud",
+      label: "天气仪",
+      description: "驱散当前或预警天气",
+      category: "boost",
+      left: snapshot.barometerLeft,
+    },
+    {
       id: "insight",
       icon: "compass",
       label: "透视镜",
@@ -1087,6 +1123,14 @@ export default function App() {
     category: "card" | "fruit" | "boost";
     left: number;
   }>;
+  const toolSeconds = (id: ToolId) =>
+    id === "cushion"
+      ? snapshot.cushionSeconds
+      : id === "vortex"
+        ? snapshot.vortexSeconds
+        : id === "insight"
+          ? snapshot.insightSeconds
+          : 0;
   const availableToolboxItems = toolboxItems.filter((item) => item.left > 0);
   const toolGroups = [
     {
@@ -1131,7 +1175,10 @@ export default function App() {
               </span>
             </a>
             <div className="nav-actions">
-              <button aria-label="我的存档" onClick={() => setArchiveOpen(true)}>
+              <button
+                aria-label="我的存档"
+                onClick={() => setArchiveOpen(true)}
+              >
                 <Icon name="bag" />
                 <span>我的存档</span>
               </button>
@@ -1385,6 +1432,7 @@ export default function App() {
           <div className="play-board">
             <div
               className="game-phone"
+              aria-busy={!gameReady}
               onPointerDown={() => {
                 if (toast) dismissToast();
               }}
@@ -1452,6 +1500,7 @@ export default function App() {
                 </div>
                 <button
                   className="top-action tool-action"
+                  disabled={!gameReady}
                   onClick={() => openGamePanel("tools")}
                   aria-label={`打开道具栏，${availableToolboxItems.length} 种可用`}
                 >
@@ -1463,6 +1512,7 @@ export default function App() {
                 </button>
                 <button
                   className="top-action"
+                  disabled={!gameReady}
                   onClick={() => openGamePanel("menu")}
                   aria-label="打开游戏菜单"
                 >
@@ -1495,6 +1545,7 @@ export default function App() {
                     aria-label={
                       lane < 0 ? "落在左侧" : lane > 0 ? "落在右侧" : "落在中央"
                     }
+                    disabled={!gameReady}
                     onClick={() => controlsRef.current?.setDropLane(lane)}
                   >
                     {lane < 0 ? "左" : lane > 0 ? "右" : "中"}
@@ -1555,7 +1606,9 @@ export default function App() {
                                 {group.items.map((item) => (
                                   <button
                                     key={item.id}
-                                    disabled={item.left <= 0}
+                                    disabled={
+                                      item.left <= 0 || toolSeconds(item.id) > 0
+                                    }
                                     onClick={() => useToolById(item.id)}
                                     aria-label={`${item.label}，${item.description}，剩余 ${item.left} 次`}
                                   >
@@ -1565,9 +1618,11 @@ export default function App() {
                                       <small>{item.description}</small>
                                     </span>
                                     <em>
-                                      {item.left > 0
-                                        ? `×${item.left}`
-                                        : "未配置"}
+                                      {toolSeconds(item.id) > 0
+                                        ? `${toolSeconds(item.id)}s`
+                                        : item.left > 0
+                                          ? `×${item.left}`
+                                          : "—"}
                                     </em>
                                   </button>
                                 ))}
@@ -1949,6 +2004,7 @@ export default function App() {
               <button
                 onClick={() => controlsRef.current?.insight()}
                 disabled={
+                  !gameReady ||
                   Boolean(result || gamePanel) ||
                   snapshot.insightLeft <= 0 ||
                   snapshot.insightSeconds > 0
@@ -1969,6 +2025,7 @@ export default function App() {
               <button
                 onClick={() => controlsRef.current?.vortex()}
                 disabled={
+                  !gameReady ||
                   Boolean(result || gamePanel) ||
                   snapshot.vortexLeft <= 0 ||
                   snapshot.vortexSeconds > 0

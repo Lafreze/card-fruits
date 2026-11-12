@@ -83,8 +83,8 @@ test("a lower card is locked by even a slight upper overlap", () => {
   );
   assert.equal(
     slotIsCovered(0, [lower, { layer: 0, x: 100, y: 100 }], active),
-    false,
-    "同层卡片只并排展示，不能互相锁住",
+    true,
+    "同层重叠时遵循实际绘制先后顺序",
   );
   assert.equal(
     slotIsCovered(1, [lower, { layer: 1, x: 100, y: 100 }], active),
@@ -330,8 +330,8 @@ test("fusion reveal stays gentle and story harvest can finish by clear or full t
   );
   assert.ok(fruitVisualDiameter(40, true) > 40 * 1.58);
   assert.ok(
-    fruitVisualDiameter(40, true) < 40 * 2,
-    "放大的图案仍位于物理碰撞圆内",
+    fruitVisualDiameter(40, true) * 0.875 <= 40 * 2,
+    "扣除素材透明留白后，水果图案贴合物理碰撞圆",
   );
 
   assert.equal(
@@ -586,7 +586,7 @@ test("fruit scale and roguelike catalog stay balanced", () => {
   assert.equal(MUTATORS.length, 10);
   assert.ok(MUTATORS.every((mutator) => mutator.description.length > 0));
   assert.equal(UPGRADES.length, 12);
-  assert.equal(TOOLS.length, 18);
+  assert.equal(TOOLS.length, 20);
   assert.equal(new Set(TOOLS.map((tool) => tool.id)).size, TOOLS.length);
   assert.ok(
     TOOLS.every(

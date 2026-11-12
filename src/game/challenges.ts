@@ -65,7 +65,7 @@ export function dailyChallenge(date = new Date()) {
   return {
     key,
     level: 3 + Math.floor(random() * 9),
-    seed: `orchard-v4-${key}`,
+    seed: `orchard-v5-${key}`,
     difficulty: "expert" as const,
   };
 }

@@ -1,3 +1,5 @@
+import { playLayout, type PlayLayout } from "./layout";
+import { CARD_FACE, cardFacesOverlap, touchingFruit } from "./geometry";
 import { WeatherCycle, insightTargets } from "./events";
 import {
   DIFFICULTIES,
@@ -14,6 +16,7 @@ import {
   FederatedPointerEvent,
   Graphics,
   Sprite,
+  RoundedRectangle,
   Text,
 } from "pixi.js";
 import "pixi.js/unsafe-eval";
@@ -22,6 +25,7 @@ import { FRUITS, LEVELS, WORLD } from "./data";
 import {
   buildFusionPairs,
   buildPlayableDeal,
+  ensureExposedOpening,
   canMergeAfterLanding,
   cardMatchScore,
   completionScoreBonus,
@@ -35,7 +39,6 @@ import {
   fruitSpawnScale,
   fruitVisualDiameter,
   rainPreviewScale,
-  rotatedRectanglesOverlap,
   scatterStackSlots,
   storyHarvestComplete,
 } from "./logic";
@@ -125,6 +128,7 @@ type FusionEcho = {
   sourceIds: [number, number];
   tier: number;
   velocityX: number;
+  resultId?: number;
   elapsed: number;
 };
 
@@ -174,8 +178,6 @@ type FusionPairState = {
 const { Engine, Bodies, Body, Composite, Events } = Matter;
 const CARD_W = 58;
 const CARD_H = 66;
-const CARD_COVER_W = CARD_W + 6;
-const CARD_COVER_H = CARD_H + 6;
 
 function shuffle<T>(items: T[], random = Math.random) {
   const copy = [...items];
@@ -188,7 +190,16 @@ function shuffle<T>(items: T[], random = Math.random) {
 
 export class FruitGame implements GameControls {
   private app = new Application();
-  private engine = Engine.create({ gravity: { x: 0, y: 1.08 } });
+  private layout: PlayLayout = WORLD;
+  private resizeObserver?: ResizeObserver;
+  private sceneDecor: Container[] = [];
+  private cushionPad = new Graphics();
+  private engine = Engine.create({
+    gravity: { x: 0, y: 1.08 },
+    positionIterations: 10,
+    velocityIterations: 8,
+    constraintIterations: 4,
+  });
   private root = new Container();
   private world = new Container();
   private ambientLayer = new Container();
@@ -272,6 +283,10 @@ export class FruitGame implements GameControls {
   private syrupLeft = 0;
   private insightLeft = 1;
   private vortexLeft = 1;
+  private cushionLeft = 1;
+  private barometerLeft = 1;
+  private cushionUntil = 0;
+  private weatherGravity = 1;
   private insightUntil = 0;
   private vortexUntil = 0;
   private insightIds = new Set<number>();
@@ -299,6 +314,7 @@ export class FruitGame implements GameControls {
   private royalEchoReady = false;
   private shake = 0;
   private elapsed = 0;
+  private physicsAccumulator = 0;
   private activeSeconds = 0;
   private skipResumedFrame = false;
   private paused = false;
@@ -359,6 +375,8 @@ export class FruitGame implements GameControls {
     this.syrupLeft += Math.max(0, tools.syrup || 0);
     this.insightLeft += Math.max(0, tools.insight || 0);
     this.vortexLeft += Math.max(0, tools.vortex || 0);
+    this.cushionLeft += Math.max(0, tools.cushion || 0);
+    this.barometerLeft += Math.max(0, tools.barometer || 0);
     // 奇物只强化已经用果币配置的道具，不会绕过温室直接解锁。
     if (this.hasRelic("tool_belt")) {
       if (tools.shuffle) this.shuffleLeft += 1;
@@ -451,14 +469,14 @@ export class FruitGame implements GameControls {
       if (this.feverLabel) this.feverLabel.visible = true;
       this.callbacks.onToast(" 甜度狂热 · 得分翻倍 9 秒！", "gold");
       this.burst(
-        WORLD.width / 2,
-        WORLD.tray.y + WORLD.tray.height,
+        this.layout.tray.x + this.layout.tray.width / 2,
+        this.layout.tray.y + this.layout.tray.height,
         0xffd85e,
         30,
       );
       this.ring(
-        WORLD.width / 2,
-        WORLD.tray.y + WORLD.tray.height - 4,
+        this.layout.tray.x + this.layout.tray.width / 2,
+        this.layout.tray.y + this.layout.tray.height - 4,
         0xffe169,
         1.2,
       );
@@ -478,6 +496,122 @@ export class FruitGame implements GameControls {
     return game;
   }
 
+  private syncLayoutStyles() {
+    const parent = this.app.canvas.parentElement;
+    if (!parent) return;
+    const layout = this.layout;
+    parent.style.setProperty(
+      "--box-top",
+      `${(layout.box.y / layout.height) * 100}%`,
+    );
+    parent.style.setProperty(
+      "--box-left",
+      `${(layout.box.x / layout.width) * 100}%`,
+    );
+    parent.style.setProperty(
+      "--box-width",
+      `${(layout.box.width / layout.width) * 100}%`,
+    );
+    parent.style.setProperty("--hud-width", `${(430 / layout.width) * 100}%`);
+    parent.dataset.landscape = String(layout.width > 430);
+  }
+
+  private resizeBoard() {
+    if (this.destroyed) return;
+    const bounds = this.app.canvas.getBoundingClientRect();
+    if (!bounds.width || !bounds.height) return;
+    const next = playLayout(bounds.width, bounds.height),
+      old = this.layout;
+    if (Math.abs(next.height - old.height) < 0.1 && next.width === old.width)
+      return;
+    const map = (
+      point: { x: number; y: number },
+      region?: "stack" | "tray" | "box",
+    ) => {
+      const key =
+        region ??
+        (old.width > 430
+          ? point.x >= old.box.x
+            ? "box"
+            : point.y >= old.tray.y
+              ? "tray"
+              : "stack"
+          : point.y >= old.box.y
+            ? "box"
+            : point.y >= old.tray.y
+              ? "tray"
+              : "stack");
+      const a = old[key],
+        b = next[key];
+      // Map card centres inside the face-safe area, so rotation never pushes
+      // the bottom row out of its panel when a phone switches orientation.
+      const insetX = key === "stack" ? 34 : 0;
+      const insetY = key === "stack" ? 38 : 0;
+      return {
+        x:
+          b.x +
+          insetX +
+          ((point.x - a.x - insetX) / (a.width - insetX * 2)) *
+            (b.width - insetX * 2),
+        y:
+          b.y +
+          insetY +
+          ((point.y - a.y - insetY) / (a.height - insetY * 2)) *
+            (b.height - insetY * 2),
+      };
+    };
+    this.cards.forEach((card) => {
+      const p = map(card, "stack");
+      card.x = p.x;
+      card.y = p.y;
+      card.view.position.set(p.x, p.y);
+    });
+    this.fruits.forEach((fruit) => {
+      const p = map(fruit.body.position, "box"),
+        radius = this.fruitRadius(fruit.tier);
+      p.x = Math.max(
+        next.box.x + radius + 5,
+        Math.min(next.box.x + next.box.width - radius - 5, p.x),
+      );
+      p.y = Math.min(next.box.y + next.box.height - radius - 5, p.y);
+      Body.setPosition(fruit.body, p);
+      fruit.view.position.copyFrom(p);
+    });
+    this.cardFlights.forEach((flight) => {
+      const a = map({ x: flight.fromX, y: flight.fromY }, "stack"),
+        b = map({ x: flight.toX, y: flight.toY }, "tray");
+      Object.assign(flight, { fromX: a.x, fromY: a.y, toX: b.x, toY: b.y });
+    });
+    this.conversions.forEach((sequence) => {
+      sequence.starts = sequence.starts.map((p) => map(p, "tray"));
+      sequence.targetX = next.tray.x + next.tray.width / 2;
+    });
+    this.fruitRain.forEach((drop) => {
+      const p = map({ x: drop.x, y: old.box.y }, "box");
+      drop.x = p.x;
+      drop.view.x = p.x;
+    });
+    this.fusionEchoes.forEach((echo) => {
+      echo.fromA = map(echo.fromA, "box");
+      echo.fromB = map(echo.fromB, "box");
+      echo.center = map(echo.center, "box");
+    });
+    this.sceneDecor.forEach((child) => child.destroy({ children: true }));
+    Composite.allBodies(this.engine.world)
+      .filter((body) => body.isStatic)
+      .forEach((body) => Composite.remove(this.engine.world, body));
+    this.layout = next;
+    this.app.renderer.resize(next.width, next.height);
+    this.app.canvas.style.width = "100%";
+    this.app.canvas.style.height = "100%";
+    this.createPhysicsWorld();
+    this.drawScene();
+    this.drawTray();
+    this.refreshCardDepth();
+    this.updateCardAccess();
+    this.syncLayoutStyles();
+  }
+
   private async initialize(canvas: HTMLCanvasElement) {
     await Promise.all([
       ...FRUITS.map((fruit) => Assets.load(fruit.icon)),
@@ -485,10 +619,12 @@ export class FruitGame implements GameControls {
         Assets.load(`/icons/${name}.svg`),
       ),
     ]);
+    const bounds = canvas.getBoundingClientRect();
+    this.layout = playLayout(bounds.width || 430, bounds.height || 860);
     await this.app.init({
       canvas,
-      width: WORLD.width,
-      height: WORLD.height,
+      width: this.layout.width,
+      height: this.layout.height,
       backgroundAlpha: 0,
       antialias: true,
       autoDensity: true,
@@ -515,6 +651,9 @@ export class FruitGame implements GameControls {
     Events.on(this.engine, "collisionStart", this.onCollisionStart);
     Events.on(this.engine, "collisionActive", this.onCollisionActive);
     this.app.ticker.add(this.tick);
+    this.syncLayoutStyles();
+    this.resizeObserver = new ResizeObserver(() => this.resizeBoard());
+    this.resizeObserver.observe(canvas);
     if (import.meta.env.DEV)
       (window as unknown as { __game?: FruitGame }).__game = this;
     this.emitSnapshot();
@@ -525,9 +664,10 @@ export class FruitGame implements GameControls {
           () =>
             this.spawnFruit(
               seedTier,
-              WORLD.width / 2 +
+              this.layout.box.x +
+                this.layout.box.width / 2 +
                 (index - (this.greenhouseSeedCount - 1) / 2) * 42,
-              WORLD.box.y + 20,
+              this.layout.box.y + 20,
             ),
           330 + index * 180,
         );
@@ -545,8 +685,8 @@ export class FruitGame implements GameControls {
         () =>
           this.spawnFruit(
             Math.min(2, Math.floor(this.wave / 3)),
-            WORLD.width / 2,
-            WORLD.box.y + 24,
+            this.layout.box.x + this.layout.box.width / 2,
+            this.layout.box.y + 24,
           ),
         520,
       );
@@ -579,7 +719,11 @@ export class FruitGame implements GameControls {
       this.callbacks.onToast(" 果骰：甜度 +22", "pink");
     } else if (roll === 1) {
       const points = 700 + this.wave * 180;
-      this.addScore(points, WORLD.width / 2, WORLD.tray.y + 18);
+      this.addScore(
+        points,
+        this.layout.tray.x + this.layout.tray.width / 2,
+        this.layout.tray.y + 18,
+      );
       this.callbacks.onToast(` 果骰：幸运分 +${points}`, "gold");
     } else if (roll === 2) {
       this.shuffleLeft += 1;
@@ -591,10 +735,19 @@ export class FruitGame implements GameControls {
         FRUITS.length - 4,
         2 + Math.floor(this.wave * 0.75),
       );
-      this.spawnFruit(tier, WORLD.width / 2, WORLD.box.y + 20);
+      this.spawnFruit(
+        tier,
+        this.layout.box.x + this.layout.box.width / 2,
+        this.layout.box.y + 20,
+      );
       this.callbacks.onToast(` 果骰：${FRUITS[tier].name}果种`, "gold");
     }
-    this.burst(WORLD.width / 2, WORLD.box.y + 56, 0xd9b5ff, 34);
+    this.burst(
+      this.layout.box.x + this.layout.box.width / 2,
+      this.layout.box.y + 56,
+      0xd9b5ff,
+      34,
+    );
     sounds.match();
   }
 
@@ -604,7 +757,11 @@ export class FruitGame implements GameControls {
     this.setTimer(() => {
       if (this.destroyed || this.status !== "playing") return;
       const lane = this.wave % 2 === 0 ? -1 : 1;
-      this.spawnFruit(tier, dropLaneX(lane, WORLD.width / 2), WORLD.box.y + 20);
+      this.spawnFruit(
+        tier,
+        dropLaneX(lane, this.layout.box.x + this.layout.box.width / 2),
+        this.layout.box.y + 20,
+      );
       this.callbacks.onToast(
         `∞ 高阶果种 · ${FRUITS[tier].name}加入果箱`,
         "gold",
@@ -626,9 +783,14 @@ export class FruitGame implements GameControls {
   }
 
   private drawScene() {
+    const existing = new Set([
+      ...this.ambientLayer.children,
+      ...this.fxLayer.children,
+      ...this.dropLayer.children,
+    ]);
     // 奶油底色与浅绿牌桌，暖色果篮和警戒线保持分区清晰。
     const background = new Graphics()
-      .rect(0, 0, WORLD.width, WORLD.height)
+      .rect(0, 0, this.layout.width, this.layout.height)
       .fill({ color: 0xfaf5e9 });
     this.ambientLayer.addChild(background);
 
@@ -646,22 +808,6 @@ export class FruitGame implements GameControls {
     haloC.filters = [new BlurFilter({ strength: 68 })];
     this.ambientLayer.addChild(haloA, haloB, haloC);
 
-    const dotPalette = [0xbba4ec, 0xd8b878, 0x7895c5];
-    for (let index = 0; index < 22; index += 1) {
-      const star = new Graphics()
-        .circle(0, 0, 0.65 + Math.random() * 1.05)
-        .fill({
-          color: dotPalette[index % dotPalette.length],
-          alpha: 0.12 + Math.random() * 0.2,
-        });
-      star.position.set(
-        Math.random() * WORLD.width,
-        Math.random() * WORLD.height,
-      );
-      star.label = `star-${Math.random() * 10}`;
-      this.ambientLayer.addChild(star);
-    }
-
     // 三块区域只用明度与柔影分层，不再用成组描边切割画面。
     const panel = (
       x: number,
@@ -677,39 +823,52 @@ export class FruitGame implements GameControls {
       const face = new Graphics()
         .roundRect(x, y, width, height, radius)
         .fill({ color: tint, alpha: 0.965 });
+      shadow.visible = false;
       this.ambientLayer.addChild(shadow, face);
     };
     panel(
-      WORLD.stack.x,
-      WORLD.stack.y,
-      WORLD.stack.width,
-      WORLD.stack.height,
+      this.layout.stack.x,
+      this.layout.stack.y,
+      this.layout.stack.width,
+      this.layout.stack.height,
       30,
       0xe9eedf,
     );
     panel(
-      WORLD.tray.x,
-      WORLD.tray.y,
-      WORLD.tray.width,
-      WORLD.tray.height,
+      this.layout.tray.x,
+      this.layout.tray.y,
+      this.layout.tray.width,
+      this.layout.tray.height,
       22,
       0xe3d6b8,
     );
     panel(
-      WORLD.box.x,
-      WORLD.box.y,
-      WORLD.box.width,
-      WORLD.box.height,
+      this.layout.box.x,
+      this.layout.box.y,
+      this.layout.box.width,
+      this.layout.box.height,
       28,
       0xf0eddf,
     );
 
+    this.cushionPad = new Graphics()
+      .roundRect(
+        this.layout.box.x + 12,
+        this.layout.box.y + this.layout.box.height - 10,
+        this.layout.box.width - 24,
+        6,
+        3,
+      )
+      .fill({ color: 0x8cae70 });
+    this.cushionPad.visible = this.activeSeconds < this.cushionUntil;
+    this.ambientLayer.addChild(this.cushionPad);
+
     // 甜度警戒在安全时近乎隐形，真正超线后再逐级显现。
     this.dangerGlow = new Graphics()
       .roundRect(
-        WORLD.box.x + 8,
-        WORLD.dangerY - 18,
-        WORLD.box.width - 16,
+        this.layout.box.x + 8,
+        this.layout.dangerY - 18,
+        this.layout.box.width - 16,
         36,
         18,
       )
@@ -717,42 +876,49 @@ export class FruitGame implements GameControls {
     this.dangerGlow.alpha = 0;
     const danger = new Graphics()
       .roundRect(
-        WORLD.box.x + 16,
-        WORLD.dangerY - 2,
-        WORLD.box.width - 32,
+        this.layout.box.x + 16,
+        this.layout.dangerY - 2,
+        this.layout.box.width - 32,
         4,
         2,
       )
       .fill({ color: 0xf17a77, alpha: 0.25 });
     danger.label = "danger-line";
+    danger.visible = false;
     this.ambientLayer.addChild(this.dangerGlow, danger);
 
     const centerDropGlow = new Graphics()
       .ellipse(0, 0, 34, 10)
       .fill({ color: 0xbca6df, alpha: 0.055 });
-    centerDropGlow.position.set(WORLD.width / 2, WORLD.box.y + 27);
+    centerDropGlow.position.set(
+      this.layout.box.x + this.layout.box.width / 2,
+      this.layout.box.y + 27,
+    );
     this.ambientLayer.addChild(centerDropGlow);
     const stamp = this.makeFruitIcon(49, 108);
-    stamp.position.set(WORLD.width / 2, WORLD.box.y + WORLD.box.height - 74);
-    stamp.alpha = 0.045;
+    stamp.position.set(
+      this.layout.box.x + this.layout.box.width / 2,
+      this.layout.box.y + this.layout.box.height - 74,
+    );
+    stamp.alpha = 0;
     this.ambientLayer.addChild(stamp);
 
     // 狂热能量条:贴在卡槽面板底边,充满触发 9 秒狂热
     const feverBack = new Graphics()
       .roundRect(
-        WORLD.tray.x + 14,
-        WORLD.tray.y + WORLD.tray.height - 9,
-        WORLD.tray.width - 28,
+        this.layout.tray.x + 14,
+        this.layout.tray.y + this.layout.tray.height - 9,
+        this.layout.tray.width - 28,
         4,
         2,
       )
       .fill({ color: 0xc2caaa, alpha: 1 });
     this.feverFill = new Graphics()
-      .roundRect(0, 0, WORLD.tray.width - 28, 4, 2)
+      .roundRect(0, 0, this.layout.tray.width - 28, 4, 2)
       .fill({ color: 0xffffff });
     this.feverFill.position.set(
-      WORLD.tray.x + 14,
-      WORLD.tray.y + WORLD.tray.height - 9,
+      this.layout.tray.x + 14,
+      this.layout.tray.y + this.layout.tray.height - 9,
     );
     this.feverFill.tint = 0x668751;
     this.feverFill.scale.x = this.feverEnergy / 100;
@@ -768,8 +934,8 @@ export class FruitGame implements GameControls {
     });
     this.feverLabel.anchor.set(0.5, 1);
     this.feverLabel.position.set(
-      WORLD.width / 2,
-      WORLD.tray.y + WORLD.tray.height - 11,
+      this.layout.tray.x + this.layout.tray.width / 2,
+      this.layout.tray.y + this.layout.tray.height - 11,
     );
     this.feverLabel.visible = false;
     // 能量条放在最上层，避免被卡槽格子的背景遮住。
@@ -788,18 +954,18 @@ export class FruitGame implements GameControls {
     });
     this.mutatorTag.anchor.set(1, 0);
     this.mutatorTag.position.set(
-      WORLD.stack.x + WORLD.stack.width - 14,
-      WORLD.stack.y + 8,
+      this.layout.stack.x + this.layout.stack.width - 14,
+      this.layout.stack.y + 8,
     );
     this.ambientLayer.addChild(this.mutatorTag);
     this.updateMutatorTag();
 
     const dropTarget = new Graphics()
       .roundRect(
-        WORLD.box.x,
-        WORLD.box.y,
-        WORLD.box.width,
-        WORLD.box.height,
+        this.layout.box.x,
+        this.layout.box.y,
+        this.layout.box.width,
+        this.layout.box.height,
         28,
       )
       .fill({ color: 0xffffff, alpha: 0.001 });
@@ -808,30 +974,45 @@ export class FruitGame implements GameControls {
     // 点击任意水果会向同级伙伴方向弹射，主动解除死角。
     dropTarget.on("pointerdown", (event: FederatedPointerEvent) => {
       if (this.status !== "playing" || this.paused) return;
-      this.pokeFruit(event.global.x, event.global.y);
+      const point = this.root.toLocal(event.global);
+      this.pokeFruit(point.x, point.y);
     });
     this.dropLayer.addChildAt(dropTarget, 0);
 
     this.frostOverlay = new Graphics()
       .roundRect(
-        WORLD.box.x + 2,
-        WORLD.box.y + 2,
-        WORLD.box.width - 4,
-        WORLD.box.height - 4,
+        this.layout.box.x + 2,
+        this.layout.box.y + 2,
+        this.layout.box.width - 4,
+        this.layout.box.height - 4,
         27,
       )
       .fill({ color: 0x8edfff, alpha: 0.42 })
       .stroke({ color: 0xdaf7ff, alpha: 0.62, width: 2 })
-      .moveTo(WORLD.box.x + 34, WORLD.box.y + 64)
-      .lineTo(WORLD.box.x + 86, WORLD.box.y + 34)
-      .lineTo(WORLD.box.x + 116, WORLD.box.y + 82)
-      .moveTo(WORLD.box.x + WORLD.box.width - 42, WORLD.box.y + 116)
-      .lineTo(WORLD.box.x + WORLD.box.width - 96, WORLD.box.y + 82)
-      .lineTo(WORLD.box.x + WORLD.box.width - 128, WORLD.box.y + 132)
+      .moveTo(this.layout.box.x + 34, this.layout.box.y + 64)
+      .lineTo(this.layout.box.x + 86, this.layout.box.y + 34)
+      .lineTo(this.layout.box.x + 116, this.layout.box.y + 82)
+      .moveTo(
+        this.layout.box.x + this.layout.box.width - 42,
+        this.layout.box.y + 116,
+      )
+      .lineTo(
+        this.layout.box.x + this.layout.box.width - 96,
+        this.layout.box.y + 82,
+      )
+      .lineTo(
+        this.layout.box.x + this.layout.box.width - 128,
+        this.layout.box.y + 132,
+      )
       .stroke({ color: 0xe8fbff, alpha: 0.5, width: 1.3 });
     this.frostOverlay.alpha = 0;
     this.frostOverlay.eventMode = "none";
     this.fxLayer.addChild(this.frostOverlay);
+    this.sceneDecor = [
+      ...this.ambientLayer.children,
+      ...this.fxLayer.children,
+      ...this.dropLayer.children,
+    ].filter((child) => !existing.has(child));
   }
 
   private updateMutatorTag() {
@@ -877,8 +1058,9 @@ export class FruitGame implements GameControls {
       )[0];
     let direction = partner
       ? Math.sign(partner.body.position.x - node.body.position.x) || 1
-      : Math.sign(WORLD.width / 2 - node.body.position.x) ||
-        (Math.random() < 0.5 ? -1 : 1);
+      : Math.sign(
+          this.layout.box.x + this.layout.box.width / 2 - node.body.position.x,
+        ) || (Math.random() < 0.5 ? -1 : 1);
     if (this.hasRelic("pinball_peel") && Math.random() < 0.35) direction *= -1;
     Body.setVelocity(node.body, {
       x: Math.max(
@@ -913,8 +1095,10 @@ export class FruitGame implements GameControls {
       .slice(0, limit);
     candidates.forEach((fruit, index) => {
       const direction =
-        Math.sign(fruit.body.position.x - WORLD.width / 2) ||
-        (index % 2 === 0 ? -1 : 1);
+        Math.sign(
+          fruit.body.position.x -
+            (this.layout.box.x + this.layout.box.width / 2),
+        ) || (index % 2 === 0 ? -1 : 1);
       Body.setVelocity(fruit.body, {
         x: direction * (2.2 + (index % 3) * 0.55) * strength,
         y: -(3.8 + (index % 2) * 0.55) * strength,
@@ -928,8 +1112,8 @@ export class FruitGame implements GameControls {
         this.elapsed + 0.62,
       );
       this.burst(
-        WORLD.width / 2,
-        WORLD.box.y + WORLD.box.height - 34,
+        this.layout.box.x + this.layout.box.width / 2,
+        this.layout.box.y + this.layout.box.height - 34,
         0x9de9ff,
         28,
       );
@@ -939,7 +1123,7 @@ export class FruitGame implements GameControls {
   }
 
   private createPhysicsWorld() {
-    const box = WORLD.box;
+    const box = this.layout.box;
     Composite.add(this.engine.world, [
       Bodies.rectangle(box.x - 6, box.y + box.height / 2, 20, box.height + 60, {
         isStatic: true,
@@ -972,6 +1156,7 @@ export class FruitGame implements GameControls {
       .flatMap((block) =>
         Array.from({ length: block.cols * block.rows }, (_, cell) => ({
           layer: block.layer,
+          rotation: 0,
           x: block.x + ((cell % block.cols) - (block.cols - 1) / 2) * block.sx,
           y:
             block.y +
@@ -981,10 +1166,26 @@ export class FruitGame implements GameControls {
       .sort((a, b) => a.layer - b.layer);
     while (slots.length < cardCount) {
       const top = slots[slots.length - 1];
-      slots.push({ layer: top.layer + 1, x: top.x + 5, y: top.y - 6 });
+      slots.push({
+        layer: top.layer + 1,
+        x: top.x + 5,
+        y: top.y - 6,
+        rotation: 0,
+      });
     }
     this.scatterSlots(slots);
     slots.sort((a, b) => a.layer - b.layer);
+    slots.forEach((slot) => {
+      slot.rotation = (this.random() - 0.5) * 0.15;
+    });
+    ensureExposedOpening(slots, {
+      left: this.layout.stack.x + 31,
+      right: this.layout.stack.x + this.layout.stack.width - 31,
+      top: this.layout.stack.y + 52,
+      bottom: this.layout.stack.y + this.layout.stack.height - 38,
+      cardWidth: CARD_W,
+      cardHeight: CARD_H,
+    });
     const maxLayer = Math.max(...slots.map((slot) => slot.layer));
     // 生成一条经过牌阵遮挡验证的安全路线。牌面仍有多条可选分支，
     // 但不再出现“开局能消、后续只能靠洗牌”的纯随机死局。
@@ -1067,13 +1268,7 @@ export class FruitGame implements GameControls {
         special,
       };
       card.view.position.set(x, y);
-      card.view.rotation = Math.max(
-        -0.087,
-        Math.min(
-          0.087,
-          (this.random() - 0.5) * 0.15 + Math.sin(x / 47 + slot.layer) * 0.018,
-        ),
-      );
+      card.view.rotation = slot.rotation;
       card.view.on("pointertap", (event: FederatedPointerEvent) => {
         event.stopPropagation();
         this.pickCard(card);
@@ -1091,10 +1286,10 @@ export class FruitGame implements GameControls {
     scatterStackSlots(
       slots,
       {
-        left: 46,
-        right: WORLD.width - 46,
-        top: WORLD.stack.y + 52,
-        bottom: WORLD.stack.y + WORLD.stack.height - 38,
+        left: this.layout.stack.x + 31,
+        right: this.layout.stack.x + this.layout.stack.width - 31,
+        top: this.layout.stack.y + 52,
+        bottom: this.layout.stack.y + this.layout.stack.height - 38,
         cardWidth: CARD_W,
         cardHeight: CARD_H,
       },
@@ -1105,6 +1300,14 @@ export class FruitGame implements GameControls {
   private makeCard(tier: number, special: CardSpecial, layer = 0) {
     const fruit = FRUITS[tier];
     const view = new Container();
+    view.hitArea = new RoundedRectangle(
+      -CARD_W / 2,
+      -CARD_H / 2,
+      CARD_W,
+      CARD_H,
+      CARD_FACE.radius,
+    );
+    view.interactiveChildren = false;
     // 象牙纸卡、轻薄侧边与清晰果形；可点边框和透视描边分别呈现。
     const farShadow = new Graphics()
       .roundRect(
@@ -1136,8 +1339,7 @@ export class FruitGame implements GameControls {
     glow.addChild(glowOuter, glowInner);
     const face = new Graphics()
       .roundRect(-CARD_W / 2, -CARD_H / 2, CARD_W, CARD_H, 12.5)
-      .fill({ color: 0xfffdf7 })
-      .stroke({ color: 0xdad8c4, alpha: 0.96, width: 1 });
+      .fill({ color: 0xfffdf7 });
     face.label = "card-face";
     const paperWash = new Graphics()
       .roundRect(-CARD_W / 2 + 2, -CARD_H / 2 + 2, CARD_W - 4, CARD_H - 4, 10.5)
@@ -1187,6 +1389,12 @@ export class FruitGame implements GameControls {
       .stroke({ color: 0x8d9e71, alpha: 0.36, width: 1 });
     shade.label = "shade";
     shade.visible = false;
+    farShadow.alpha = 0.28;
+    glowOuter.visible = false;
+    glowInner.visible = false;
+    innerFrame.visible = false;
+    topGlint.visible = false;
+    sheen.visible = false;
     view.addChild(
       farShadow,
       cardEdge,
@@ -1262,21 +1470,9 @@ export class FruitGame implements GameControls {
   }
 
   private cardOverlaps(first: CardNode, second: CardNode) {
-    return rotatedRectanglesOverlap(
-      {
-        x: first.x,
-        y: first.y,
-        width: CARD_COVER_W,
-        height: CARD_COVER_H,
-        rotation: first.view.rotation,
-      },
-      {
-        x: second.x,
-        y: second.y,
-        width: CARD_COVER_W,
-        height: CARD_COVER_H,
-        rotation: second.view.rotation,
-      },
+    return cardFacesOverlap(
+      { x: first.x, y: first.y, rotation: first.view.rotation },
+      { x: second.x, y: second.y, rotation: second.view.rotation },
     );
   }
 
@@ -1301,7 +1497,7 @@ export class FruitGame implements GameControls {
     blockers.slice(0, 3).forEach((blocker, index) => {
       this.setTimer(() => {
         if (!blocker.active) return;
-        blocker.view.scale.set(1.035);
+        blocker.view.scale.set(1);
         this.ring(blocker.x, blocker.y, 0xf3b76a, 0.32);
         this.setTimer(() => {
           if (blocker.active) this.updateCardAccess();
@@ -1378,7 +1574,7 @@ export class FruitGame implements GameControls {
       if (resonanceDot)
         resonanceDot.visible = usable && phaseReady && boxTiers.has(card.tier);
       card.view.alpha = phaseReady ? 1 : usable ? 0.82 : 0.9;
-      card.view.scale.set(usable ? (phaseReady ? 1 : 0.988) : 0.982);
+      card.view.scale.set(1);
     });
   }
 
@@ -1479,7 +1675,12 @@ export class FruitGame implements GameControls {
         }
         this.lastPick = null;
         this.drawTray();
-        this.burst(WORLD.width / 2, WORLD.tray.y + 30, 0x9be8ff, 26);
+        this.burst(
+          this.layout.tray.x + this.layout.tray.width / 2,
+          this.layout.tray.y + 30,
+          0x9be8ff,
+          26,
+        );
         this.callbacks.onToast(" 回魂果露 · 弹出两张卡！", "cyan");
         haptic([20, 40, 20]);
         this.emitSnapshot();
@@ -1554,11 +1755,24 @@ export class FruitGame implements GameControls {
           wave: this.wave,
         }) * this.effectiveScoreMultiplier(),
       );
-      this.addScore(points, WORLD.width / 2, WORLD.tray.y + 18);
+      this.addScore(
+        points,
+        this.layout.tray.x + this.layout.tray.width / 2,
+        this.layout.tray.y + 18,
+      );
       sounds.match();
       haptic([16, 35, 22]);
-      this.burst(WORLD.width / 2, WORLD.tray.y + 28, FRUITS[tier].color, 26);
-      this.ring(WORLD.width / 2, WORLD.tray.y + 30, FRUITS[tier].glow);
+      this.burst(
+        this.layout.tray.x + this.layout.tray.width / 2,
+        this.layout.tray.y + 28,
+        FRUITS[tier].color,
+        26,
+      );
+      this.ring(
+        this.layout.tray.x + this.layout.tray.width / 2,
+        this.layout.tray.y + 30,
+        FRUITS[tier].glow,
+      );
       this.shake = Math.max(this.shake, 4 + this.combo * 0.8);
       this.callbacks.onToast(
         this.comboMessage(),
@@ -1621,7 +1835,12 @@ export class FruitGame implements GameControls {
       this.bubbleGroups.set(tier, stored);
     }
     this.lastPick = null;
-    this.burst(WORLD.width / 2, WORLD.tray.y + 30, 0x9be8ff, 20);
+    this.burst(
+      this.layout.tray.x + this.layout.tray.width / 2,
+      this.layout.tray.y + 30,
+      0x9be8ff,
+      20,
+    );
     this.setTimer(
       () =>
         this.callbacks.onToast(` 泡泡派对 · 收起${FRUITS[tier].name}`, "cyan"),
@@ -1773,7 +1992,7 @@ export class FruitGame implements GameControls {
       toX: this.traySlotX(
         Math.max(0, Math.min(destinationIndex, this.trayLimit - 1)),
       ),
-      toY: WORLD.tray.y + WORLD.tray.height / 2 - 1,
+      toY: this.layout.tray.y + this.layout.tray.height / 2 - 1,
       life: 0.22,
       maxLife: 0.22,
     });
@@ -1785,11 +2004,13 @@ export class FruitGame implements GameControls {
       .forEach((child) => child.destroy({ children: true }));
     const gap = 4;
     const slotWidth =
-      (WORLD.tray.width - 20 - gap * (this.trayLimit - 1)) / this.trayLimit;
+      (this.layout.tray.width - 20 - gap * (this.trayLimit - 1)) /
+      this.trayLimit;
     const counts = new Map<number, number>();
     this.tray.forEach((tier) => counts.set(tier, (counts.get(tier) || 0) + 1));
     for (let index = 0; index < this.trayLimit; index += 1) {
-      const x = WORLD.tray.x + 10 + slotWidth / 2 + index * (slotWidth + gap);
+      const x =
+        this.layout.tray.x + 10 + slotWidth / 2 + index * (slotWidth + gap);
       const tier = this.tray[index];
       const pairReady = tier !== undefined && counts.get(tier) === 2;
       const pressure = this.tray.length >= this.trayLimit - 2;
@@ -1816,14 +2037,17 @@ export class FruitGame implements GameControls {
           width: 1,
         });
       if (pairReady) slot.label = "tray-pair-ready";
-      slot.position.set(x, WORLD.tray.y + WORLD.tray.height / 2);
+      slot.position.set(x, this.layout.tray.y + this.layout.tray.height / 2);
       this.trayLayer.addChild(slot);
       if (tier !== undefined) {
         const fruitIcon = this.makeFruitIcon(
           tier,
           FRUITS[tier].icon ? 31 : this.trayLimit > 7 ? 23 : 26,
         );
-        fruitIcon.position.set(x, WORLD.tray.y + WORLD.tray.height / 2 - 1);
+        fruitIcon.position.set(
+          x,
+          this.layout.tray.y + this.layout.tray.height / 2 - 1,
+        );
         this.trayLayer.addChild(fruitIcon);
       }
     }
@@ -1832,8 +2056,9 @@ export class FruitGame implements GameControls {
   private traySlotX(index: number) {
     const gap = 4;
     const slotWidth =
-      (WORLD.tray.width - 20 - gap * (this.trayLimit - 1)) / this.trayLimit;
-    return WORLD.tray.x + 10 + slotWidth / 2 + index * (slotWidth + gap);
+      (this.layout.tray.width - 20 - gap * (this.trayLimit - 1)) /
+      this.trayLimit;
+    return this.layout.tray.x + 10 + slotWidth / 2 + index * (slotWidth + gap);
   }
 
   private updateCardFlights(seconds: number) {
@@ -1861,16 +2086,19 @@ export class FruitGame implements GameControls {
     const power = this.dropPowerForTier(tier);
     this.prismCharge = 0;
     this.activateCardResonance(tier);
-    const transferX = WORLD.width / 2;
-    const transferY = WORLD.box.y - 2;
+    const transferX = this.layout.tray.x + this.layout.tray.width / 2;
+    const transferY = this.layout.box.y - 2;
     const starts = matchedSlots.map((index) => ({
       x: this.traySlotX(index),
-      y: WORLD.tray.y + WORLD.tray.height / 2 - 1,
+      y: this.layout.tray.y + this.layout.tray.height / 2 - 1,
     }));
     while (starts.length < 3)
       starts.push({
-        x: WORLD.width / 2 + (starts.length - 1) * 28,
-        y: WORLD.tray.y + WORLD.tray.height / 2,
+        x:
+          this.layout.tray.x +
+          this.layout.tray.width / 2 +
+          (starts.length - 1) * 28,
+        y: this.layout.tray.y + this.layout.tray.height / 2,
       });
     const cards = starts.map(({ x, y }) => {
       const miniCard = new Container();
@@ -1908,7 +2136,7 @@ export class FruitGame implements GameControls {
   }
 
   private updateConversions(seconds: number) {
-    const transferY = WORLD.box.y - 2;
+    const transferY = this.layout.box.y - 2;
     this.conversions = this.conversions.filter((sequence) => {
       const transferX = sequence.targetX;
       sequence.elapsed += seconds;
@@ -1953,7 +2181,7 @@ export class FruitGame implements GameControls {
         const eased = progress * progress;
         sequence.fruit.position.set(
           transferX,
-          transferY + (WORLD.box.y + 27 - transferY) * eased,
+          transferY + (this.layout.box.y + 27 - transferY) * eased,
         );
         sequence.fruit.scale.set(
           conversionFruitScale(progress, Boolean(FRUITS[sequence.tier].icon)),
@@ -2014,9 +2242,12 @@ export class FruitGame implements GameControls {
     const total = dropTiers.length;
     const startAt = Math.max(this.elapsed + 0.12, this.nextRainReleaseAt + 0.1);
     dropTiers.forEach((dropTier, order) => {
-      const x = dropLaneX(this.dropLane, WORLD.width / 2);
+      const x = dropLaneX(
+        this.dropLane,
+        this.layout.box.x + this.layout.box.width / 2,
+      );
       const view = this.makeRainPreview(dropTier, total);
-      view.position.set(x, WORLD.box.y + 28 - order * 2.5);
+      view.position.set(x, this.layout.box.y + 28 - order * 2.5);
       view.zIndex = total - order;
       this.dropPreviewLayer.addChild(view);
       const releaseAt = startAt + order * 0.17;
@@ -2086,7 +2317,7 @@ export class FruitGame implements GameControls {
         drop.view.scale.set(
           rainPreviewScale(ready, Boolean(FRUITS[drop.tier].icon)),
         );
-        drop.view.y = WORLD.box.y + 28 - Math.sin(ready * Math.PI) * 7;
+        drop.view.y = this.layout.box.y + 28 - Math.sin(ready * Math.PI) * 7;
         remaining.push(drop);
         return;
       }
@@ -2098,7 +2329,11 @@ export class FruitGame implements GameControls {
         3,
         Math.max(drop.power, drop.total) + Number(this.hasRelic("shock_core")),
       );
-      const dropped = this.spawnFruit(drop.tier, drop.x, WORLD.box.y + 18);
+      const dropped = this.spawnFruit(
+        drop.tier,
+        drop.x,
+        this.layout.box.y + 18,
+      );
       if (dropped) {
         this.focusedFruitIds.add(dropped.body.id);
         const plugin = this.fruitPlugin(dropped);
@@ -2111,10 +2346,10 @@ export class FruitGame implements GameControls {
         this.elapsed + 0.58,
       );
       this.gainFever(1 + impactPower);
-      this.burst(drop.x, WORLD.box.y + 30, FRUITS[drop.tier].glow, 12);
+      this.burst(drop.x, this.layout.box.y + 30, FRUITS[drop.tier].glow, 12);
       this.ring(
         drop.x,
-        WORLD.box.y + 30,
+        this.layout.box.y + 30,
         FRUITS[drop.tier].glow,
         0.44 + impactPower * 0.05,
       );
@@ -2204,8 +2439,11 @@ export class FruitGame implements GameControls {
       )
       .sort((a, b) => {
         const score = (fruit: FruitNode) =>
-          Math.abs(fruit.body.position.x - (gateX ?? WORLD.width / 2)) +
-          (fruit.body.position.y - WORLD.box.y) * 0.12;
+          Math.abs(
+            fruit.body.position.x -
+              (gateX ?? this.layout.box.x + this.layout.box.width / 2),
+          ) +
+          (fruit.body.position.y - this.layout.box.y) * 0.12;
         return score(a) - score(b);
       });
     return candidates.find((fruit) => !this.activeBondTarget(fruit));
@@ -2267,16 +2505,18 @@ export class FruitGame implements GameControls {
 
   private spawnFruit(
     tier: number,
-    x = WORLD.box.x + 55 + Math.random() * (WORLD.box.width - 110),
-    y = WORLD.box.y + 18,
+    x = this.layout.box.x + 55 + Math.random() * (this.layout.box.width - 110),
+    y = this.layout.box.y + 18,
   ) {
     if (this.destroyed || this.status !== "playing") return;
     const definition = FRUITS[tier];
     const radius = this.fruitRadius(tier);
     const body = Bodies.circle(x, y, radius, {
-      restitution: 0.07,
-      friction: 0.16,
-      frictionAir: 0.008,
+      restitution: 0.22,
+      friction: 0.24,
+      frictionStatic: 0.65,
+      frictionAir: 0.003,
+      slop: 0.025,
       density: 0.0012 + tier * 0.00008,
       label: `fruit-${tier}`,
     });
@@ -2478,9 +2718,10 @@ export class FruitGame implements GameControls {
   }
 
   private collisionStrength(pair: Matter.Pair) {
-    const relativeSpeed = Math.hypot(
-      pair.bodyA.velocity.x - pair.bodyB.velocity.x,
-      pair.bodyA.velocity.y - pair.bodyB.velocity.y,
+    const normal = pair.collision.normal;
+    const relativeSpeed = Math.abs(
+      (pair.bodyA.velocity.x - pair.bodyB.velocity.x) * normal.x +
+        (pair.bodyA.velocity.y - pair.bodyB.velocity.y) * normal.y,
     );
     return Math.max(0, Math.min(1, (relativeSpeed - 0.42) / 4.8));
   }
@@ -2643,8 +2884,19 @@ export class FruitGame implements GameControls {
     this.processCollision(event, false);
   };
 
-  private mergeFruits(first: FruitNode, second: FruitNode) {
-    if (!this.fruitsCanMerge(first, second)) return;
+  private fruitsTouch(first: FruitNode, second: FruitNode) {
+    return touchingFruit(
+      { ...first.body.position, radius: this.fruitRadius(first.tier) },
+      { ...second.body.position, radius: this.fruitRadius(second.tier) },
+    );
+  }
+
+  private mergeFruits(first: FruitNode, second: FruitNode, remote = false) {
+    if (
+      !this.fruitsCanMerge(first, second) ||
+      (!remote && !this.fruitsTouch(first, second))
+    )
+      return;
     this.merging.add(first.body.id);
     this.merging.add(second.body.id);
     this.fruitFocusUntil = Math.max(this.fruitFocusUntil, this.elapsed + 0.52);
@@ -2653,7 +2905,18 @@ export class FruitGame implements GameControls {
     const y = (first.body.position.y + second.body.position.y) / 2;
     const fromA = { x: first.body.position.x, y: first.body.position.y };
     const fromB = { x: second.body.position.x, y: second.body.position.y };
-    const velocityX = (first.body.velocity.x + second.body.velocity.x) * 0.22;
+    const totalMass = first.body.mass + second.body.mass;
+    const velocityX =
+      (first.body.velocity.x * first.body.mass +
+        second.body.velocity.x * second.body.mass) /
+      totalMass;
+    const velocityY =
+      (first.body.velocity.y * first.body.mass +
+        second.body.velocity.y * second.body.mass) /
+      totalMass;
+    const spin =
+      first.body.angularVelocity * first.body.inertia +
+      second.body.angularVelocity * second.body.inertia;
     this.removeFruit(first);
     this.removeFruit(second);
     this.registerCombo();
@@ -2713,13 +2976,16 @@ export class FruitGame implements GameControls {
         this.spawnFruit(
           echoTier,
           Math.max(
-            WORLD.box.x + this.fruitRadius(echoTier),
+            this.layout.box.x + this.fruitRadius(echoTier),
             Math.min(
-              WORLD.box.x + WORLD.box.width - this.fruitRadius(echoTier),
-              x + (x < WORLD.width / 2 ? 34 : -34),
+              this.layout.box.x +
+                this.layout.box.width -
+                this.fruitRadius(echoTier),
+              x +
+                (x < this.layout.box.x + this.layout.box.width / 2 ? 34 : -34),
             ),
           ),
-          WORLD.box.y + 20,
+          this.layout.box.y + 20,
         );
         this.callbacks.onToast(
           ` 王冠回声 · 返还${FRUITS[echoTier].name}`,
@@ -2748,7 +3014,29 @@ export class FruitGame implements GameControls {
     echoB.position.set(fromB.x, fromB.y);
     result.position.set(x, y - 4);
     result.visible = false;
+    const radius = this.fruitRadius(tier);
+    const physical = this.spawnFruit(
+      tier,
+      Math.max(
+        this.layout.box.x + radius + 5,
+        Math.min(this.layout.box.x + this.layout.box.width - radius - 5, x),
+      ),
+      Math.min(this.layout.box.y + this.layout.box.height - radius - 5, y),
+    );
+    if (physical) {
+      Body.setVelocity(physical.body, { x: velocityX, y: velocityY });
+      Body.setAngularVelocity(
+        physical.body,
+        Math.max(-0.12, Math.min(0.12, spin / physical.body.inertia)),
+      );
+      Object.assign(this.fruitPlugin(physical), {
+        landedAt: this.elapsed,
+        noMergeUntil: this.elapsed + 0.34,
+      });
+      physical.view.visible = false;
+    }
     this.fusionEchoes.push({
+      resultId: physical?.body.id,
       first: echoA,
       second: echoB,
       result,
@@ -2765,6 +3053,14 @@ export class FruitGame implements GameControls {
   private updateFusionEchoes(seconds: number) {
     this.fusionEchoes = this.fusionEchoes.filter((echo) => {
       echo.elapsed += seconds;
+      const physical = echo.resultId
+        ? this.fruits.get(echo.resultId)
+        : undefined;
+      if (physical) {
+        echo.center = { ...physical.body.position };
+        echo.result.position.copyFrom(physical.body.position);
+        echo.result.rotation = physical.body.angle;
+      }
       const gather = Math.min(1, echo.elapsed / 0.16);
       const eased = 1 - (1 - gather) ** 3;
       for (const [icon, start] of [
@@ -2790,7 +3086,7 @@ export class FruitGame implements GameControls {
         echo.result.scale.set(
           fusionResultScale(reveal, Boolean(FRUITS[echo.tier].icon)),
         );
-        echo.result.rotation = 0;
+        echo.result.rotation = physical?.body.angle ?? 0;
       }
       if (echo.elapsed < 0.32) return true;
       echo.first.destroy({ children: true });
@@ -2821,20 +3117,10 @@ export class FruitGame implements GameControls {
           ),
         55,
       );
-      const result = this.spawnFruit(
-        echo.tier,
-        echo.center.x,
-        echo.center.y - 5,
-      );
-      if (result) {
-        // spawnFruit 默认带入场成长；合成结果必须在本帧直接接住预览尺寸，
-        // 否则会先渲染一帧 0.2 倍，再在下一帧突然跳到 1 倍。
-        result.view.scale.set(1);
-        const plugin = this.fruitPlugin(result);
-        plugin.spawnedByMerge = true;
-        plugin.visualSettleUntil = this.elapsed + 0.28;
-        Body.setVelocity(result.body, { x: echo.velocityX, y: -2.45 });
-        this.focusedFruitIds.add(result.body.id);
+      if (physical) {
+        physical.view.visible = true;
+        physical.view.scale.set(1);
+        this.focusedFruitIds.add(physical.body.id);
       }
       return false;
     });
@@ -3013,18 +3299,72 @@ export class FruitGame implements GameControls {
 
   private updateEffects() {
     this.weather.tick(this.activeSeconds);
-    this.engine.gravity.x = this.weather.active?.drift ?? 0;
+    const weather = this.weather.active;
+    this.engine.gravity.x =
+      (weather?.drift ?? 0) *
+      (weather?.id === "tempest" ? Math.sin(this.activeSeconds * 1.8) : 1);
+    this.engine.gravity.y =
+      (this.engine.gravity.y / this.weatherGravity) * (weather?.gravity ?? 1);
+    this.weatherGravity = weather?.gravity ?? 1;
+    const bouncing = this.activeSeconds < this.cushionUntil;
+    this.cushionPad.visible = bouncing;
+    Composite.allBodies(this.engine.world)
+      .filter((body) => body.label === "floor")
+      .forEach((body) => {
+        body.restitution = bouncing ? 0.82 : 0.12;
+      });
     if (this.activeSeconds >= this.insightUntil) this.insightIds.clear();
     const state = JSON.stringify([
       this.weather.snapshot(this.activeSeconds),
       Math.max(0, Math.ceil(this.insightUntil - this.activeSeconds)),
       Math.max(0, Math.ceil(this.vortexUntil - this.activeSeconds)),
+      Math.max(0, Math.ceil(this.cushionUntil - this.activeSeconds)),
     ]);
     if (state !== this.lastEffectState) {
       this.lastEffectState = state;
       this.emitSnapshot();
     }
   }
+
+  cushion = () => {
+    if (
+      this.paused ||
+      this.status !== "playing" ||
+      this.cushionLeft <= 0 ||
+      this.activeSeconds < this.cushionUntil
+    )
+      return;
+    if (!this.fruits.size) {
+      this.callbacks.onToast("先让水果落进果箱", "cyan");
+      return;
+    }
+    this.cushionLeft--;
+    this.cushionUntil = this.activeSeconds + 10;
+    // Only fruit resting on the floor receives the initial spring impulse.
+    this.fruits.forEach((fruit) => {
+      if (
+        fruit.body.position.y + this.fruitRadius(fruit.tier) >=
+        this.layout.box.y + this.layout.box.height - 12
+      )
+        Body.setVelocity(fruit.body, { x: fruit.body.velocity.x, y: -5.2 });
+    });
+    this.updateEffects();
+    this.callbacks.onToast("弹力垫 · 10 秒", "cyan");
+    this.emitSnapshot();
+  };
+
+  barometer = () => {
+    if (this.paused || this.status !== "playing" || this.barometerLeft <= 0)
+      return;
+    if (!this.weather.clear(this.activeSeconds)) {
+      this.callbacks.onToast("现在正是晴好天气", "cyan");
+      return;
+    }
+    this.barometerLeft--;
+    this.updateEffects();
+    this.callbacks.onToast("天气已放晴", "gold");
+    this.emitSnapshot();
+  };
 
   insight = () => {
     if (
@@ -3076,7 +3416,12 @@ export class FruitGame implements GameControls {
     }
     this.vortexLeft -= 1;
     this.vortexUntil = this.activeSeconds + 10;
-    this.ring(WORLD.width / 2, WORLD.box.y + WORLD.box.height / 2, 0x86b5a1, 2);
+    this.ring(
+      this.layout.box.x + this.layout.box.width / 2,
+      this.layout.box.y + this.layout.box.height / 2,
+      0x86b5a1,
+      2,
+    );
     haptic([15, 20, 25]);
     this.emitSnapshot();
   };
@@ -3090,7 +3435,7 @@ export class FruitGame implements GameControls {
     if (this.status === "playing")
       this.activeSeconds +=
         Math.max(0, ticker.elapsedMS ?? ticker.deltaMS) / 1000;
-    const deltaMs = Math.min(ticker.deltaMS, 1000 / 60);
+    const deltaMs = Math.min(Math.max(0, ticker.deltaMS), 100);
     const delta = deltaMs / 16.667;
     const seconds = deltaMs / 1000;
     this.elapsed += seconds;
@@ -3122,7 +3467,12 @@ export class FruitGame implements GameControls {
             y: fruit.body.velocity.y * factor,
           });
         });
-      Engine.update(this.engine, deltaMs);
+      this.physicsAccumulator += deltaMs;
+      const step = 1000 / 120;
+      while (this.physicsAccumulator + 1e-8 >= step) {
+        Engine.update(this.engine, step);
+        this.physicsAccumulator -= step;
+      }
     }
 
     this.fruits.forEach((fruit) => {
@@ -3207,9 +3557,7 @@ export class FruitGame implements GameControls {
       if (glow?.visible) {
         glow.alpha =
           0.62 + Math.sin(this.elapsed * 2.6 + card.id * 0.35) * 0.18;
-        const breathe =
-          1.0025 + Math.sin(this.elapsed * 2.25 + card.id * 0.27) * 0.0025;
-        card.view.scale.set(breathe);
+        card.view.scale.set(1);
       }
       const sheen = card.view.getChildByLabel("card-sheen");
       if (sheen) {
@@ -3341,11 +3689,6 @@ export class FruitGame implements GameControls {
       const dx = second.body.position.x - first.body.position.x;
       const dy = second.body.position.y - first.body.position.y;
       const distance = Math.max(0.001, Math.hypot(dx, dy));
-      const contactDistance =
-        this.fruitRadius(first.tier) + this.fruitRadius(second.tier);
-      // 同级配对在靠近期间消除碰撞带来的角速度，只保留平移和自然落体。
-      Body.setAngularVelocity(first.body, 0);
-      Body.setAngularVelocity(second.body, 0);
       const state = this.fusionPairStates.get(key) || {
         pairedFor: 0,
         stalledFor: 0,
@@ -3369,55 +3712,51 @@ export class FruitGame implements GameControls {
           )
         : 0;
 
-      // 轻微擦边、卡牌建立的共鸣、或长时间被小果卡住都会完成合成。
-      const closeEnough =
-        distance <= contactDistance + (plan.bonded ? 8 + bondPower * 3 : 5);
-      const bondedRescue =
-        plan.bonded &&
-        state.pairedFor >=
-          (distance < 180 ? 1.85 : 2.35) - (bondPower - 1) * 0.35;
-      const crowdedRescue =
-        !plan.bonded &&
-        state.stalledFor >= 2.45 &&
-        distance <= contactDistance + 58;
-      if (closeEnough || bondedRescue || crowdedRescue) {
+      if (this.fruitsTouch(first, second)) {
         this.mergeFruits(first, second);
         continue;
       }
-
-      const pull =
-        ((185 + Math.max(0, 1 - distance / 175) * 325) *
-          this.magnetMultiplier *
-          (this.weather.active?.magnet ?? 1) *
-          (this.activeSeconds < this.vortexUntil ? 2.6 : 1) *
-          (this.mutator.magnet || 1) *
-          (this.feverActive ? 1.8 : 1) *
-          (plan.bonded ? 1.3 + bondPower * 0.24 : 1) *
-          seconds) /
-        60;
-      const pullX = (dx / distance) * pull;
-      const clampVelocity = (value: number) =>
-        Math.max(-4.8, Math.min(4.8, value));
-      Body.setVelocity(first.body, {
-        x: clampVelocity(first.body.velocity.x + pullX),
-        y: first.body.velocity.y,
-      });
-      Body.setVelocity(second.body, {
-        x: clampVelocity(second.body.velocity.x - pullX),
-        y: second.body.velocity.y,
-      });
-
-      // 只让较高的水果向下寻找伙伴，不把底部水果自动抛起。
-      if (Math.abs(dy) > contactDistance * 0.45) {
-        const upper = dy > 0 ? first : second;
-        const downward = Math.min(
-          plan.bonded ? 0.92 : 0.52,
-          Math.abs(dy / distance) * pull * (plan.bonded ? 1.22 : 0.72) +
-            (state.stalledFor > 0.72 ? 0.08 : 0),
+      // Equal and opposite impulses preserve momentum. Contacts and friction,
+      // rather than teleportation or zeroed rotation, decide whether fruit meet.
+      const blocked = [...this.fruits.values()].some((other) => {
+        if (other === first || other === second) return false;
+        const p = other.body.position;
+        const t =
+          ((p.x - first.body.position.x) * dx +
+            (p.y - first.body.position.y) * dy) /
+          (distance * distance);
+        return (
+          t > 0 &&
+          t < 1 &&
+          Math.hypot(
+            p.x - first.body.position.x - t * dx,
+            p.y - first.body.position.y - t * dy,
+          ) <
+            this.fruitRadius(other.tier) * 0.85
         );
-        Body.setVelocity(upper.body, {
-          x: upper.body.velocity.x,
-          y: Math.max(0, upper.body.velocity.y) + downward,
+      });
+      if (blocked) continue;
+      const strength =
+        this.magnetMultiplier *
+        (this.weather.active?.magnet ?? 1) *
+        (this.activeSeconds < this.vortexUntil ? 2.6 : 1) *
+        (this.mutator.magnet || 1) *
+        (plan.bonded ? 1.3 + bondPower * 0.24 : 1);
+      const mass =
+        (first.body.mass * second.body.mass) /
+        (first.body.mass + second.body.mass);
+      const impulse = mass * Math.min(0.9, seconds * 10 * strength);
+      for (const [fruit, direction] of [
+        [first, 1],
+        [second, -1],
+      ] as const) {
+        Body.setVelocity(fruit.body, {
+          x:
+            fruit.body.velocity.x +
+            (((direction * dx) / distance) * impulse) / fruit.body.mass,
+          y:
+            fruit.body.velocity.y +
+            (((direction * dy) / distance) * impulse) / fruit.body.mass,
         });
       }
     }
@@ -3470,7 +3809,8 @@ export class FruitGame implements GameControls {
     const overflowing = [...this.fruits.values()].some((fruit) => {
       const birth = Number(fruit.body.plugin.birth || 0);
       return (
-        this.elapsed - birth > 1.35 && fruit.body.bounds.min.y < WORLD.dangerY
+        this.elapsed - birth > 1.35 &&
+        fruit.body.bounds.min.y < this.layout.dangerY
       );
     });
     if (overflowing) {
@@ -3607,6 +3947,12 @@ export class FruitGame implements GameControls {
       syrupLeft: this.syrupLeft,
       insightLeft: this.insightLeft,
       vortexLeft: this.vortexLeft,
+      cushionLeft: this.cushionLeft,
+      barometerLeft: this.barometerLeft,
+      cushionSeconds: Math.max(
+        0,
+        Math.ceil(this.cushionUntil - this.activeSeconds),
+      ),
       insightSeconds: Math.max(
         0,
         Math.ceil(this.insightUntil - this.activeSeconds),
@@ -3650,6 +3996,15 @@ export class FruitGame implements GameControls {
     if (this.status !== "playing") return;
     this.status = status;
     this.engine.gravity.x = 0;
+    this.engine.gravity.y /= this.weatherGravity;
+    this.weatherGravity = 1;
+    this.cushionUntil = this.activeSeconds;
+    this.cushionPad.visible = false;
+    Composite.allBodies(this.engine.world)
+      .filter((body) => body.label === "floor")
+      .forEach((body) => {
+        body.restitution = 0.12;
+      });
     this.insightUntil = this.activeSeconds;
     this.vortexUntil = this.activeSeconds;
     this.insightIds.clear();
@@ -3671,8 +4026,8 @@ export class FruitGame implements GameControls {
       });
       if (this.mode !== "sprint")
         this.score += Math.round(bonus * DIFFICULTIES[this.difficulty].score);
-      this.burst(WORLD.width / 2, WORLD.height / 2, 0xffd60a, 90);
-      this.ring(WORLD.width / 2, WORLD.height / 2, 0xffcf5e, 1.6);
+      this.burst(this.layout.width / 2, this.layout.height / 2, 0xffd60a, 90);
+      this.ring(this.layout.width / 2, this.layout.height / 2, 0xffcf5e, 1.6);
       sounds.win();
       haptic([35, 50, 35, 50, 80]);
     } else {
@@ -3724,6 +4079,7 @@ export class FruitGame implements GameControls {
       card.view.position.set(card.x, card.y);
       card.view.rotation = (this.random() - 0.5) * 0.17;
     });
+    this.refreshCardDepth();
     // 洗牌是救场资源：把卡槽中最接近三消的一组放到可选层，
     // 避免消耗道具后仍然只得到一副没有即时决策价值的牌面。
     const trayCounts = new Map<number, number>();
@@ -3771,13 +4127,19 @@ export class FruitGame implements GameControls {
           x: source.x,
           y: source.y,
           layer: source.layer,
+          rotation: source.view.rotation,
+          stackOrder: source.stackOrder,
         };
         source.x = target.x;
         source.y = target.y;
         source.layer = target.layer;
+        source.view.rotation = target.view.rotation;
+        source.stackOrder = target.stackOrder;
         target.x = sourcePosition.x;
         target.y = sourcePosition.y;
         target.layer = sourcePosition.layer;
+        target.view.rotation = sourcePosition.rotation;
+        target.stackOrder = sourcePosition.stackOrder;
         source.view.position.set(source.x, source.y);
         target.view.position.set(target.x, target.y);
       }
@@ -3787,8 +4149,8 @@ export class FruitGame implements GameControls {
     this.lastPick = null;
     this.updateCardAccess();
     this.burst(
-      WORLD.width / 2,
-      WORLD.stack.y + WORLD.stack.height / 2,
+      this.layout.stack.x + this.layout.stack.width / 2,
+      this.layout.stack.y + this.layout.stack.height / 2,
       0xb88cff,
       34,
     );
@@ -3878,7 +4240,12 @@ export class FruitGame implements GameControls {
     }
     this.wildLeft -= 1;
     this.callbacks.onToast(`万能果 · 补齐${FRUITS[tier].name}三消`, "gold");
-    this.burst(WORLD.width / 2, WORLD.tray.y + 30, 0xb6f36a, 24);
+    this.burst(
+      this.layout.tray.x + this.layout.tray.width / 2,
+      this.layout.tray.y + 30,
+      0xb6f36a,
+      24,
+    );
     haptic([16, 30, 24]);
     sources.forEach((card) => {
       card.active = false;
@@ -3917,7 +4284,12 @@ export class FruitGame implements GameControls {
     this.bubbleLeft -= 1;
     this.lastPick = null;
     this.drawTray();
-    this.burst(WORLD.width / 2, WORLD.tray.y + 30, 0x8be9fd, 30);
+    this.burst(
+      this.layout.tray.x + this.layout.tray.width / 2,
+      this.layout.tray.y + 30,
+      0x8be9fd,
+      30,
+    );
     this.callbacks.onToast(` 收起 ${ordered.length} 张 · 凑满仍会转果`, "cyan");
     haptic([12, 25, 12]);
     this.emitSnapshot();
@@ -3936,12 +4308,17 @@ export class FruitGame implements GameControls {
       this.sunLeft -= 1;
       this.gainFever(20);
       this.burst(
-        WORLD.width / 2,
-        WORLD.stack.y + WORLD.stack.height / 2,
+        this.layout.stack.x + this.layout.stack.width / 2,
+        this.layout.stack.y + this.layout.stack.height / 2,
         0xffe878,
         34,
       );
-      this.ring(WORLD.width / 2, WORLD.stack.y + 160, 0xfff5b5, 1.12);
+      this.ring(
+        this.layout.stack.x + this.layout.stack.width / 2,
+        this.layout.stack.y + 160,
+        0xfff5b5,
+        1.12,
+      );
       this.callbacks.onToast(" 阳光充能 · 甜度 +20", "gold");
       sounds.match();
       haptic([12, 24, 16]);
@@ -3958,12 +4335,17 @@ export class FruitGame implements GameControls {
     });
     this.updateCardAccess();
     this.burst(
-      WORLD.width / 2,
-      WORLD.stack.y + WORLD.stack.height / 2,
+      this.layout.stack.x + this.layout.stack.width / 2,
+      this.layout.stack.y + this.layout.stack.height / 2,
       0xffe878,
       42,
     );
-    this.ring(WORLD.width / 2, WORLD.stack.y + 160, 0xfff5b5, 1.25);
+    this.ring(
+      this.layout.stack.x + this.layout.stack.width / 2,
+      this.layout.stack.y + 160,
+      0xfff5b5,
+      1.25,
+    );
     this.callbacks.onToast(` 净化 ${obstacles.length} 张障碍牌`, "gold");
     haptic([16, 28, 16]);
     this.emitSnapshot();
@@ -4024,8 +4406,8 @@ export class FruitGame implements GameControls {
     const radius = this.fruitRadius(nextTier);
     const spread = radius + 6;
     const centerX = Math.max(
-      WORLD.box.x + radius + spread,
-      Math.min(WORLD.box.x + WORLD.box.width - radius - spread, x),
+      this.layout.box.x + radius + spread,
+      Math.min(this.layout.box.x + this.layout.box.width - radius - spread, x),
     );
     this.removeFruit(target);
     const pieces = [
@@ -4133,13 +4515,18 @@ export class FruitGame implements GameControls {
     this.updateDanger();
     for (let index = 0; index < 5; index += 1) {
       this.burst(
-        WORLD.box.x + 54 + index * 72,
-        WORLD.box.y + 72 + (index % 2) * 112,
+        this.layout.box.x + 54 + index * 72,
+        this.layout.box.y + 72 + (index % 2) * 112,
         0x9eeaff,
         10,
       );
     }
-    this.ring(WORLD.width / 2, WORLD.dangerY + 68, 0xa6efff, 1.7);
+    this.ring(
+      this.layout.box.x + this.layout.box.width / 2,
+      this.layout.dangerY + 68,
+      0xa6efff,
+      1.7,
+    );
     this.callbacks.onToast(" 冰冻喷雾 · 果箱静止 6 秒", "cyan");
     haptic([14, 22, 14, 22, 30]);
     this.emitSnapshot();
@@ -4149,7 +4536,12 @@ export class FruitGame implements GameControls {
     if (this.paused || this.status !== "playing" || this.harvestLeft <= 0)
       return;
     this.harvestLeft -= 1;
-    this.burst(WORLD.width / 2, WORLD.tray.y + 24, 0xe2c36b, 22);
+    this.burst(
+      this.layout.tray.x + this.layout.tray.width / 2,
+      this.layout.tray.y + 24,
+      0xe2c36b,
+      22,
+    );
     if (this.fruitBatchTotal(this.cardMatchCount + 1) >= 3) {
       this.gainFever(12);
       this.callbacks.onToast(" 满产转化 · 甜度 +12", "gold");
@@ -4171,8 +4563,8 @@ export class FruitGame implements GameControls {
       return;
     }
     this.quakeLeft -= 1;
-    const centerX = WORLD.width / 2;
-    const centerY = WORLD.box.y + WORLD.box.height * 0.58;
+    const centerX = this.layout.box.x + this.layout.box.width / 2;
+    const centerY = this.layout.box.y + this.layout.box.height * 0.58;
     fruits.forEach((fruit, index) => {
       const dx = fruit.body.position.x - centerX;
       const dy = fruit.body.position.y - centerY;
@@ -4277,8 +4669,18 @@ export class FruitGame implements GameControls {
       if (!this.feverActive)
         this.callbacks.onToast(" 甜度糖浆 · 甜度 +45", "pink");
     }
-    this.burst(WORLD.width / 2, WORLD.tray.y + 42, 0xffd166, 28);
-    this.ring(WORLD.width / 2, WORLD.tray.y + 42, 0xffe59a, 0.9);
+    this.burst(
+      this.layout.tray.x + this.layout.tray.width / 2,
+      this.layout.tray.y + 42,
+      0xffd166,
+      28,
+    );
+    this.ring(
+      this.layout.tray.x + this.layout.tray.width / 2,
+      this.layout.tray.y + 42,
+      0xffe59a,
+      0.9,
+    );
     haptic([12, 22, 18]);
     this.emitSnapshot();
   };
@@ -4314,7 +4716,7 @@ export class FruitGame implements GameControls {
     }
     this.magnetLeft -= 1;
     this.callbacks.onToast("引力核启动 · 立即合成！", "pink");
-    this.mergeFruits(pair[0], pair[1]);
+    this.mergeFruits(pair[0], pair[1], true);
     this.emitSnapshot();
   };
 
@@ -4340,6 +4742,7 @@ export class FruitGame implements GameControls {
   destroy = () => {
     if (this.destroyed) return;
     this.destroyed = true;
+    this.resizeObserver?.disconnect();
     this.timers.clear();
     Events.off(this.engine, "collisionStart", this.onCollisionStart);
     Events.off(this.engine, "collisionActive", this.onCollisionActive);
