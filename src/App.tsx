@@ -1,3 +1,10 @@
+import { Icon } from "./Icon";
+import {
+  DIFFICULTIES,
+  dailyChallenge,
+  type Difficulty,
+} from "./game/challenges";
+import { storage, exportSave, importSave } from "./storage";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   getLeaderboard,
@@ -71,13 +78,14 @@ const EMPTY_SNAPSHOT: GameSnapshot = {
   mutator: "",
   mutatorHint: "",
   dropLane: 0,
+  difficulty: "classic",
+  timeLeft: null,
+  challengeKey: "",
 };
 
-const GREENHOUSE_PLANTS = ["🌱", "🌿", "🌸", "🍓"];
-const MODE_UNLOCK_LEVEL: Partial<Record<GameMode, number>> = {
-  endless: 2,
-  expedition: 4,
-};
+const GREENHOUSE_PLANTS = ["sprout", "leaf", "flower", "basket"];
+const MODE_UNLOCK_LEVEL: Partial<Record<GameMode, number>> = {};
+const DAILY_UPGRADES: GameUpgrades = {};
 const TUTORIAL_KEY = "fruit-king-tutorial-v2";
 const STARTER_GIFT_KEY = "fruit-king-starter-gift-v1";
 const CARD_BASE_TOOL_IDS = new Set<ToolId>(["shuffle", "hammer", "sun"]);
@@ -93,9 +101,9 @@ const RELIC_RARITY_LABEL = {
 } as const;
 
 function readProgress() {
-  const stored = Number(localStorage.getItem("fruit-king-unlocked") || 0);
+  const stored = Number(storage.getItem("fruit-king-unlocked") || 0);
   return Number.isFinite(stored)
-    ? Math.max(0, Math.min(stored, LEVELS.length - 1))
+    ? Math.max(0, Math.min(Math.floor(stored), LEVELS.length - 1))
     : 0;
 }
 
@@ -111,32 +119,18 @@ function FruitIcon({
   className?: string;
   decorative?: boolean;
 }) {
-  const classes =
-    `fruit-visual ${fruit.icon ? "fruit-visual-image" : "fruit-visual-emoji"} ${className}`.trim();
-  if (fruit.icon) {
-    return (
-      <img
-        className={classes}
-        src={fruit.icon}
-        alt={decorative ? "" : fruit.name}
-        draggable={false}
-      />
-    );
-  }
   return (
-    <span
-      className={classes}
-      role={decorative ? undefined : "img"}
-      aria-label={decorative ? undefined : fruit.name}
-      aria-hidden={decorative ? true : undefined}
-    >
-      {fruit.emoji}
-    </span>
+    <img
+      className={`fruit-visual fruit-visual-image ${className}`}
+      src={fruit.icon}
+      alt={decorative ? "" : fruit.name}
+      draggable={false}
+    />
   );
 }
 
 function readCoins() {
-  const stored = Number(localStorage.getItem("fruit-king-coins") || 0);
+  const stored = Number(storage.getItem("fruit-king-coins") || 0);
   return Number.isFinite(stored) ? Math.max(0, Math.floor(stored)) : 0;
 }
 
@@ -158,7 +152,7 @@ function readUpgrades(): UpgradeLevels {
 
   try {
     const stored = JSON.parse(
-      localStorage.getItem("fruit-king-upgrades") || "{}",
+      storage.getItem("fruit-king-upgrades") || "{}",
     ) as Partial<Record<UpgradeId, number>>;
     for (const definition of UPGRADES) {
       const level = Number(stored[definition.id] || 0);
@@ -178,7 +172,7 @@ function readTools(): ToolLevels {
   ) as ToolLevels;
   try {
     const stored = JSON.parse(
-      localStorage.getItem("fruit-king-tools") || "{}",
+      storage.getItem("fruit-king-tools") || "{}",
     ) as Partial<Record<ToolId, number>>;
     TOOLS.forEach((tool) => {
       const level = Number(stored[tool.id] || 0);
@@ -210,6 +204,9 @@ function formatScore(value: number) {
 
 function GameCanvas({
   level,
+  difficulty,
+  challengeKey,
+  seed,
   mode,
   wave,
   relics,
@@ -223,6 +220,9 @@ function GameCanvas({
   onDropLaneChange,
 }: {
   level: number;
+  difficulty: Difficulty;
+  challengeKey: string;
+  seed?: string;
   mode: GameMode;
   wave: number;
   relics: RelicId[];
@@ -245,7 +245,17 @@ function GameCanvas({
       .then(({ FruitGame: Game }) =>
         Game.create(
           canvasRef.current!,
-          { level, mode, wave, relics, startingScore, upgrades },
+          {
+            level,
+            mode,
+            wave,
+            relics,
+            startingScore,
+            upgrades,
+            difficulty,
+            challengeKey,
+            seed,
+          },
           { onSnapshot, onFinish, onToast, onDropLaneChange },
         ),
       )
@@ -267,6 +277,9 @@ function GameCanvas({
     };
   }, [
     level,
+    difficulty,
+    challengeKey,
+    seed,
     mode,
     onFinish,
     onReady,
@@ -306,20 +319,24 @@ function Leaderboard({
   onClose: () => void;
   onRefresh: () => void;
 }) {
+  const [filter, setFilter] = useState<Difficulty | "all">("all");
+  const filteredEntries = entries.filter(
+    (entry) => filter === "all" || entry.difficulty === filter,
+  );
   return (
     <div
       className="modal-backdrop"
       role="dialog"
       aria-modal="true"
-      aria-label="全球排行榜"
+      aria-label="本机战绩榜"
     >
       <section className="modal-card leaderboard-card">
-        <div className="modal-kicker">GLOBAL JUICE LEAGUE</div>
-        <h2>果王排行榜</h2>
+        <div className="modal-kicker">YOUR ORCHARD RECORDS</div>
+        <h2>我的收成记录</h2>
         <p className="modal-copy">
           {mode === "story"
-            ? "全关卡玩家进度排行 · 每位玩家展示最佳战绩"
-            : "每位玩家展示最佳战绩，不再被重复记录挤满。"}
+            ? "此浏览器内的最佳战绩 · 按难度分别保存"
+            : "本机历史最佳 · 每日挑战按日期分别记录"}
         </p>
         <div className="leaderboard-tabs">
           {(Object.keys(MODE_INFO) as GameMode[]).map((item) => (
@@ -328,7 +345,24 @@ function Leaderboard({
               className={mode === item ? "active" : ""}
               onClick={() => onModeChange(item)}
             >
-              {MODE_INFO[item].icon} {MODE_INFO[item].name}
+              {<Icon name={MODE_INFO[item].icon} />} {MODE_INFO[item].name}
+            </button>
+          ))}
+        </div>
+        <div className="rank-filters" aria-label="战绩难度筛选">
+          <button
+            aria-pressed={filter === "all"}
+            onClick={() => setFilter("all")}
+          >
+            全部难度
+          </button>
+          {(Object.keys(DIFFICULTIES) as Difficulty[]).map((item) => (
+            <button
+              key={item}
+              aria-pressed={filter === item}
+              onClick={() => setFilter(item)}
+            >
+              {DIFFICULTIES[item].name}
             </button>
           ))}
         </div>
@@ -338,21 +372,23 @@ function Leaderboard({
           ) : null}
           {!loading && offline ? (
             <div className="empty-state">
-              排行榜暂时离线，游戏仍可正常进行。
+              浏览器未允许保存数据，可导出存档备份。
             </div>
           ) : null}
-          {!loading && !offline && entries.length === 0 ? (
+          {!loading && !offline && filteredEntries.length === 0 ? (
             <div className="empty-state">第一名正在等你来拿。</div>
           ) : null}
-          {entries.map((entry, index) => (
+          {filteredEntries.map((entry, index) => (
             <div
               className={`rank-row rank-${index + 1}`}
               key={`${entry.username}-${entry.createdAt}`}
             >
               <span className="rank-number">
-                {index < 3
-                  ? ["🥇", "🥈", "🥉"][index]
-                  : String(index + 1).padStart(2, "0")}
+                {index < 3 ? (
+                  <Icon name="trophy" />
+                ) : (
+                  String(index + 1).padStart(2, "0")
+                )}
               </span>
               <span className="rank-player">
                 <strong>{entry.username}</strong>
@@ -362,7 +398,8 @@ function Leaderboard({
                     : mode === "endless"
                       ? `第 ${entry.level} 波`
                       : `远征路线 ${entry.level + 1}`}{" "}
-                  · 最高{" "}
+                  · {DIFFICULTIES[entry.difficulty].name} {entry.challengeKey} ·
+                  最高{" "}
                   <FruitIcon
                     fruit={FRUITS[Math.min(entry.fruitTier, FRUITS.length - 1)]}
                     decorative
@@ -388,7 +425,15 @@ function Leaderboard({
 }
 
 export default function App() {
+  const [muted, setMuted] = useState(
+    () => storage.getItem("fruit-king-muted") === "true",
+  );
   const [screen, setScreen] = useState<Screen>("home");
+  const [difficulty, setDifficulty] = useState<Difficulty>("classic");
+  const [challenge, setChallenge] = useState(dailyChallenge);
+  const [archiveOpen, setArchiveOpen] = useState(false);
+  const [archiveMessage, setArchiveMessage] = useState("");
+  const [collectionOpen, setCollectionOpen] = useState(false);
   const [mode, setMode] = useState<GameMode>("story");
   const [level, setLevel] = useState(readProgress);
   const [unlocked, setUnlocked] = useState(readProgress);
@@ -438,7 +483,7 @@ export default function App() {
   });
 
   const persistCoins = useCallback((next: number) => {
-    localStorage.setItem("fruit-king-coins", String(next));
+    storage.setItem("fruit-king-coins", String(next));
     setCoins(next);
   }, []);
 
@@ -450,7 +495,7 @@ export default function App() {
     const cost = definition.costs[currentLevel];
     if (coins < cost) return;
     const nextUpgrades = { ...upgrades, [id]: currentLevel + 1 };
-    localStorage.setItem("fruit-king-upgrades", JSON.stringify(nextUpgrades));
+    storage.setItem("fruit-king-upgrades", JSON.stringify(nextUpgrades));
     setUpgrades(nextUpgrades);
     persistCoins(coins - cost);
     setShopPulse((value) => value + 1);
@@ -480,7 +525,7 @@ export default function App() {
     );
     if (coins < cost) return;
     const nextTools = { ...tools, [id]: currentLevel + 1 };
-    localStorage.setItem("fruit-king-tools", JSON.stringify(nextTools));
+    storage.setItem("fruit-king-tools", JSON.stringify(nextTools));
     setTools(nextTools);
     persistCoins(coins - cost);
     setShopPulse((value) => value + 1);
@@ -494,7 +539,7 @@ export default function App() {
     const safeLevel = Math.max(0, Math.min(nextLevel, LEVELS.length - 1));
     const persisted = readProgress();
     const nextUnlocked = Math.max(persisted, safeLevel);
-    localStorage.setItem("fruit-king-unlocked", String(nextUnlocked));
+    storage.setItem("fruit-king-unlocked", String(nextUnlocked));
     setUnlocked((current) => Math.max(current, nextUnlocked));
     return nextUnlocked;
   }, []);
@@ -508,14 +553,14 @@ export default function App() {
   }, []);
 
   const finishTutorial = useCallback(() => {
-    localStorage.setItem(TUTORIAL_KEY, "done");
+    storage.setItem(TUTORIAL_KEY, "done");
     setTutorialStep(null);
   }, []);
 
   const handleDropLaneChange = useCallback(() => {
     setTutorialStep((current) => {
       if (current !== "lane") return current;
-      localStorage.setItem(TUTORIAL_KEY, "done");
+      storage.setItem(TUTORIAL_KEY, "done");
       return null;
     });
   }, []);
@@ -527,10 +572,10 @@ export default function App() {
         next.mode === "story" &&
         next.status === "won" &&
         level === 0 &&
-        localStorage.getItem(STARTER_GIFT_KEY) !== "claimed";
+        storage.getItem(STARTER_GIFT_KEY) !== "claimed";
       const reward =
         computeCoinReward(next, readUpgrades()) + (starterGift ? 60 : 0);
-      if (starterGift) localStorage.setItem(STARTER_GIFT_KEY, "claimed");
+      if (starterGift) storage.setItem(STARTER_GIFT_KEY, "claimed");
       setLastCoinStarterGift(starterGift);
       setLastCoinReward(reward);
       persistCoins(readCoins() + reward);
@@ -548,6 +593,20 @@ export default function App() {
     },
     [level, mode, persistCoins, persistUnlocked, relics],
   );
+  useEffect(() => {
+    if (!result || !runId) return;
+    void saveScore({
+      runId,
+      username: storage.getItem("fruit-king-name") || "果园旅人",
+      score: result.score,
+      maxCombo: result.maxCombo,
+      fruitTier: result.maxFruitTier,
+      level: mode === "endless" || mode === "sprint" ? result.wave : level,
+    })
+      .then(() => setSaveState("saved"))
+      .catch((error: Error) => setSaveError(error.message));
+  }, [result, runId, mode, level]);
+
   const handleToast = useCallback(
     (message: string, tone: "gold" | "pink" | "cyan" = "pink") => {
       if (toastTimer.current) window.clearTimeout(toastTimer.current);
@@ -568,7 +627,20 @@ export default function App() {
       targetMode = mode,
       run: { wave?: number; relics?: RelicId[]; score?: number } = {},
     ) => {
+      if (targetMode === "daily") targetLevel = dailyChallenge().level;
       sounds.prepare();
+      gameUpgrades.current = {
+        fever: upgrades.fever,
+        danger: upgrades.danger,
+        launch: upgrades.sun,
+        magnet: upgrades.magnet,
+        score: upgrades.score,
+        combo: upgrades.combo,
+        fruitBatch: upgrades.sweet_start,
+        seedStart: upgrades.seed_start,
+        trayCapacity: upgrades.tray,
+        tools,
+      };
       const nextWave = run.wave || 1;
       const nextRelics = run.relics || [];
       const nextScore = run.score || 0;
@@ -589,25 +661,35 @@ export default function App() {
       setTutorialStep(
         targetMode === "story" &&
           targetLevel === 0 &&
-          localStorage.getItem(TUTORIAL_KEY) !== "done"
+          storage.getItem(TUTORIAL_KEY) !== "done"
           ? "pick"
           : null,
       );
       setScreen("game");
       setSession((value) => value + 1);
-      void startRun(
-        targetMode,
-        targetMode === "endless" ? nextWave : targetLevel,
-      )
-        .then(({ runId: id }) => setRunId(id))
-        .catch(() => setRunId(null));
+      const day = targetMode === "daily" ? dailyChallenge() : challenge;
+      if (targetMode === "daily") setChallenge(day);
+      setRunId(
+        startRun(
+          targetMode,
+          targetMode === "endless" || targetMode === "sprint"
+            ? nextWave
+            : targetLevel,
+          targetMode === "daily" ? "expert" : difficulty,
+          targetMode === "daily" ? day.key : "",
+        ).runId,
+      );
     },
-    [level, mode],
+    [level, mode, difficulty, challenge, upgrades, tools],
   );
 
   const startSelectedMode = () => {
     const requiredLevel = MODE_UNLOCK_LEVEL[mode] || 0;
     if (unlocked < requiredLevel) return;
+    if (mode === "daily") {
+      beginGame(dailyChallenge().level, "daily");
+      return;
+    }
     if (mode === "story") {
       beginGame(level, "story");
       return;
@@ -617,7 +699,11 @@ export default function App() {
       mode === "expedition" && upgrades.relic_start >= 1
         ? pickRelics([], 1).map((relic) => relic.id)
         : [];
-    beginGame(0, mode, { wave: 1, relics: startingRelics, score: 0 });
+    beginGame(mode === "sprint" ? 2 : 0, mode, {
+      wave: 1,
+      relics: startingRelics,
+      score: 0,
+    });
   };
 
   const backHome = () => {
@@ -647,6 +733,17 @@ export default function App() {
     });
   }, [level, screen, unlocked]);
 
+  useEffect(() => {
+    const onHidden = () => {
+      if (document.hidden && screen === "game" && !result) {
+        controlsRef.current?.pause();
+        setGamePanel("menu");
+      }
+    };
+    document.addEventListener("visibilitychange", onHidden);
+    return () => document.removeEventListener("visibilitychange", onHidden);
+  }, [screen, result]);
+
   const closeGamePanel = () => {
     controlsRef.current?.resume();
     setGamePanel(null);
@@ -675,7 +772,11 @@ export default function App() {
       mode === "expedition" && upgrades.relic_start >= 1
         ? pickRelics([], 1).map((relic) => relic.id)
         : [];
-    beginGame(0, mode, { wave: 1, relics: startingRelics, score: 0 });
+    beginGame(
+      mode === "daily" ? dailyChallenge().level : mode === "sprint" ? 2 : 0,
+      mode,
+      { wave: 1, relics: startingRelics, score: 0 },
+    );
   };
 
   const chooseRelic = (relic: RelicId) => {
@@ -705,6 +806,10 @@ export default function App() {
   );
 
   const openLeaderboard = () => {
+    if (screen === "game") {
+      controlsRef.current?.pause();
+      setGamePanel("menu");
+    }
     setLeaderboardMode(mode);
     setLeaderboardOpen(true);
     loadLeaderboard(mode);
@@ -745,19 +850,86 @@ export default function App() {
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key !== "Escape") return;
-      if (leaderboardOpen) {
+      if (archiveOpen) {
+        setArchiveOpen(false);
+      } else if (collectionOpen) {
+        setCollectionOpen(false);
+      } else if (leaderboardOpen) {
         setLeaderboardOpen(false);
       } else if (shopOpen) {
         setShopOpen(false);
       } else if (gamePanel) {
         closeGamePanel();
+      } else if (screen === "game" && !result) {
+        openGamePanel("menu");
       }
     };
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [gamePanel, leaderboardOpen, shopOpen]);
+  }, [
+    gamePanel,
+    leaderboardOpen,
+    shopOpen,
+    archiveOpen,
+    collectionOpen,
+    screen,
+    result,
+  ]);
 
-  const target = FRUITS[LEVELS[level].target];
+  useEffect(() => {
+    const dialogs = document.querySelectorAll<HTMLElement>('[role="dialog"]');
+    const dialog = dialogs[dialogs.length - 1];
+    if (!dialog) return;
+    const previous = document.activeElement as HTMLElement | null;
+    const focusables = () =>
+      Array.from(
+        dialog.querySelectorAll<HTMLElement>(
+          'button:not(:disabled), input:not(:disabled), [href], [tabindex="0"]',
+        ),
+      ).filter((el) => el.getClientRects().length > 0);
+    focusables()[0]?.focus();
+    const trap = (event: KeyboardEvent) => {
+      if (event.key !== "Tab") return;
+      const items = focusables(),
+        first = items[0],
+        last = items.at(-1);
+      if (!first || !last) return;
+      if (
+        event.shiftKey &&
+        (document.activeElement === first ||
+          !dialog.contains(document.activeElement))
+      ) {
+        event.preventDefault();
+        last.focus();
+      } else if (
+        !event.shiftKey &&
+        (document.activeElement === last ||
+          !dialog.contains(document.activeElement))
+      ) {
+        event.preventDefault();
+        first.focus();
+      }
+    };
+    document.addEventListener("keydown", trap);
+    return () => {
+      document.removeEventListener("keydown", trap);
+      if (previous?.isConnected) previous.focus();
+    };
+  }, [
+    leaderboardOpen,
+    shopOpen,
+    archiveOpen,
+    collectionOpen,
+    gamePanel,
+    result,
+  ]);
+
+  const target =
+    FRUITS[
+      LEVELS[
+        mode === "daily" && screen === "home" ? dailyChallenge().level : level
+      ].target
+    ];
   const currentFruit =
     FRUITS[Math.min(snapshot.maxFruitTier, FRUITS.length - 1)];
   const activeRelics = relics
@@ -782,7 +954,7 @@ export default function App() {
   const toolboxItems = [
     {
       id: "undo",
-      icon: "🕰️",
+      icon: "clock",
       label: "撤回",
       description: "退回上一张普通卡",
       category: "card",
@@ -790,7 +962,7 @@ export default function App() {
     },
     {
       id: "shuffle",
-      icon: "🎲",
+      icon: "dice",
       label: "洗牌",
       description: "重排并优先露出三消路线",
       category: "card",
@@ -798,7 +970,7 @@ export default function App() {
     },
     {
       id: "hammer",
-      icon: "🔨",
+      icon: "hammer",
       label: "清顶",
       description: "自动收取最有用的顶层卡",
       category: "card",
@@ -806,7 +978,7 @@ export default function App() {
     },
     {
       id: "wild",
-      icon: "🍀",
+      icon: "flower",
       label: "万能",
       description: "补齐卡槽里最接近的三消",
       category: "card",
@@ -814,7 +986,7 @@ export default function App() {
     },
     {
       id: "bubble",
-      icon: "🫧",
+      icon: "bubble",
       label: "清槽",
       description: "收起两张最难配对的散牌",
       category: "card",
@@ -822,7 +994,7 @@ export default function App() {
     },
     {
       id: "sun",
-      icon: "☀️",
+      icon: "sun",
       label: "净化",
       description: "清障；无障碍时转为狂热充能",
       category: "card",
@@ -830,7 +1002,7 @@ export default function App() {
     },
     {
       id: "bomb",
-      icon: "💣",
+      icon: "bomb",
       label: "炸弹",
       description: "清理警戒线附近的低阶水果",
       category: "fruit",
@@ -838,7 +1010,7 @@ export default function App() {
     },
     {
       id: "shield",
-      icon: "🧊",
+      icon: "ice",
       label: "冰冻",
       description: "暂停物理和警戒线 6 秒",
       category: "fruit",
@@ -846,7 +1018,7 @@ export default function App() {
     },
     {
       id: "quake",
-      icon: "⚙️",
+      icon: "gear",
       label: "搅拌",
       description: "重排果箱，解开堆叠死角",
       category: "fruit",
@@ -854,7 +1026,7 @@ export default function App() {
     },
     {
       id: "juice",
-      icon: "🥤",
+      icon: "juice",
       label: "榨汁",
       description: "最高阶水果降一级并减压",
       category: "fruit",
@@ -862,7 +1034,7 @@ export default function App() {
     },
     {
       id: "magnet",
-      icon: "🧲",
+      icon: "magnet",
       label: "合并",
       description: "立即合成一对落稳水果",
       category: "fruit",
@@ -870,7 +1042,7 @@ export default function App() {
     },
     {
       id: "ripen",
-      icon: "🌱",
+      icon: "sprout",
       label: "催熟",
       description: "最低阶水果直接升一级",
       category: "fruit",
@@ -878,7 +1050,7 @@ export default function App() {
     },
     {
       id: "split",
-      icon: "✂️",
+      icon: "scissors",
       label: "分果",
       description: "最高阶水果拆成两个低一级水果",
       category: "fruit",
@@ -886,7 +1058,7 @@ export default function App() {
     },
     {
       id: "harvest",
-      icon: "🌾",
+      icon: "wheat",
       label: "丰收",
       description: "下一次三消额外生成水果",
       category: "boost",
@@ -894,7 +1066,7 @@ export default function App() {
     },
     {
       id: "basket",
-      icon: "🧺",
+      icon: "basket",
       label: "采摘",
       description: "穿层采收一组三张同果卡",
       category: "card",
@@ -902,7 +1074,7 @@ export default function App() {
     },
     {
       id: "syrup",
-      icon: "🍯",
+      icon: "honey",
       label: "糖浆",
       description: "甜度 +45；狂热中延时",
       category: "boost",
@@ -945,147 +1117,287 @@ export default function App() {
   return (
     <main className="app-shell">
       <div className="noise" />
+      {!storage.persistent ? (
+        <div className="storage-warning" role="status">
+          浏览器暂时无法保存数据，请在离开前导出存档。
+        </div>
+      ) : null}
       {screen === "home" ? (
         <section className="home-screen">
-          <div className="hero-orbit" aria-hidden="true">
-            <span className="orbit-fruit fruit-a">🍓</span>
-            <span className="orbit-fruit fruit-b">🍋</span>
-            <span className="orbit-fruit fruit-c">
-              <FruitIcon
-                fruit={FRUITS.find((fruit) => fruit.name === "西瓜")!}
-                decorative
-              />
-            </span>
-            <span className="orbit-fruit fruit-d">🍇</span>
-            <div className="crown-core">
-              <FruitIcon
-                fruit={FRUITS[FRUITS.length - 1]}
-                className="hero-fruit-icon"
-                decorative
-              />
+          <nav className="home-nav" aria-label="果园导航">
+            <a className="wordmark" href="#" aria-label="叠个果王首页">
+              <Icon name="sprout" />
+              <span>
+                叠个果王<small>THE ORCHARD CLUB</small>
+              </span>
+            </a>
+            <div className="nav-actions">
+              <button onClick={() => setArchiveOpen(true)}>
+                <Icon name="bag" />
+                <span>我的存档</span>
+              </button>
+              <button onClick={() => setShopOpen(true)} className="wallet">
+                <Icon name="coin" />
+                {formatScore(coins)}
+                <span>果币</span>
+              </button>
             </div>
-          </div>
-          <div className="eyebrow">
-            <i /> NEON ORCHARD <i />
-          </div>
-          <h1>
-            叠个<span>果王</span>
-          </h1>
-          <p className="tagline">点三张，自选落点，弹射合成果王！</p>
-          <div className="mode-switch" aria-label="选择游戏模式">
-            {(Object.keys(MODE_INFO) as GameMode[]).map((item) => {
-              const requiredLevel = MODE_UNLOCK_LEVEL[item] || 0;
-              const locked = unlocked < requiredLevel;
-              return (
-                <button
-                  key={item}
-                  className={mode === item ? "active" : ""}
-                  disabled={locked}
-                  title={
-                    locked ? `完成第 ${requiredLevel} 关后解锁` : undefined
-                  }
-                  onClick={() => setMode(item)}
-                >
-                  <i>{locked ? "🔒" : MODE_INFO[item].icon}</i>
-                  <span>
-                    {MODE_INFO[item].name}
-                    {locked ? <small>第 {requiredLevel} 关解锁</small> : null}
-                  </span>
-                </button>
-              );
-            })}
-          </div>
-          <div className="mode-card">
-            <div className="mode-topline">
-              <span>{MODE_INFO[mode].name}</span>
-              <b>
-                {mode === "story"
-                  ? unlocked + 1
-                  : mode === "endless"
-                    ? "∞"
-                    : "ROGUE"}
-                {mode === "story" ? <small> / {LEVELS.length}</small> : null}
-              </b>
+          </nav>
+          <div className="home-content">
+            <div className="orchard-intro">
+              <div className="season-label">
+                <span /> 新鲜开园 · 随时来一局
+              </div>
+              <h1>
+                把小小的快乐，
+                <br />
+                叠成一颗<span>果王。</span>
+              </h1>
+              <p className="tagline">
+                三张卡片，一场丰收。
+                <br />
+                在这片小果园，让每一次碰撞都有好事发生。
+              </p>
+              <button
+                className="mobile-quick-start button button-primary"
+                onClick={startSelectedMode}
+              >
+                快速开局 <Icon name="arrow" />
+              </button>
+              <div
+                className="hero-illustration"
+                aria-label="手绘水果、卡片与丰收果篮"
+              >
+                <div className="art-orbit orbit-one" />
+                <div className="art-orbit orbit-two" />
+                <span className="art-note">
+                  FRESHLY PICKED
+                  <br />
+                  <b>100% 快乐配方</b>
+                </span>
+                <div className="hero-card card-one">
+                  <span>01</span>
+                  <FruitIcon fruit={FRUITS[4]} decorative />
+                  <small>草莓</small>
+                </div>
+                <div className="hero-card card-two">
+                  <span>02</span>
+                  <FruitIcon fruit={FRUITS[4]} decorative />
+                  <small>草莓</small>
+                </div>
+                <div className="hero-card card-three">
+                  <span>03</span>
+                  <FruitIcon fruit={FRUITS[4]} decorative />
+                  <small>草莓</small>
+                </div>
+                <div className="hero-harvest">
+                  <FruitIcon fruit={FRUITS[21]} decorative />
+                  <FruitIcon fruit={FRUITS[9]} decorative />
+                  <FruitIcon fruit={FRUITS[12]} decorative />
+                  <FruitIcon fruit={FRUITS[2]} decorative />
+                  <FruitIcon fruit={FRUITS[49]} decorative />
+                </div>
+                <div className="harvest-bowl">
+                  <span>ORCHARD CLUB</span>
+                  <i>今日宜丰收</i>
+                </div>
+                <Icon className="art-spark spark-one" name="spark" />
+                <Icon className="art-spark spark-two" name="spark" />
+                <Icon className="art-leaf" name="leaf" />
+                <span className="art-caption">PICK THREE. MAKE MAGIC.</span>
+              </div>
+              <div className="intro-bottom">
+                <span>
+                  <b>50</b> 种手绘水果
+                </span>
+                <span>
+                  <b>47</b> 个闯关关卡
+                </span>
+                <span>
+                  <b>5</b> 种快乐玩法
+                </span>
+              </div>
             </div>
-            {mode === "story" ? (
-              <div className="level-track" ref={levelTrackRef}>
-                {LEVELS.map((item, index) => (
+            <section className="start-panel" aria-label="开始游戏">
+              <div className="panel-heading">
+                <div>
+                  <span className="eyebrow">YOUR NEXT HARVEST</span>
+                  <h2>今天，怎么玩？</h2>
+                </div>
+                <Icon name="sun" />
+              </div>
+              <div className="mode-switch" aria-label="选择游戏模式">
+                {(
+                  [
+                    "story",
+                    "endless",
+                    "expedition",
+                    "sprint",
+                    "daily",
+                  ] as GameMode[]
+                ).map((item, index) => (
                   <button
-                    key={item.name}
-                    className={`level-dot ${index <= unlocked ? "unlocked" : ""} ${index === level ? "selected" : ""}`}
-                    disabled={index > unlocked}
-                    aria-label={`${item.name}${index > unlocked ? "，未解锁" : ""}`}
-                    onClick={() => setLevel(index)}
+                    key={item}
+                    className={mode === item ? "active" : ""}
+                    aria-pressed={mode === item}
+                    onClick={() => setMode(item)}
                   >
-                    {index < unlocked ? "✓" : index + 1}
+                    <i>
+                      <Icon name={MODE_INFO[item].icon} />
+                    </i>
+                    <span>
+                      <strong>{MODE_INFO[item].name}</strong>
+                      <small>{MODE_INFO[item].tagline}</small>
+                    </span>
+                    {index > 2 ? <em>NEW</em> : null}
+                    <b className="mode-radio" />
                   </button>
                 ))}
               </div>
-            ) : (
-              <p className="mode-description">{MODE_INFO[mode].tagline}</p>
-            )}
-            <div className="mission-preview">
-              <span className="mission-icon">
-                {mode === "story" ? (
-                  <FruitIcon fruit={target} decorative />
-                ) : (
-                  MODE_INFO[mode].icon
-                )}
-              </span>
-              <span>
-                <small>
+              <div className="difficulty-section">
+                <div className="section-line">
+                  <b>{mode === "daily" ? "今日统一规则" : "选择难度"}</b>
+                  <small>
+                    {mode === "daily"
+                      ? `${dailyChallenge().key} · UTC`
+                      : "高手也有新挑战"}
+                  </small>
+                </div>
+                <div className="difficulty-switch" aria-label="选择难度">
+                  {(Object.keys(DIFFICULTIES) as Difficulty[]).map((item) => (
+                    <button
+                      key={item}
+                      aria-pressed={
+                        (mode === "daily" ? "expert" : difficulty) === item
+                      }
+                      disabled={mode === "daily"}
+                      className={
+                        (mode === "daily" ? "expert" : difficulty) === item
+                          ? "active"
+                          : ""
+                      }
+                      onClick={() => setDifficulty(item)}
+                    >
+                      {DIFFICULTIES[item].name}
+                    </button>
+                  ))}
+                </div>
+                <p>
+                  {mode === "daily"
+                    ? "固定牌阵 · 基础道具 · 不计温室加成 · 每日可重试"
+                    : DIFFICULTIES[difficulty].hint}
+                </p>
+              </div>
+              {mode === "story" ? (
+                <div className="level-section">
+                  <div className="section-line">
+                    <b>选择关卡</b>
+                    <small>
+                      已解锁 {unlocked + 1} / {LEVELS.length}
+                    </small>
+                  </div>
+                  <div className="level-track" ref={levelTrackRef}>
+                    {LEVELS.map((item, index) => (
+                      <button
+                        key={item.name}
+                        className={`level-dot ${index <= unlocked ? "unlocked" : ""} ${index === level ? "selected" : ""}`}
+                        disabled={index > unlocked}
+                        aria-label={`${item.name}${index > unlocked ? "，未解锁" : ""}`}
+                        onClick={() => setLevel(index)}
+                      >
+                        {index < unlocked
+                          ? "✓"
+                          : String(index + 1).padStart(2, "0")}
+                      </button>
+                    ))}
+                  </div>
+                  <div className="mission-preview">
+                    <FruitIcon fruit={target} decorative />
+                    <span>
+                      <small>
+                        第 {level + 1} 关 · {LEVELS[level].name}
+                      </small>
+                      <strong>合成{target.name}，收好这一篮</strong>
+                    </span>
+                  </div>
+                </div>
+              ) : (
+                <div className="mode-note">
+                  <Icon name={MODE_INFO[mode].icon} />
+                  <span>
+                    {mode === "daily"
+                      ? `今日目标：${target.name} · 每个人从同一副牌开始`
+                      : mode === "sprint"
+                        ? "两分钟倒计时，清空卡牌继续下一波。"
+                        : mode === "expedition"
+                          ? "每过一关选择奇物，打造专属合成流派。"
+                          : "没有终点，波次变异让每一篮都充满惊喜。"}
+                  </span>
+                </div>
+              )}
+              <button
+                className="button button-play"
+                onClick={startSelectedMode}
+              >
+                <span>
                   {mode === "story"
-                    ? `第 ${level + 1} 关`
-                    : mode === "endless"
-                      ? "一直玩"
-                      : "8 关"}
-                </small>
-                <strong>
-                  {mode === "story"
-                    ? LEVELS[level].name
-                    : mode === "endless"
-                      ? "冲最高分"
-                      : "过关选奇物"}
-                </strong>
-              </span>
-              <span className="mission-target">
-                {mode === "story"
-                  ? "目标"
-                  : mode === "endless"
-                    ? "记录"
-                    : "奇物"}
-                <br />
-                <b>
-                  {mode === "story"
-                    ? target.name
-                    : mode === "endless"
-                      ? "最高分"
-                      : `${RELICS.length} 种`}
-                </b>
-              </span>
-            </div>
+                    ? "开始采摘"
+                    : `开始${MODE_INFO[mode].name}`}
+                </span>
+                <Icon name="arrow" />
+              </button>
+              <div className="panel-footnote">
+                <span /> 成绩自动保存 · 不用登录
+              </div>
+            </section>
           </div>
-          <button className="button button-play" onClick={startSelectedMode}>
-            <span>
-              {mode === "story"
-                ? "开始挑战"
-                : mode === "endless"
-                  ? "开始无尽"
-                  : "开始 Rogue"}
-            </span>
-            <i>▶</i>
-          </button>
-          <div className="home-links">
-            <button className="leaderboard-link" onClick={openLeaderboard}>
-              <span>🏆</span> 全球排行榜
-            </button>
+          <div className="orchard-shelf">
             <button
-              className="leaderboard-link"
-              onClick={() => setShopOpen(true)}
+              className="shelf-link"
+              onClick={() => setCollectionOpen(true)}
             >
-              <span>🏡</span> 果园温室 · 🪙{formatScore(coins)}
+              <Icon name="book" />
+              <span>
+                <b>水果图鉴</b>
+                <small>认识你的 50 位新朋友</small>
+              </span>
+              <span className="shelf-arrow">↗</span>
+            </button>
+            <button className="shelf-link" onClick={openLeaderboard}>
+              <Icon name="trophy" />
+              <span>
+                <b>我的收成</b>
+                <small>每一次进步，都值得记住</small>
+              </span>
+              <span className="shelf-arrow">↗</span>
+            </button>
+            <button className="shelf-link" onClick={() => setShopOpen(true)}>
+              <Icon name="home" />
+              <span>
+                <b>果园温室</b>
+                <small>培育成长，解锁更多道具</small>
+              </span>
+              <span className="shelf-arrow">↗</span>
             </button>
           </div>
+          <div className="how-it-works">
+            <span>快乐很简单</span>
+            <p>
+              <b>01</b> 点亮牌，凑三个
+            </p>
+            <i>→</i>
+            <p>
+              <b>02</b> 选落点，接水果
+            </p>
+            <i>→</i>
+            <p>
+              <b>03</b> 同果碰撞，变大果
+            </p>
+          </div>
+          <footer className="home-footer">
+            <span>叠个果王 · 小小果园，大大满足</span>
+            <span>HAND-DRAWN WITH A LITTLE SUNSHINE</span>
+          </footer>
         </section>
       ) : (
         <section className="play-layout">
@@ -1106,7 +1418,7 @@ export default function App() {
               ))}
             </div>
             <button className="leaderboard-link" onClick={openLeaderboard}>
-              🏆 查看排行榜
+              <Icon name="trophy" /> 查看排行榜
             </button>
           </aside>
           <div
@@ -1118,10 +1430,15 @@ export default function App() {
             <GameCanvas
               level={level}
               mode={mode}
+              difficulty={mode === "daily" ? "expert" : difficulty}
+              challengeKey={mode === "daily" ? challenge.key : ""}
+              seed={mode === "daily" ? challenge.seed : undefined}
               wave={wave}
               relics={relics}
               startingScore={carryScore}
-              upgrades={gameUpgrades.current}
+              upgrades={
+                mode === "daily" ? DAILY_UPGRADES : gameUpgrades.current
+              }
               session={session}
               onReady={handleReady}
               onSnapshot={handleSnapshot}
@@ -1140,12 +1457,21 @@ export default function App() {
                     ? "最高水果"
                     : mode === "expedition"
                       ? `远征 ${wave}/8`
-                      : snapshot.maxFruitTier >= LEVELS[level].target
+                      : mode !== "sprint" &&
+                          snapshot.maxFruitTier >= LEVELS[level].target
                         ? "目标达成 · 清牌或满槽过关"
                         : `剩余 ${snapshot.remainingCards} 张 · 槽 ${snapshot.trayCount}/${snapshot.trayLimit}`}
                 </small>
                 <strong>
-                  {mode === "endless" ? (
+                  {mode === "sprint" ? (
+                    <span
+                      className={`clock-remaining ${(snapshot.timeLeft ?? 120) <= 20 ? "urgent" : ""}`}
+                      aria-label={`剩余 ${snapshot.timeLeft ?? 120} 秒`}
+                    >
+                      <Icon name="clock" /> {snapshot.timeLeft ?? 120}
+                      <small>秒</small>
+                    </span>
+                  ) : mode === "endless" ? (
                     <>
                       <FruitIcon fruit={currentFruit} decorative />{" "}
                       {currentFruit.name}
@@ -1169,7 +1495,7 @@ export default function App() {
                 aria-label={`打开道具栏，${availableToolboxItems.length} 种可用`}
               >
                 <i>
-                  🧰
+                  <Icon name="bag" />
                   <em>{availableToolboxItems.length}</em>
                 </i>
                 <span>道具</span>
@@ -1179,10 +1505,27 @@ export default function App() {
                 onClick={() => openGamePanel("menu")}
                 aria-label="打开游戏菜单"
               >
-                <i>⚙️</i>
+                <i>
+                  <Icon name="gear" />
+                </i>
                 <span>菜单</span>
               </button>
             </header>
+            <div
+              className={`challenge-status ${snapshot.timeLeft !== null && snapshot.timeLeft <= 20 ? "urgent" : ""}`}
+            >
+              <span>
+                {DIFFICULTIES[mode === "daily" ? "expert" : difficulty].name} ·{" "}
+                {MODE_INFO[mode].name}
+              </span>
+              <b>
+                {mode === "sprint"
+                  ? `${snapshot.timeLeft ?? 120}s`
+                  : mode === "daily"
+                    ? challenge.key
+                    : `第 ${mode === "endless" ? snapshot.wave : level + 1} ${mode === "endless" ? "波" : "关"}`}
+              </b>
+            </div>
             <div className="drop-lane-control" aria-label="选择下次落果位置">
               <span>下次落点</span>
               {([-1, 0, 1] as const).map((lane) => (
@@ -1205,15 +1548,13 @@ export default function App() {
               COMBO <b>×{snapshot.combo}</b>
             </div>
             {toast ? (
-              <button
-                type="button"
+              <div
                 key={toast.id}
                 className={`game-toast toast-${toast.tone}`}
-                onClick={dismissToast}
-                aria-label="关闭提示"
+                role="status"
               >
                 {toast.message}
-              </button>
+              </div>
             ) : null}
             {tutorialStep ? (
               <div
@@ -1222,7 +1563,7 @@ export default function App() {
               >
                 <span>
                   {tutorialStep === "pick"
-                    ? "① 点有金边的亮牌，先收集相同水果"
+                    ? "① 点有绿边的亮牌，先收集相同水果"
                     : tutorialStep === "tray"
                       ? "② 凑齐三张，卡槽会自动消除并落果"
                       : "③ 选择左、中、右，决定下一颗水果落点"}
@@ -1272,7 +1613,7 @@ export default function App() {
                                   onClick={() => useToolById(item.id)}
                                   aria-label={`${item.label}，${item.description}，剩余 ${item.left} 次`}
                                 >
-                                  <i>{item.icon}</i>
+                                  <i>{<Icon name={item.icon} />}</i>
                                   <span>
                                     <b>{item.label}</b>
                                     <small>{item.description}</small>
@@ -1309,18 +1650,38 @@ export default function App() {
                       </div>
                       <h3>区域道具</h3>
                       <div className="zone-tool-legend">
-                        <span>牌桌 · 🎲 洗牌 / 🔨 清顶 / ☀️ 净化</span>
-                        <span>果箱 · 💣 炸弹 / 🧊 冰冻 / ⚙️ 搅拌</span>
+                        <span>
+                          牌桌 · <Icon name="dice" /> 洗牌 /{" "}
+                          <Icon name="hammer" /> 清顶 / <Icon name="sun" /> 净化
+                        </span>
+                        <span>
+                          果箱 · <Icon name="bomb" /> 炸弹 / <Icon name="ice" />{" "}
+                          冰冻 / <Icon name="gear" /> 搅拌
+                        </span>
                       </div>
                       <h3>特殊牌角标</h3>
                       <div className="special-legend">
-                        <span>🧊 冰冻</span>
-                        <span>💣 炸弹</span>
-                        <span>🌿 藤蔓</span>
-                        <span>🍬 甜度</span>
-                        <span>🌾 丰收</span>
-                        <span>🔮 棱镜</span>
-                        <span>🌪️ 季风</span>
+                        <span>
+                          <Icon name="ice" /> 冰冻
+                        </span>
+                        <span>
+                          <Icon name="bomb" /> 炸弹
+                        </span>
+                        <span>
+                          <Icon name="leaf" /> 藤蔓
+                        </span>
+                        <span>
+                          <Icon name="candy" /> 甜度
+                        </span>
+                        <span>
+                          <Icon name="wheat" /> 丰收
+                        </span>
+                        <span>
+                          <Icon name="gem" /> 棱镜
+                        </span>
+                        <span>
+                          <Icon name="wind" /> 季风
+                        </span>
                       </div>
                       <h3>合成路径</h3>
                       <div className="help-chain">
@@ -1356,7 +1717,7 @@ export default function App() {
                             {activeRelics.length ? (
                               activeRelics.map((relic) => (
                                 <span key={relic.id} title={relic.description}>
-                                  <i>{relic.icon}</i>
+                                  <i>{<Icon name={relic.icon} />}</i>
                                   <small>{relic.name}</small>
                                 </span>
                               ))
@@ -1373,8 +1734,18 @@ export default function App() {
                         继续游戏
                       </button>
                       <div className="panel-actions">
+                        <button
+                          aria-pressed={!muted}
+                          onClick={() => {
+                            sounds.setMuted(!muted);
+                            setMuted(!muted);
+                          }}
+                        >
+                          <Icon name="volume" />{" "}
+                          {muted ? "开启音效" : "关闭音效"}
+                        </button>
                         <button onClick={() => setGamePanel("help")}>
-                          ? 玩法说明
+                          <Icon name="book" /> 玩法说明
                         </button>
                         <button
                           onClick={() => {
@@ -1386,9 +1757,11 @@ export default function App() {
                             });
                           }}
                         >
-                          ↻ 重新开始
+                          <Icon name="spiral" /> 重新开始
                         </button>
-                        <button onClick={backHome}>⌂ 返回首页</button>
+                        <button onClick={backHome}>
+                          <Icon name="home" /> 返回首页
+                        </button>
                       </div>
                     </>
                   ) : null}
@@ -1401,11 +1774,14 @@ export default function App() {
                   <div className="result-rays" />
                   <div className="result-emoji">
                     {result.status === "won" ? (
-                      <FruitIcon fruit={target} decorative />
+                      <FruitIcon
+                        fruit={mode === "sprint" ? currentFruit : target}
+                        decorative
+                      />
                     ) : mode === "endless" ? (
                       "∞"
                     ) : (
-                      "🍹"
+                      <Icon name="juice" />
                     )}
                   </div>
                   <div className="result-kicker">
@@ -1413,22 +1789,34 @@ export default function App() {
                       ? `Rogue 第 ${result.wave} 关`
                       : mode === "expedition" && result.status === "won"
                         ? "Rogue 完成"
-                        : mode === "endless"
-                          ? `无尽第 ${result.wave} 波`
-                          : result.status === "won"
-                            ? `第 ${level + 1} 关完成`
-                            : "本局结束"}
+                        : mode === "daily"
+                          ? `每日鲜摘 · ${result.challengeKey}`
+                          : mode === "sprint"
+                            ? `限时榨汁 · ${DIFFICULTIES[result.difficulty].name}`
+                            : mode === "endless"
+                              ? `无尽第 ${result.wave} 波`
+                              : result.status === "won"
+                                ? `第 ${level + 1} 关完成`
+                                : "本局结束"}
                   </div>
                   <h2>
                     {isRelicReward
                       ? "选择一项构筑强化"
                       : mode === "expedition" && result.status === "won"
                         ? "Rogue 通关！"
-                        : mode === "endless"
-                          ? "无尽模式结算"
-                          : result.status === "won"
-                            ? "甜度通关！"
-                            : "差一点就合成了"}
+                        : mode === "sprint"
+                          ? result.status === "won"
+                            ? "鲜榨时间到"
+                            : "鲜榨挑战结束"
+                          : mode === "daily"
+                            ? result.status === "won"
+                              ? "今日鲜摘完成"
+                              : "今日鲜摘结算"
+                            : mode === "endless"
+                              ? "无尽模式结算"
+                              : result.status === "won"
+                                ? "甜度通关！"
+                                : "差一点就合成了"}
                   </h2>
                   <p>{result.reason}</p>
                   <div className="score-total">
@@ -1461,7 +1849,8 @@ export default function App() {
                     </span>
                   </div>
                   <div className="coin-reward">
-                    🪙 +{formatScore(lastCoinReward)} 果币已存入温室
+                    <Icon name="coin" /> +{formatScore(lastCoinReward)}{" "}
+                    果币已存入温室
                     {lastCoinStarterGift ? <small> · 含新手礼 60</small> : null}
                   </div>
                   {isRelicReward ? (
@@ -1472,7 +1861,7 @@ export default function App() {
                           className={`relic-choice relic-${relic.tone} rarity-${relic.rarity}`}
                           onClick={() => chooseRelic(relic.id)}
                         >
-                          <i>{relic.icon}</i>
+                          <i>{<Icon name={relic.icon} />}</i>
                           <span className="relic-copy">
                             <span className="relic-meta">
                               <em>{RELIC_RARITY_LABEL[relic.rarity]}</em>
@@ -1488,12 +1877,14 @@ export default function App() {
                     <div className={`save-box ${!runId ? "save-offline" : ""}`}>
                       {saveState === "saved" ? (
                         <div className="saved-message">
-                          ✓ 战绩已进入全球排行榜
+                          {storage.persistent
+                            ? "✓ 战绩已自动保存到本机"
+                            : "已记入本次会话，请导出存档"}
                         </div>
                       ) : !runId ? (
                         <div className="offline-score-note">
                           <b>战绩保存在本机</b>
-                          <small>排行榜暂时离线，不影响继续闯关。</small>
+                          <small>浏览器存储不可用，请导出存档保留战绩。</small>
                         </div>
                       ) : (
                         <>
@@ -1537,7 +1928,7 @@ export default function App() {
                       className="button button-ghost result-home"
                       onClick={backHome}
                     >
-                      暂停远征并返回
+                      结束远征并返回
                     </button>
                   ) : (
                     <div className="result-actions">
@@ -1569,6 +1960,135 @@ export default function App() {
           </div>
         </section>
       )}
+      {archiveOpen ? (
+        <div
+          className="modal-backdrop"
+          role="dialog"
+          aria-modal="true"
+          aria-label="我的存档"
+        >
+          <section className="modal-card archive-card">
+            <button
+              className="panel-close"
+              onClick={() => setArchiveOpen(false)}
+              aria-label="关闭"
+            >
+              ×
+            </button>
+            <span className="modal-kicker">TAKE YOUR ORCHARD WITH YOU</span>
+            <h2>把果园装进口袋</h2>
+            <p className="modal-copy">
+              关卡、果币、温室和最高分保存在当前浏览器。换设备或清理浏览器前，记得导出一份存档。
+            </p>
+            <label className="profile-name">
+              你的果园名号
+              <input
+                maxLength={20}
+                defaultValue={storage.getItem("fruit-king-name") || "果园旅人"}
+                onChange={(e) =>
+                  storage.setItem(
+                    "fruit-king-name",
+                    e.target.value.trim().slice(0, 20) || "果园旅人",
+                  )
+                }
+              />
+            </label>
+            <button
+              className="button button-primary"
+              onClick={() => {
+                const url = URL.createObjectURL(
+                  new Blob([exportSave()], { type: "application/json" }),
+                );
+                const link = document.createElement("a");
+                link.href = url;
+                link.download = `orchard-${new Date().toISOString().slice(0, 10)}.json`;
+                link.click();
+                setTimeout(() => URL.revokeObjectURL(url), 1000);
+              }}
+            >
+              导出存档
+            </button>
+            <label className="import-save">
+              导入存档
+              <input
+                type="file"
+                accept=".json,application/json"
+                onChange={async (e) => {
+                  const file = e.target.files?.[0];
+                  if (!file) return;
+                  try {
+                    if (file.size > 2_000_000) throw new Error("存档文件过大");
+                    const saved = importSave(await file.text());
+                    setCoins(readCoins());
+                    setUpgrades(readUpgrades());
+                    setTools(readTools());
+                    setUnlocked(readProgress());
+                    setLevel(readProgress());
+                    const nextMuted =
+                      storage.getItem("fruit-king-muted") === "true";
+                    sounds.setMuted(nextMuted);
+                    setMuted(nextMuted);
+                    setArchiveMessage(
+                      saved
+                        ? "存档已恢复，欢迎回到果园。"
+                        : "已恢复到本次会话；浏览器无法持久保存，请保留导出文件。",
+                    );
+                  } catch (err) {
+                    setArchiveMessage(
+                      err instanceof Error
+                        ? err.message
+                        : "导入失败，原存档未改变",
+                    );
+                  }
+                  e.target.value = "";
+                }}
+              />
+            </label>
+            <small className="storage-note">
+              导入会覆盖文件中的同名进度。建议先导出当前存档。
+            </small>
+            <p role="status">{archiveMessage}</p>
+          </section>
+        </div>
+      ) : null}
+      {collectionOpen ? (
+        <div
+          className="modal-backdrop"
+          role="dialog"
+          aria-modal="true"
+          aria-label="水果图鉴"
+        >
+          <section className="modal-card collection-card">
+            <button
+              className="panel-close"
+              onClick={() => setCollectionOpen(false)}
+              aria-label="关闭"
+            >
+              ×
+            </button>
+            <span className="modal-kicker">MEET THE WHOLE ORCHARD</span>
+            <h2>从蓝莓，到果王</h2>
+            <p className="modal-copy">
+              两颗相同水果落稳后相遇，会变成下一种。点击果箱里的水果，可以帮它找到伙伴。
+            </p>
+            <div className="collection-grid">
+              {FRUITS.map((fruit, index) => (
+                <div key={fruit.name}>
+                  <small>{String(index + 1).padStart(2, "0")}</small>
+                  <FruitIcon fruit={fruit} />
+                  <b>{fruit.name}</b>
+                </div>
+              ))}
+            </div>
+            <button
+              className="button button-primary"
+              onClick={() => setCollectionOpen(false)}
+            >
+              回到果园
+            </button>
+          </section>
+        </div>
+      ) : null}
       {shopOpen ? (
         <div
           className="modal-backdrop"
@@ -1577,21 +2097,36 @@ export default function App() {
           aria-label="果园温室"
         >
           <section className="modal-card shop-card">
+            <button
+              className="panel-close"
+              onClick={() => setShopOpen(false)}
+              aria-label="关闭"
+            >
+              ×
+            </button>
             <div className="modal-kicker">ORCHARD GREENHOUSE</div>
             <h2>果园温室</h2>
             <p className="modal-copy">
               每局结算都会攒下果币，在这里兑换跨局永久成长。
             </p>
-            <div className="coin-balance">🪙 {formatScore(coins)}</div>
+            <div className="coin-balance">
+              <Icon name="coin" /> {formatScore(coins)}
+            </div>
             <div
               className={`greenhouse-stage growth-${Math.min(6, greenhouseGrowth)}`}
               aria-label={`温室成长等级 ${greenhouseGrowth}`}
             >
-              <span className="greenhouse-sun">☀️</span>
-              <span className="greenhouse-cloud cloud-a">☁️</span>
-              <span className="greenhouse-cloud cloud-b">☁️</span>
+              <span className="greenhouse-sun">
+                <Icon name="sun" />
+              </span>
+              <span className="greenhouse-cloud cloud-a">
+                <Icon name="cloud" />
+              </span>
+              <span className="greenhouse-cloud cloud-b">
+                <Icon name="cloud" />
+              </span>
               <div className="greenhouse-vines" aria-hidden="true">
-                〰 🌿 〰 🌿 〰
+                〰 <Icon name="leaf" /> 〰 <Icon name="leaf" /> 〰
               </div>
               <div className="greenhouse-plants">
                 {UPGRADES.map((item) => {
@@ -1602,19 +2137,31 @@ export default function App() {
                       key={item.id}
                       title={`${item.name} ${upgrades[item.id]}/${item.maxLevel}`}
                     >
-                      <b>{GREENHOUSE_PLANTS[plantLevel]}</b>
-                      {plantLevel > 0 ? <i>{item.icon}</i> : null}
+                      <b>{<Icon name={GREENHOUSE_PLANTS[plantLevel]} />}</b>
+                      {plantLevel > 0 ? (
+                        <i>{<Icon name={item.icon} />}</i>
+                      ) : null}
                     </span>
                   );
                 })}
               </div>
               {shopPulse > 0 ? (
                 <div className="greenhouse-burst" key={shopPulse}>
-                  <span>✨</span>
-                  <span>🍃</span>
-                  <span>🪙</span>
-                  <span>✨</span>
-                  <span>🍓</span>
+                  <span>
+                    <Icon name="spark" />
+                  </span>
+                  <span>
+                    <Icon name="leaf" />
+                  </span>
+                  <span>
+                    <Icon name="coin" />
+                  </span>
+                  <span>
+                    <Icon name="spark" />
+                  </span>
+                  <span>
+                    <Icon name="leaf" />
+                  </span>
                 </div>
               ) : null}
             </div>
@@ -1632,7 +2179,7 @@ export default function App() {
                     className={`upgrade-row ${item.id === "sweet_start" ? "upgrade-featured" : ""}`}
                     key={item.id}
                   >
-                    <i>{item.icon}</i>
+                    <i>{<Icon name={item.icon} />}</i>
                     <span className="upgrade-info">
                       <b>
                         {item.name}
@@ -1650,7 +2197,7 @@ export default function App() {
                       disabled={maxed || coins < cost}
                       onClick={() => buyUpgrade(item.id)}
                     >
-                      {maxed ? "已满级" : `🪙 ${cost}`}
+                      {maxed ? "已满级" : `${cost} 果币`}
                     </button>
                   </div>
                 );
@@ -1672,7 +2219,7 @@ export default function App() {
                 );
                 return (
                   <div className="supply-card" key={item.id}>
-                    <i>{item.icon}</i>
+                    <i>{<Icon name={item.icon} />}</i>
                     <span>
                       <b>{item.name}</b>
                       <small>{item.description}</small>
@@ -1685,7 +2232,7 @@ export default function App() {
                       disabled={maxed || coins < cost}
                       onClick={() => buyTool(item.id)}
                     >
-                      {maxed ? "已配满" : `🪙 ${cost}`}
+                      {maxed ? "已配满" : `${cost} 果币`}
                     </button>
                   </div>
                 );

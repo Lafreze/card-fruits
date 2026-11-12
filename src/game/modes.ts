@@ -1,4 +1,4 @@
-export type GameMode = "story" | "endless" | "expedition";
+export type GameMode = "story" | "endless" | "expedition" | "sprint" | "daily";
 
 export type RelicId =
   | "mini_orchard"
@@ -51,7 +51,7 @@ export type RelicDefinition = {
 export const RELICS: RelicDefinition[] = [
   {
     id: "mini_orchard",
-    icon: "🫧",
+    icon: "bubble",
     name: "迷你果园",
     description: "物理水果缩小 14%，果箱更耐装。",
     tone: "cyan",
@@ -60,7 +60,7 @@ export const RELICS: RelicDefinition[] = [
   },
   {
     id: "golden_touch",
-    icon: "✨",
+    icon: "spark",
     name: "黄金触感",
     description: "所有三消与合成得分提高 35%。",
     tone: "gold",
@@ -69,7 +69,7 @@ export const RELICS: RelicDefinition[] = [
   },
   {
     id: "deep_tray",
-    icon: "🧺",
+    icon: "basket",
     name: "深口果篮",
     description: "卡槽容量增加 1 格。",
     tone: "pink",
@@ -78,7 +78,7 @@ export const RELICS: RelicDefinition[] = [
   },
   {
     id: "slow_sugar",
-    icon: "⏳",
+    icon: "clock",
     name: "慢糖结界",
     description: "警戒线容错时间延长 1.2 秒。",
     tone: "cyan",
@@ -87,7 +87,7 @@ export const RELICS: RelicDefinition[] = [
   },
   {
     id: "tool_belt",
-    icon: "🎒",
+    icon: "bag",
     name: "园丁腰包",
     description: "已配置的洗牌、锤子、泡泡袋、分果每局各 +1 次。",
     tone: "gold",
@@ -96,7 +96,7 @@ export const RELICS: RelicDefinition[] = [
   },
   {
     id: "magnet_core",
-    icon: "🧲",
+    icon: "magnet",
     name: "引力果核",
     description: "同级水果吸引速度提高 55%。",
     tone: "pink",
@@ -105,7 +105,7 @@ export const RELICS: RelicDefinition[] = [
   },
   {
     id: "blast_juice",
-    icon: "💥",
+    icon: "burst",
     name: "爆浆配方",
     description: "炸弹卡出现率和爆炸范围提高。",
     tone: "gold",
@@ -114,7 +114,7 @@ export const RELICS: RelicDefinition[] = [
   },
   {
     id: "lucky_bloom",
-    icon: "🌸",
+    icon: "flower",
     name: "幸运花期",
     description: "每波开局额外生成一颗低阶水果。",
     tone: "pink",
@@ -123,7 +123,7 @@ export const RELICS: RelicDefinition[] = [
   },
   {
     id: "honey_glaze",
-    icon: "🍯",
+    icon: "honey",
     name: "蜜糖涂层",
     description: "每次三消额外获得 6 点狂热能量。",
     tone: "gold",
@@ -132,7 +132,7 @@ export const RELICS: RelicDefinition[] = [
   },
   {
     id: "combo_engine",
-    icon: "🎇",
+    icon: "spark",
     name: "连击引擎",
     description: "连击窗口从 2.3 秒延长到 3.4 秒。",
     tone: "pink",
@@ -141,7 +141,7 @@ export const RELICS: RelicDefinition[] = [
   },
   {
     id: "crystal_seed",
-    icon: "🔮",
+    icon: "gem",
     name: "水晶果核",
     description: "已配置的万能果、榨汁、催熟每局各 +1 次。",
     tone: "cyan",
@@ -150,7 +150,7 @@ export const RELICS: RelicDefinition[] = [
   },
   {
     id: "storm_stir",
-    icon: "💍",
+    icon: "ring",
     name: "共鸣指环",
     description: "弹射无冷却，落地冲击范围提高 25%。",
     tone: "cyan",
@@ -159,7 +159,7 @@ export const RELICS: RelicDefinition[] = [
   },
   {
     id: "frost_ward",
-    icon: "🌻",
+    icon: "sun",
     name: "向阳花田",
     description: "冰冻卡与藤蔓卡出现率减半。",
     tone: "gold",
@@ -168,7 +168,7 @@ export const RELICS: RelicDefinition[] = [
   },
   {
     id: "fever_bloom",
-    icon: "🌡️",
+    icon: "fire",
     name: "甜度沸腾",
     description: "狂热能量获取速度提高 40%。",
     tone: "pink",
@@ -177,7 +177,7 @@ export const RELICS: RelicDefinition[] = [
   },
   {
     id: "gold_rain",
-    icon: "🪙",
+    icon: "coin",
     name: "果币雨",
     description: "结算果币收益提高 25%。",
     tone: "gold",
@@ -186,7 +186,7 @@ export const RELICS: RelicDefinition[] = [
   },
   {
     id: "second_wind",
-    icon: "💫",
+    icon: "spark",
     name: "回魂果露",
     description: "每局一次：卡槽满时自动弹出两张卡。",
     tone: "cyan",
@@ -195,7 +195,7 @@ export const RELICS: RelicDefinition[] = [
   },
   {
     id: "harvest_gene",
-    icon: "🧬",
+    icon: "dna",
     name: "丰收基因",
     description: "每次三消额外生成 1 颗水果，满产时转为狂热能量。",
     tone: "gold",
@@ -204,7 +204,7 @@ export const RELICS: RelicDefinition[] = [
   },
   {
     id: "launch_coil",
-    icon: "🌀",
+    icon: "spiral",
     name: "回弹线圈",
     description: "点击水果的弹射强度提高 45%。",
     tone: "cyan",
@@ -213,7 +213,7 @@ export const RELICS: RelicDefinition[] = [
   },
   {
     id: "gravity_feather",
-    icon: "🪶",
+    icon: "feather",
     name: "低重力羽",
     description: "果箱重力降低 14%，更容易调整堆叠。",
     tone: "cyan",
@@ -222,7 +222,7 @@ export const RELICS: RelicDefinition[] = [
   },
   {
     id: "shock_core",
-    icon: "⚙️",
+    icon: "gear",
     name: "冲击果核",
     description: "落果冲击与同果牵引等级 +1。",
     tone: "pink",
@@ -231,7 +231,7 @@ export const RELICS: RelicDefinition[] = [
   },
   {
     id: "wild_graft",
-    icon: "💠",
+    icon: "gem",
     name: "异色嫁接",
     description: "功能牌出现率提高 10%，增益牌更常见。",
     tone: "pink",
@@ -240,7 +240,7 @@ export const RELICS: RelicDefinition[] = [
   },
   {
     id: "sugar_shell",
-    icon: "🛡️",
+    icon: "shield",
     name: "糖壳强化",
     description: "警戒容错再延长 0.8 秒。",
     tone: "gold",
@@ -249,7 +249,7 @@ export const RELICS: RelicDefinition[] = [
   },
   {
     id: "rainbow_sprout",
-    icon: "🌈",
+    icon: "rainbow",
     name: "彩虹萌芽",
     description: "每关前 2 次三消，落下的水果直接提高 1 阶。",
     tone: "pink",
@@ -258,7 +258,7 @@ export const RELICS: RelicDefinition[] = [
   },
   {
     id: "tool_carousel",
-    icon: "🎠",
+    icon: "carousel",
     name: "道具旋转木马",
     description: "每完成 4 次三消，轮流补充一种基础道具。",
     tone: "gold",
@@ -267,7 +267,7 @@ export const RELICS: RelicDefinition[] = [
   },
   {
     id: "confetti_core",
-    icon: "🎊",
+    icon: "burst",
     name: "彩纸果核",
     description: "每 3 次物理合成触发庆典，甜度 +12 并喷出彩纸。",
     tone: "pink",
@@ -276,7 +276,7 @@ export const RELICS: RelicDefinition[] = [
   },
   {
     id: "fruit_fountain",
-    icon: "⛲",
+    icon: "fountain",
     name: "水果喷泉",
     description: "每 4 次三消额外喷出一颗低 1 阶水果。",
     tone: "cyan",
@@ -285,7 +285,7 @@ export const RELICS: RelicDefinition[] = [
   },
   {
     id: "lucky_dice",
-    icon: "🎲",
+    icon: "dice",
     name: "幸运果骰",
     description: "每关开局摇出甜度、分数、道具或稀有果种奖励。",
     tone: "gold",
@@ -294,7 +294,7 @@ export const RELICS: RelicDefinition[] = [
   },
   {
     id: "royal_echo",
-    icon: "👑",
+    icon: "crown",
     name: "王冠回声",
     description: "每关第一次物理合成会返还一颗合成前水果。",
     tone: "gold",
@@ -303,7 +303,7 @@ export const RELICS: RelicDefinition[] = [
   },
   {
     id: "pinball_peel",
-    icon: "🪩",
+    icon: "ball",
     name: "弹珠果皮",
     description: "手动弹射更强，并随机向左右偏转，适合花式救球。",
     tone: "cyan",
@@ -312,7 +312,7 @@ export const RELICS: RelicDefinition[] = [
   },
   {
     id: "bubble_party",
-    icon: "🫧",
+    icon: "bubble",
     name: "泡泡派对",
     description: "每点击 6 张牌，自动收起卡槽里最孤立的一张。",
     tone: "pink",
@@ -321,7 +321,7 @@ export const RELICS: RelicDefinition[] = [
   },
   {
     id: "orchard_basket",
-    icon: "🧺",
+    icon: "basket",
     name: "穿层采摘篮",
     description: "每关获得 1 次采摘篮，直接采收牌堆中的一组三张同果卡。",
     tone: "gold",
@@ -330,7 +330,7 @@ export const RELICS: RelicDefinition[] = [
   },
   {
     id: "sugar_kettle",
-    icon: "🍯",
+    icon: "honey",
     name: "狂热糖锅",
     description: "每关获得 1 份甜度糖浆，可快速充能或延长狂热。",
     tone: "pink",
@@ -339,7 +339,7 @@ export const RELICS: RelicDefinition[] = [
   },
   {
     id: "triple_crown",
-    icon: "👑",
+    icon: "crown",
     name: "三消王冠",
     description: "每第 5 次三消，落下的主水果直接提高 1 阶。",
     tone: "gold",
@@ -348,7 +348,7 @@ export const RELICS: RelicDefinition[] = [
   },
   {
     id: "meteor_garden",
-    icon: "☄️",
+    icon: "meteor",
     name: "流星果园",
     description: "每第 4 次物理合成触发弹射风暴，并获得 10 点甜度。",
     tone: "cyan",
@@ -357,7 +357,7 @@ export const RELICS: RelicDefinition[] = [
   },
   {
     id: "choice_branch",
-    icon: "🌳",
+    icon: "tree",
     name: "选择枝杈",
     description: "之后每次过关的奇物选择从三选一增加为四选一。",
     tone: "cyan",
@@ -366,7 +366,7 @@ export const RELICS: RelicDefinition[] = [
   },
   {
     id: "fruit_pinata",
-    icon: "🪅",
+    icon: "gift",
     name: "水果彩罐",
     description: "每点击 10 张卡触发彩罐，获得分数、甜度与彩纸庆典。",
     tone: "pink",
@@ -379,20 +379,30 @@ export const MODE_INFO: Record<
   GameMode,
   { icon: string; name: string; tagline: string }
 > = {
+  sprint: {
+    icon: "clock",
+    name: "限时榨汁",
+    tagline: "120 秒冲分，清牌续波，挑战手速与策略",
+  },
+  daily: {
+    icon: "calendar",
+    name: "每日鲜摘",
+    tagline: "每天一副固定牌阵，统一困难难度与基础道具",
+  },
   story: {
-    icon: "🗺️",
+    icon: "map",
     name: "闯关模式",
     tagline: "47 关，逐关合成果王",
   },
   endless: {
-    icon: "∞",
+    icon: "infinity",
     name: "无尽模式",
     tagline: "一直玩，冲最高分",
   },
   expedition: {
-    icon: "🧭",
-    name: "Rogue 模式",
-    tagline: "过关选奇物，失败重来",
+    icon: "compass",
+    name: "果园远征",
+    tagline: "8 关冒险，36 件奇物自由构筑",
   },
 };
 
@@ -447,11 +457,11 @@ export type WaveMutator = {
 };
 
 export const MUTATORS: WaveMutator[] = [
-  { id: "calm", name: "风平浪静", icon: "🍃", description: "无额外规则" },
+  { id: "calm", name: "风平浪静", icon: "leaf", description: "无额外规则" },
   {
     id: "big",
     name: "大果日",
-    icon: "🎈",
+    icon: "bubble",
     description: "水果体积 +15% · 得分 +15%",
     radius: 1.15,
     score: 1.15,
@@ -459,7 +469,7 @@ export const MUTATORS: WaveMutator[] = [
   {
     id: "ice",
     name: "冰河期",
-    icon: "🧊",
+    icon: "ice",
     description: "冰冻牌增多 · 得分 +20%",
     frozen: true,
     score: 1.2,
@@ -467,7 +477,7 @@ export const MUTATORS: WaveMutator[] = [
   {
     id: "boom",
     name: "炸弹节",
-    icon: "🎆",
+    icon: "burst",
     description: "炸弹牌增多 · 得分 +10%",
     bomb: true,
     score: 1.1,
@@ -475,21 +485,21 @@ export const MUTATORS: WaveMutator[] = [
   {
     id: "gold",
     name: "黄金雨",
-    icon: "✨",
+    icon: "spark",
     description: "无额外风险 · 得分 +30%",
     score: 1.3,
   },
   {
     id: "storm",
     name: "磁暴",
-    icon: "🧲",
+    icon: "magnet",
     description: "同级磁吸 +50%",
     magnet: 1.5,
   },
   {
     id: "rush",
     name: "甜度激涌",
-    icon: "⚡",
+    icon: "bolt",
     description: "警戒时间 -0.5 秒 · 得分 +35%",
     danger: -0.5,
     score: 1.35,
@@ -497,7 +507,7 @@ export const MUTATORS: WaveMutator[] = [
   {
     id: "harvest",
     name: "丰收潮",
-    icon: "🌾",
+    icon: "wheat",
     description: "每次三消多掉 1 颗水果 · 得分 +8%",
     harvest: 1,
     score: 1.08,
@@ -505,7 +515,7 @@ export const MUTATORS: WaveMutator[] = [
   {
     id: "wide_tray",
     name: "宽篮节",
-    icon: "🧺",
+    icon: "basket",
     description: "卡槽容量 +1 · 得分 +12%",
     tray: 1,
     score: 1.12,
@@ -513,7 +523,7 @@ export const MUTATORS: WaveMutator[] = [
   {
     id: "pinball",
     name: "弹弹果园",
-    icon: "🎯",
+    icon: "compass",
     description: "低重力与强弹射 · 得分 +18%",
     gravity: 0.78,
     launch: 1.35,
@@ -553,7 +563,7 @@ export type UpgradeDefinition = {
 export const UPGRADES: UpgradeDefinition[] = [
   {
     id: "pack",
-    icon: "🧰",
+    icon: "bag",
     name: "补给工坊",
     maxLevel: 3,
     costs: [480, 1400, 3200],
@@ -561,7 +571,7 @@ export const UPGRADES: UpgradeDefinition[] = [
   },
   {
     id: "fever",
-    icon: "🍬",
+    icon: "candy",
     name: "甜度储备",
     maxLevel: 3,
     costs: [520, 1500, 3400],
@@ -570,7 +580,7 @@ export const UPGRADES: UpgradeDefinition[] = [
   },
   {
     id: "danger",
-    icon: "🛡️",
+    icon: "shield",
     name: "警戒缓冲",
     maxLevel: 3,
     costs: [460, 1320, 3000],
@@ -579,7 +589,7 @@ export const UPGRADES: UpgradeDefinition[] = [
   },
   {
     id: "magnet",
-    icon: "🧲",
+    icon: "magnet",
     name: "磁力温床",
     maxLevel: 3,
     costs: [600, 1700, 3800],
@@ -588,7 +598,7 @@ export const UPGRADES: UpgradeDefinition[] = [
   },
   {
     id: "score",
-    icon: "💎",
+    icon: "gem",
     name: "分数水晶",
     maxLevel: 3,
     costs: [720, 2100, 4600],
@@ -596,7 +606,7 @@ export const UPGRADES: UpgradeDefinition[] = [
   },
   {
     id: "combo",
-    icon: "🎀",
+    icon: "ring",
     name: "连击丝带",
     maxLevel: 3,
     costs: [620, 1800, 4000],
@@ -605,7 +615,7 @@ export const UPGRADES: UpgradeDefinition[] = [
   },
   {
     id: "sweet_start",
-    icon: "🌾",
+    icon: "wheat",
     name: "丰收培育",
     maxLevel: 2,
     costs: [850, 2800],
@@ -618,7 +628,7 @@ export const UPGRADES: UpgradeDefinition[] = [
   },
   {
     id: "coin",
-    icon: "💰",
+    icon: "coin",
     name: "果币磁铁",
     maxLevel: 3,
     costs: [680, 1900, 4300],
@@ -626,7 +636,7 @@ export const UPGRADES: UpgradeDefinition[] = [
   },
   {
     id: "sun",
-    icon: "🌀",
+    icon: "spiral",
     name: "弹射培育",
     maxLevel: 3,
     costs: [560, 1600, 3600],
@@ -635,7 +645,7 @@ export const UPGRADES: UpgradeDefinition[] = [
   },
   {
     id: "seed_start",
-    icon: "🪴",
+    icon: "sprout",
     name: "开局育苗床",
     maxLevel: 2,
     costs: [980, 3200],
@@ -644,7 +654,7 @@ export const UPGRADES: UpgradeDefinition[] = [
   },
   {
     id: "tray",
-    icon: "🧺",
+    icon: "basket",
     name: "宽口卡槽",
     maxLevel: 2,
     costs: [1450, 4600],
@@ -652,7 +662,7 @@ export const UPGRADES: UpgradeDefinition[] = [
   },
   {
     id: "relic_start",
-    icon: "🎁",
+    icon: "gift",
     name: "远征福袋",
     maxLevel: 1,
     costs: [5200],
@@ -691,7 +701,7 @@ export type ToolDefinition = {
 export const TOOLS: ToolDefinition[] = [
   {
     id: "shuffle",
-    icon: "🎲",
+    icon: "dice",
     name: "洗牌",
     maxLevel: 3,
     costs: [90, 240, 520],
@@ -699,7 +709,7 @@ export const TOOLS: ToolDefinition[] = [
   },
   {
     id: "undo",
-    icon: "🕰️",
+    icon: "clock",
     name: "撤回",
     maxLevel: 2,
     costs: [120, 360],
@@ -707,7 +717,7 @@ export const TOOLS: ToolDefinition[] = [
   },
   {
     id: "hammer",
-    icon: "🔨",
+    icon: "hammer",
     name: "清顶锤",
     maxLevel: 2,
     costs: [150, 420],
@@ -715,7 +725,7 @@ export const TOOLS: ToolDefinition[] = [
   },
   {
     id: "juice",
-    icon: "🥤",
+    icon: "juice",
     name: "榨汁",
     maxLevel: 2,
     costs: [180, 480],
@@ -723,7 +733,7 @@ export const TOOLS: ToolDefinition[] = [
   },
   {
     id: "bubble",
-    icon: "🫧",
+    icon: "bubble",
     name: "泡泡袋",
     maxLevel: 2,
     costs: [220, 600],
@@ -731,7 +741,7 @@ export const TOOLS: ToolDefinition[] = [
   },
   {
     id: "bomb",
-    icon: "💣",
+    icon: "bomb",
     name: "果箱炸弹",
     maxLevel: 2,
     costs: [260, 760],
@@ -739,7 +749,7 @@ export const TOOLS: ToolDefinition[] = [
   },
   {
     id: "shield",
-    icon: "🧊",
+    icon: "ice",
     name: "冰冻喷雾",
     maxLevel: 2,
     costs: [240, 660],
@@ -747,7 +757,7 @@ export const TOOLS: ToolDefinition[] = [
   },
   {
     id: "magnet",
-    icon: "🧲",
+    icon: "magnet",
     name: "强磁合并",
     maxLevel: 2,
     costs: [260, 700],
@@ -755,7 +765,7 @@ export const TOOLS: ToolDefinition[] = [
   },
   {
     id: "sun",
-    icon: "☀️",
+    icon: "sun",
     name: "阳光净化",
     maxLevel: 2,
     costs: [260, 720],
@@ -763,7 +773,7 @@ export const TOOLS: ToolDefinition[] = [
   },
   {
     id: "split",
-    icon: "✂️",
+    icon: "scissors",
     name: "分果剪",
     maxLevel: 2,
     costs: [280, 760],
@@ -771,7 +781,7 @@ export const TOOLS: ToolDefinition[] = [
   },
   {
     id: "ripen",
-    icon: "🌱",
+    icon: "sprout",
     name: "催熟露",
     maxLevel: 2,
     costs: [300, 820],
@@ -779,7 +789,7 @@ export const TOOLS: ToolDefinition[] = [
   },
   {
     id: "wild",
-    icon: "🍀",
+    icon: "flower",
     name: "万能果",
     maxLevel: 2,
     costs: [320, 900],
@@ -787,7 +797,7 @@ export const TOOLS: ToolDefinition[] = [
   },
   {
     id: "quake",
-    icon: "⚙️",
+    icon: "gear",
     name: "果箱搅拌机",
     maxLevel: 2,
     costs: [360, 980],
@@ -795,7 +805,7 @@ export const TOOLS: ToolDefinition[] = [
   },
   {
     id: "harvest",
-    icon: "🌾",
+    icon: "wheat",
     name: "丰收剂",
     maxLevel: 2,
     costs: [420, 1200],
@@ -803,7 +813,7 @@ export const TOOLS: ToolDefinition[] = [
   },
   {
     id: "basket",
-    icon: "🧺",
+    icon: "basket",
     name: "穿层采摘篮",
     maxLevel: 2,
     costs: [520, 1480],
@@ -811,7 +821,7 @@ export const TOOLS: ToolDefinition[] = [
   },
   {
     id: "syrup",
-    icon: "🍯",
+    icon: "honey",
     name: "甜度糖浆",
     maxLevel: 2,
     costs: [460, 1320],

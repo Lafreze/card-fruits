@@ -537,15 +537,13 @@ test("fruit scale and roguelike catalog stay balanced", () => {
     }
   });
   assert.ok(FRUITS.at(-1)!.radius / FRUITS[0].radius <= 5.2);
-  assert.equal(FRUITS.find((fruit) => fruit.name === "香蕉")?.emoji, "");
   assert.equal(
     FRUITS.find((fruit) => fruit.name === "香蕉")?.icon,
-    "/fruits/banana-bunch.webp",
+    "/art/fruit-15.svg",
   );
-  assert.equal(FRUITS.find((fruit) => fruit.name === "西瓜")?.emoji, "");
   assert.equal(
     FRUITS.find((fruit) => fruit.name === "西瓜")?.icon,
-    "/fruits/watermelon-whole.webp",
+    "/art/fruit-21.svg",
   );
   [
     "石榴",
@@ -619,8 +617,10 @@ test("fruit scale and roguelike catalog stay balanced", () => {
     ),
   );
   assert.deepEqual(Object.keys(MODE_INFO).sort(), [
+    "daily",
     "endless",
     "expedition",
+    "sprint",
     "story",
   ]);
   assert.equal(new Set(pickRelics([], 3).map((relic) => relic.id)).size, 3);

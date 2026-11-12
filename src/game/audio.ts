@@ -1,3 +1,5 @@
+import { storage } from "../storage";
+let muted = storage.getItem("fruit-king-muted") === "true";
 let context: AudioContext | null = null;
 let master: GainNode | null = null;
 let sharedNoise: AudioBuffer | null = null;
@@ -12,7 +14,7 @@ function getContext() {
     compressor.attack.value = 0.004;
     compressor.release.value = 0.16;
     master = context.createGain();
-    master.gain.value = 0.78;
+    master.gain.value = muted ? 0 : 0.78;
     master.connect(compressor).connect(context.destination);
   }
   if (context.state === "suspended") void context.resume();
@@ -173,6 +175,11 @@ function softImpact(strength: number, delay = 0) {
 }
 
 export const sounds = {
+  setMuted: (value: boolean) => {
+    muted = value;
+    storage.setItem("fruit-king-muted", String(value));
+    if (master) master.gain.value = value ? 0 : 0.78;
+  },
   prepare: () => {
     try {
       const ctx = getContext();

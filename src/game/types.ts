@@ -1,3 +1,4 @@
+import type { Difficulty } from "./challenges";
 import type { GameMode, RelicId, ToolId } from "./modes";
 
 export type GameStatus = "playing" | "won" | "lost";
@@ -36,6 +37,9 @@ export type GameSnapshot = {
   mutator: string;
   mutatorHint: string;
   dropLane: -1 | 0 | 1;
+  difficulty: Difficulty;
+  timeLeft: number | null;
+  challengeKey: string;
 };
 
 export type GameResult = GameSnapshot & {
@@ -64,6 +68,9 @@ export type GameUpgrades = {
 };
 
 export type GameOptions = {
+  difficulty?: Difficulty;
+  seed?: string;
+  challengeKey?: string;
   level: number;
   mode: GameMode;
   wave?: number;

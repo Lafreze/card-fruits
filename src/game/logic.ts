@@ -542,7 +542,7 @@ export function calculateCoinReward({
   goldRain = false,
 }: {
   score: number;
-  mode: "story" | "endless" | "expedition";
+  mode: "story" | "endless" | "expedition" | "sprint" | "daily";
   wave: number;
   won: boolean;
   coinLevel?: number;
@@ -578,7 +578,7 @@ export function challengeScoreMultiplier({
   level,
   wave = 1,
 }: {
-  mode: "story" | "endless" | "expedition";
+  mode: "story" | "endless" | "expedition" | "sprint" | "daily";
   level: number;
   wave?: number;
 }) {
@@ -597,7 +597,7 @@ export function cardMatchScore({
 }: {
   tier: number;
   combo: number;
-  mode: "story" | "endless" | "expedition";
+  mode: "story" | "endless" | "expedition" | "sprint" | "daily";
   level: number;
   wave?: number;
 }) {
@@ -619,7 +619,7 @@ export function fruitMergeScore({
 }: {
   tier: number;
   combo: number;
-  mode: "story" | "endless" | "expedition";
+  mode: "story" | "endless" | "expedition" | "sprint" | "daily";
   level: number;
   wave?: number;
 }) {
@@ -643,7 +643,7 @@ export function completionScoreBonus({
   maxFruitTier,
 }: {
   level: number;
-  mode: "story" | "endless" | "expedition";
+  mode: "story" | "endless" | "expedition" | "sprint" | "daily";
   wave: number;
   remainingCards: number;
   openTraySlots: number;
