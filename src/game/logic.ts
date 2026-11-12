@@ -490,7 +490,7 @@ export function rainPreviewScale(progress: number, usesImage: boolean) {
 }
 
 export function fruitVisualDiameter(radius: number, usesImage: boolean) {
-  return Math.max(18, radius * (usesImage ? 1.58 : 1.72));
+  return Math.max(20, radius * (usesImage ? 1.82 : 1.72));
 }
 
 export function storyHarvestComplete({

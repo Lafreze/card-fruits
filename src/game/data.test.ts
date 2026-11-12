@@ -244,7 +244,7 @@ test("every generated stack contains a verified low-risk clear route", () => {
               Math.abs(first.y - second.y) >= CARD_HEIGHT + 2.5,
             `第 ${levelIndex + 1} 关同层卡片不应互相遮挡`,
           );
-      }
+        }
       const active = new Set(slots.map((_, index) => index));
       const initiallyCovered = slots.filter((_, slotIndex) =>
         slotIsCovered(slotIndex, slots, active),
@@ -328,7 +328,11 @@ test("fusion reveal stays gentle and story harvest can finish by clear or full t
       rainPreviewScale(index / 100, true),
     ).every((scale) => scale === 1),
   );
-  assert.ok(fruitVisualDiameter(40, true) < fruitVisualDiameter(40, false));
+  assert.ok(fruitVisualDiameter(40, true) > 40 * 1.58);
+  assert.ok(
+    fruitVisualDiameter(40, true) < 40 * 2,
+    "放大的图案仍位于物理碰撞圆内",
+  );
 
   assert.equal(
     storyHarvestComplete({
@@ -582,7 +586,7 @@ test("fruit scale and roguelike catalog stay balanced", () => {
   assert.equal(MUTATORS.length, 10);
   assert.ok(MUTATORS.every((mutator) => mutator.description.length > 0));
   assert.equal(UPGRADES.length, 12);
-  assert.equal(TOOLS.length, 16);
+  assert.equal(TOOLS.length, 18);
   assert.equal(new Set(TOOLS.map((tool) => tool.id)).size, TOOLS.length);
   assert.ok(
     TOOLS.every(

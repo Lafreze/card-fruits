@@ -46,11 +46,11 @@ test("daily challenge uses the same UTC date and deal across devices, changes ne
   }
   assert.deepEqual(deal(), deal());
 });
-test("four difficulties trade capacity and grace period for score", () => {
+test("five difficulties trade capacity and grace period for score", () => {
   const rules = Object.values(DIFFICULTIES);
   assert.deepEqual(
     rules.map((r) => r.slots),
-    [8, 7, 6, 5],
+    [8, 7, 6, 5, 4],
   );
   for (let i = 1; i < rules.length; i++) {
     assert.ok(rules[i].score > rules[i - 1].score);
@@ -71,8 +71,14 @@ test("all 50 fruits have distinct WebP artwork with matching cache fingerprints"
     const content = readFileSync(file);
     assert.equal(content.toString("ascii", 0, 4), "RIFF");
     assert.equal(content.toString("ascii", 8, 12), "WEBP");
-    const digest = createHash("sha256").update(content).digest("hex").slice(0, 12);
-    assert.ok(f.icon.endsWith(`.${digest}.webp`), `${f.name}: stale artwork URL`);
+    const digest = createHash("sha256")
+      .update(content)
+      .digest("hex")
+      .slice(0, 12);
+    assert.ok(
+      f.icon.endsWith(`.${digest}.webp`),
+      `${f.name}: stale artwork URL`,
+    );
     assert.ok(content.length < 150_000, `${f.name}: oversized card artwork`);
   });
 });

@@ -686,7 +686,9 @@ export type ToolId =
   | "harvest"
   | "quake"
   | "basket"
-  | "syrup";
+  | "syrup"
+  | "insight"
+  | "vortex";
 
 export type ToolDefinition = {
   id: ToolId;
@@ -699,6 +701,22 @@ export type ToolDefinition = {
 
 // 道具购买的是“每局可用次数”，不是一次性消耗品；玩家用果币构筑自己的补给方案。
 export const TOOLS: ToolDefinition[] = [
+  {
+    id: "insight",
+    icon: "compass",
+    name: "透视镜",
+    maxLevel: 2,
+    costs: [240, 680],
+    description: "标出最易凑齐的一组同果卡，持续 8 秒",
+  },
+  {
+    id: "vortex",
+    icon: "spiral",
+    name: "聚果场",
+    maxLevel: 2,
+    costs: [320, 880],
+    description: "全部同果吸引 ×2.6，持续 10 秒",
+  },
   {
     id: "shuffle",
     icon: "dice",

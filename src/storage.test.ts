@@ -87,3 +87,28 @@ test("blocked browser storage falls back to the session and remains exportable",
   assert.equal(JSON.parse(exportSave()).data["fruit-king-coins"], "789");
   globalThis.localStorage.setItem = original;
 });
+
+test("extreme records and new skill upgrades survive save export and import", async () => {
+  const { runId } = startRun("story", 3, "extreme");
+  await saveScore({
+    runId,
+    username: "极限园丁",
+    score: 1400,
+    maxCombo: 5,
+    fruitTier: 6,
+  });
+  storage.setItem(
+    "fruit-king-tools",
+    JSON.stringify({ insight: 2, vortex: 1 }),
+  );
+  const backup = exportSave();
+  importSave(backup);
+  assert.equal(
+    (await getLeaderboard("story", "extreme")).scores[0].score,
+    1400,
+  );
+  assert.deepEqual(JSON.parse(storage.getItem("fruit-king-tools")!), {
+    insight: 2,
+    vortex: 1,
+  });
+});

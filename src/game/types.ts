@@ -1,3 +1,4 @@
+import type { WeatherSnapshot } from "./events";
 import type { Difficulty } from "./challenges";
 import type { GameMode, RelicId, ToolId } from "./modes";
 
@@ -29,6 +30,11 @@ export type GameSnapshot = {
   quakeLeft: number;
   basketLeft: number;
   syrupLeft: number;
+  insightLeft: number;
+  vortexLeft: number;
+  insightSeconds: number;
+  vortexSeconds: number;
+  weather: WeatherSnapshot;
   wave: number;
   mode: GameMode;
   relics: RelicId[];
@@ -51,7 +57,6 @@ export type GameCallbacks = {
   onSnapshot: (snapshot: GameSnapshot) => void;
   onFinish: (result: GameResult) => void;
   onToast: (message: string, tone?: "gold" | "pink" | "cyan") => void;
-  onDropLaneChange?: () => void;
 };
 
 export type GameUpgrades = {
@@ -96,6 +101,8 @@ export type GameControls = {
   quake: () => void;
   basket: () => void;
   syrup: () => void;
+  insight: () => void;
+  vortex: () => void;
   setDropLane: (lane: -1 | 0 | 1) => void;
   pause: () => void;
   resume: () => void;

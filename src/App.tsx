@@ -37,7 +37,6 @@ import type {
 
 type Screen = "home" | "game";
 type GamePanel = "tools" | "help" | "menu" | null;
-type TutorialStep = "pick" | "tray" | "lane" | null;
 type ToastState = {
   id: number;
   message: string;
@@ -70,6 +69,11 @@ const EMPTY_SNAPSHOT: GameSnapshot = {
   quakeLeft: 1,
   basketLeft: 0,
   syrupLeft: 0,
+  insightLeft: 1,
+  vortexLeft: 1,
+  insightSeconds: 0,
+  vortexSeconds: 0,
+  weather: null,
   wave: 1,
   mode: "story",
   relics: [],
@@ -86,10 +90,19 @@ const EMPTY_SNAPSHOT: GameSnapshot = {
 const GREENHOUSE_PLANTS = ["sprout", "leaf", "flower", "basket"];
 const MODE_UNLOCK_LEVEL: Partial<Record<GameMode, number>> = {};
 const DAILY_UPGRADES: GameUpgrades = {};
-const TUTORIAL_KEY = "fruit-king-tutorial-v2";
 const STARTER_GIFT_KEY = "fruit-king-starter-gift-v1";
-const CARD_BASE_TOOL_IDS = new Set<ToolId>(["shuffle", "hammer", "sun"]);
-const FRUIT_BASE_TOOL_IDS = new Set<ToolId>(["bomb", "shield", "quake"]);
+const CARD_BASE_TOOL_IDS = new Set<ToolId>([
+  "shuffle",
+  "hammer",
+  "sun",
+  "insight",
+]);
+const FRUIT_BASE_TOOL_IDS = new Set<ToolId>([
+  "bomb",
+  "shield",
+  "quake",
+  "vortex",
+]);
 const BASE_TOOL_IDS = new Set<ToolId>([
   ...CARD_BASE_TOOL_IDS,
   ...FRUIT_BASE_TOOL_IDS,
@@ -217,7 +230,6 @@ function GameCanvas({
   onSnapshot,
   onFinish,
   onToast,
-  onDropLaneChange,
 }: {
   level: number;
   difficulty: Difficulty;
@@ -233,7 +245,6 @@ function GameCanvas({
   onSnapshot: (snapshot: GameSnapshot) => void;
   onFinish: (result: GameResult) => void;
   onToast: (message: string, tone?: "gold" | "pink" | "cyan") => void;
-  onDropLaneChange: () => void;
 }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
@@ -256,7 +267,7 @@ function GameCanvas({
             challengeKey,
             seed,
           },
-          { onSnapshot, onFinish, onToast, onDropLaneChange },
+          { onSnapshot, onFinish, onToast },
         ),
       )
       .then((created) => {
@@ -285,7 +296,6 @@ function GameCanvas({
     onReady,
     onSnapshot,
     onToast,
-    onDropLaneChange,
     relics,
     session,
     upgrades,
@@ -297,7 +307,7 @@ function GameCanvas({
       key={`${mode}-${level}-${wave}-${session}`}
       ref={canvasRef}
       className="game-canvas"
-      aria-label="叠个果王游戏画面"
+      aria-label="水果叠叠乐游戏画面"
     />
   );
 }
@@ -464,7 +474,6 @@ export default function App() {
   const [lastCoinReward, setLastCoinReward] = useState(0);
   const [lastCoinStarterGift, setLastCoinStarterGift] = useState(false);
   const [gamePanel, setGamePanel] = useState<GamePanel>(null);
-  const [tutorialStep, setTutorialStep] = useState<TutorialStep>(null);
   const controlsRef = useRef<GameControls | null>(null);
   const toastTimer = useRef<number | null>(null);
   const levelTrackRef = useRef<HTMLDivElement | null>(null);
@@ -545,24 +554,6 @@ export default function App() {
   }, []);
   const handleSnapshot = useCallback((next: GameSnapshot) => {
     setSnapshot(next);
-    setTutorialStep((current) => {
-      if (current === "pick" && next.trayCount > 0) return "tray";
-      if (current === "tray" && next.score > 0) return "lane";
-      return current;
-    });
-  }, []);
-
-  const finishTutorial = useCallback(() => {
-    storage.setItem(TUTORIAL_KEY, "done");
-    setTutorialStep(null);
-  }, []);
-
-  const handleDropLaneChange = useCallback(() => {
-    setTutorialStep((current) => {
-      if (current !== "lane") return current;
-      storage.setItem(TUTORIAL_KEY, "done");
-      return null;
-    });
   }, []);
   const handleFinish = useCallback(
     (next: GameResult) => {
@@ -658,13 +649,6 @@ export default function App() {
       setRunId(null);
       setGamePanel(null);
       setLastCoinStarterGift(false);
-      setTutorialStep(
-        targetMode === "story" &&
-          targetLevel === 0 &&
-          storage.getItem(TUTORIAL_KEY) !== "done"
-          ? "pick"
-          : null,
-      );
       setScreen("game");
       setSession((value) => value + 1);
       const day = targetMode === "daily" ? dailyChallenge() : challenge;
@@ -710,7 +694,6 @@ export default function App() {
     controlsRef.current?.destroy();
     controlsRef.current = null;
     setGamePanel(null);
-    setTutorialStep(null);
     setResult(null);
     setScreen("home");
   };
@@ -953,6 +936,22 @@ export default function App() {
     rewardOptions.length > 0;
   const toolboxItems = [
     {
+      id: "insight",
+      icon: "compass",
+      label: "透视镜",
+      description: "标记同果 · 8 秒",
+      category: "card",
+      left: snapshot.insightLeft,
+    },
+    {
+      id: "vortex",
+      icon: "spiral",
+      label: "聚果场",
+      description: "磁力 ×2.6 · 10 秒",
+      category: "fruit",
+      left: snapshot.vortexLeft,
+    },
+    {
       id: "undo",
       icon: "clock",
       label: "撤回",
@@ -1115,7 +1114,7 @@ export default function App() {
       else controls[id]();
     });
   return (
-    <main className="app-shell">
+    <main className={`app-shell ${screen === "game" ? "is-playing" : ""}`}>
       <div className="noise" />
       {!storage.persistent ? (
         <div className="storage-warning" role="status">
@@ -1125,14 +1124,14 @@ export default function App() {
       {screen === "home" ? (
         <section className="home-screen">
           <nav className="home-nav" aria-label="果园导航">
-            <a className="wordmark" href="#" aria-label="叠个果王首页">
+            <a className="wordmark" href="#" aria-label="水果叠叠乐首页">
               <Icon name="sprout" />
               <span>
-                叠个果王<small>THE ORCHARD CLUB</small>
+                水果叠叠乐<small>FRUIT STACK</small>
               </span>
             </a>
             <div className="nav-actions">
-              <button onClick={() => setArchiveOpen(true)}>
+              <button aria-label="我的存档" onClick={() => setArchiveOpen(true)}>
                 <Icon name="bag" />
                 <span>我的存档</span>
               </button>
@@ -1146,35 +1145,18 @@ export default function App() {
           <div className="home-content">
             <div className="orchard-intro">
               <div className="season-label">
-                <span /> 新鲜开园 · 随时来一局
+                <span /> FRESH & PLAYFUL
               </div>
               <h1>
-                把小小的快乐，
-                <br />
-                叠成一颗<span>果王。</span>
+                水果<span>叠叠乐</span>
               </h1>
-              <p className="tagline">
-                三张卡片，一场丰收。
-                <br />
-                在这片小果园，让每一次碰撞都有好事发生。
-              </p>
-              <button
-                className="mobile-quick-start button button-primary"
-                onClick={startSelectedMode}
-              >
-                快速开局 <Icon name="arrow" />
-              </button>
+              <p className="tagline">叠三张，合一果。</p>
               <div
                 className="hero-illustration"
                 aria-label="手绘水果、卡片与丰收果篮"
               >
                 <div className="art-orbit orbit-one" />
                 <div className="art-orbit orbit-two" />
-                <span className="art-note">
-                  FRESHLY PICKED
-                  <br />
-                  <b>100% 快乐配方</b>
-                </span>
                 <div className="hero-card card-one">
                   <span>01</span>
                   <FruitIcon fruit={FRUITS[4]} decorative />
@@ -1198,31 +1180,28 @@ export default function App() {
                   <FruitIcon fruit={FRUITS[49]} decorative />
                 </div>
                 <div className="harvest-bowl">
-                  <span>ORCHARD CLUB</span>
-                  <i>今日宜丰收</i>
+                  <Icon name="leaf" />
                 </div>
                 <Icon className="art-spark spark-one" name="spark" />
                 <Icon className="art-spark spark-two" name="spark" />
                 <Icon className="art-leaf" name="leaf" />
-                <span className="art-caption">PICK THREE. MAKE MAGIC.</span>
               </div>
               <div className="intro-bottom">
                 <span>
-                  <b>50</b> 种手绘水果
+                  <b>50</b> 种卡通水果
                 </span>
                 <span>
-                  <b>47</b> 个闯关关卡
+                  <b>47</b> 个关卡
                 </span>
                 <span>
-                  <b>5</b> 种快乐玩法
+                  <b>5</b> 种玩法
                 </span>
               </div>
             </div>
             <section className="start-panel" aria-label="开始游戏">
               <div className="panel-heading">
                 <div>
-                  <span className="eyebrow">YOUR NEXT HARVEST</span>
-                  <h2>今天，怎么玩？</h2>
+                  <h2>选一局</h2>
                 </div>
                 <Icon name="sun" />
               </div>
@@ -1235,7 +1214,7 @@ export default function App() {
                     "sprint",
                     "daily",
                   ] as GameMode[]
-                ).map((item, index) => (
+                ).map((item) => (
                   <button
                     key={item}
                     className={mode === item ? "active" : ""}
@@ -1247,9 +1226,18 @@ export default function App() {
                     </i>
                     <span>
                       <strong>{MODE_INFO[item].name}</strong>
-                      <small>{MODE_INFO[item].tagline}</small>
+                      <small>
+                        {
+                          {
+                            story: "47 关",
+                            endless: "不限时",
+                            expedition: "8 关远征",
+                            sprint: "120 秒",
+                            daily: "每日更新",
+                          }[item]
+                        }
+                      </small>
                     </span>
-                    {index > 2 ? <em>NEW</em> : null}
                     <b className="mode-radio" />
                   </button>
                 ))}
@@ -1258,9 +1246,7 @@ export default function App() {
                 <div className="section-line">
                   <b>{mode === "daily" ? "今日统一规则" : "选择难度"}</b>
                   <small>
-                    {mode === "daily"
-                      ? `${dailyChallenge().key} · UTC`
-                      : "高手也有新挑战"}
+                    {mode === "daily" ? `${dailyChallenge().key} · UTC` : ""}
                   </small>
                 </div>
                 <div className="difficulty-switch" aria-label="选择难度">
@@ -1284,7 +1270,7 @@ export default function App() {
                 </div>
                 <p>
                   {mode === "daily"
-                    ? "固定牌阵 · 基础道具 · 不计温室加成 · 每日可重试"
+                    ? "固定牌阵 · 困难"
                     : DIFFICULTIES[difficulty].hint}
                 </p>
               </div>
@@ -1317,7 +1303,7 @@ export default function App() {
                       <small>
                         第 {level + 1} 关 · {LEVELS[level].name}
                       </small>
-                      <strong>合成{target.name}，收好这一篮</strong>
+                      <strong>合成{target.name}</strong>
                     </span>
                   </div>
                 </div>
@@ -1326,12 +1312,12 @@ export default function App() {
                   <Icon name={MODE_INFO[mode].icon} />
                   <span>
                     {mode === "daily"
-                      ? `今日目标：${target.name} · 每个人从同一副牌开始`
+                      ? `今日目标：${target.name}`
                       : mode === "sprint"
-                        ? "两分钟倒计时，清空卡牌继续下一波。"
+                        ? "120 秒 · 清牌续波"
                         : mode === "expedition"
-                          ? "每过一关选择奇物，打造专属合成流派。"
-                          : "没有终点，波次变异让每一篮都充满惊喜。"}
+                          ? "8 关 · 奇物三选一"
+                          : "无限波次 · 随机变异"}
                   </span>
                 </div>
               )}
@@ -1346,9 +1332,6 @@ export default function App() {
                 </span>
                 <Icon name="arrow" />
               </button>
-              <div className="panel-footnote">
-                <span /> 成绩自动保存 · 不用登录
-              </div>
             </section>
           </div>
           <div className="orchard-shelf">
@@ -1359,7 +1342,6 @@ export default function App() {
               <Icon name="book" />
               <span>
                 <b>水果图鉴</b>
-                <small>认识你的 50 位新朋友</small>
               </span>
               <span className="shelf-arrow">↗</span>
             </button>
@@ -1367,7 +1349,6 @@ export default function App() {
               <Icon name="trophy" />
               <span>
                 <b>我的收成</b>
-                <small>每一次进步，都值得记住</small>
               </span>
               <span className="shelf-arrow">↗</span>
             </button>
@@ -1375,37 +1356,17 @@ export default function App() {
               <Icon name="home" />
               <span>
                 <b>果园温室</b>
-                <small>培育成长，解锁更多道具</small>
               </span>
               <span className="shelf-arrow">↗</span>
             </button>
           </div>
-          <div className="how-it-works">
-            <span>快乐很简单</span>
-            <p>
-              <b>01</b> 点亮牌，凑三个
-            </p>
-            <i>→</i>
-            <p>
-              <b>02</b> 选落点，接水果
-            </p>
-            <i>→</i>
-            <p>
-              <b>03</b> 同果碰撞，变大果
-            </p>
-          </div>
-          <footer className="home-footer">
-            <span>叠个果王 · 小小果园，大大满足</span>
-            <span>HAND-DRAWN WITH A LITTLE SUNSHINE</span>
-          </footer>
         </section>
       ) : (
         <section className="play-layout">
           <aside className="desktop-brief">
             <button className="brand-button" onClick={backHome}>
-              叠个<span>果王</span>
+              水果<span>叠叠乐</span>
             </button>
-            <p>三张消除，自选落点。</p>
             <div className="brief-chain">
               {FRUITS.slice(
                 Math.max(0, LEVELS[level].target - 3),
@@ -1421,542 +1382,611 @@ export default function App() {
               <Icon name="trophy" /> 查看排行榜
             </button>
           </aside>
-          <div
-            className="game-phone"
-            onPointerDown={() => {
-              if (toast) dismissToast();
-            }}
-          >
-            <GameCanvas
-              level={level}
-              mode={mode}
-              difficulty={mode === "daily" ? "expert" : difficulty}
-              challengeKey={mode === "daily" ? challenge.key : ""}
-              seed={mode === "daily" ? challenge.seed : undefined}
-              wave={wave}
-              relics={relics}
-              startingScore={carryScore}
-              upgrades={
-                mode === "daily" ? DAILY_UPGRADES : gameUpgrades.current
-              }
-              session={session}
-              onReady={handleReady}
-              onSnapshot={handleSnapshot}
-              onFinish={handleFinish}
-              onToast={handleToast}
-              onDropLaneChange={handleDropLaneChange}
-            />
-            <header className="game-hud">
-              <div className="score-chip">
-                <small>分数</small>
-                <b>{formatScore(snapshot.score)}</b>
-              </div>
-              <div className="target-chip">
-                <small>
-                  {mode === "endless"
-                    ? "最高水果"
-                    : mode === "expedition"
-                      ? `远征 ${wave}/8`
-                      : mode !== "sprint" &&
-                          snapshot.maxFruitTier >= LEVELS[level].target
-                        ? "目标达成 · 清牌或满槽过关"
-                        : `剩余 ${snapshot.remainingCards} 张 · 槽 ${snapshot.trayCount}/${snapshot.trayLimit}`}
-                </small>
-                <strong>
-                  {mode === "sprint" ? (
-                    <span
-                      className={`clock-remaining ${(snapshot.timeLeft ?? 120) <= 20 ? "urgent" : ""}`}
-                      aria-label={`剩余 ${snapshot.timeLeft ?? 120} 秒`}
-                    >
-                      <Icon name="clock" /> {snapshot.timeLeft ?? 120}
-                      <small>秒</small>
-                    </span>
-                  ) : mode === "endless" ? (
-                    <>
-                      <FruitIcon fruit={currentFruit} decorative />{" "}
-                      {currentFruit.name}
-                    </>
-                  ) : currentFruit !== target ? (
-                    <>
-                      <FruitIcon fruit={currentFruit} decorative />
-                      <i className="fruit-path-arrow">→</i>
-                      <FruitIcon fruit={target} decorative />
-                    </>
-                  ) : (
-                    <>
-                      <FruitIcon fruit={target} decorative /> ×1
-                    </>
-                  )}
-                </strong>
-              </div>
-              <button
-                className="top-action tool-action"
-                onClick={() => openGamePanel("tools")}
-                aria-label={`打开道具栏，${availableToolboxItems.length} 种可用`}
-              >
-                <i>
-                  <Icon name="bag" />
-                  <em>{availableToolboxItems.length}</em>
-                </i>
-                <span>道具</span>
-              </button>
-              <button
-                className="top-action"
-                onClick={() => openGamePanel("menu")}
-                aria-label="打开游戏菜单"
-              >
-                <i>
-                  <Icon name="gear" />
-                </i>
-                <span>菜单</span>
-              </button>
-            </header>
+          <div className="play-board">
             <div
-              className={`challenge-status ${snapshot.timeLeft !== null && snapshot.timeLeft <= 20 ? "urgent" : ""}`}
+              className="game-phone"
+              onPointerDown={() => {
+                if (toast) dismissToast();
+              }}
             >
-              <span>
-                {DIFFICULTIES[mode === "daily" ? "expert" : difficulty].name} ·{" "}
-                {MODE_INFO[mode].name}
-              </span>
-              <b>
-                {mode === "sprint"
-                  ? `${snapshot.timeLeft ?? 120}s`
-                  : mode === "daily"
-                    ? challenge.key
-                    : `第 ${mode === "endless" ? snapshot.wave : level + 1} ${mode === "endless" ? "波" : "关"}`}
-              </b>
-            </div>
-            <div className="drop-lane-control" aria-label="选择下次落果位置">
-              <span>下次落点</span>
-              {([-1, 0, 1] as const).map((lane) => (
+              <GameCanvas
+                level={level}
+                mode={mode}
+                difficulty={mode === "daily" ? "expert" : difficulty}
+                challengeKey={mode === "daily" ? challenge.key : ""}
+                seed={mode === "daily" ? challenge.seed : undefined}
+                wave={wave}
+                relics={relics}
+                startingScore={carryScore}
+                upgrades={
+                  mode === "daily" ? DAILY_UPGRADES : gameUpgrades.current
+                }
+                session={session}
+                onReady={handleReady}
+                onSnapshot={handleSnapshot}
+                onFinish={handleFinish}
+                onToast={handleToast}
+              />
+              <header className="game-hud">
+                <div className="score-chip">
+                  <small>分数</small>
+                  <b>{formatScore(snapshot.score)}</b>
+                </div>
+                <div className="target-chip">
+                  <small>
+                    {mode === "endless"
+                      ? "最高水果"
+                      : mode === "expedition"
+                        ? `远征 ${wave}/8`
+                        : mode !== "sprint" &&
+                            snapshot.maxFruitTier >= LEVELS[level].target
+                          ? "目标达成"
+                          : `${snapshot.remainingCards} 张 · ${snapshot.trayCount}/${snapshot.trayLimit} 格`}
+                  </small>
+                  <strong>
+                    {mode === "sprint" ? (
+                      <span
+                        className={`clock-remaining ${(snapshot.timeLeft ?? 120) <= 20 ? "urgent" : ""}`}
+                        aria-label={`剩余 ${snapshot.timeLeft ?? 120} 秒`}
+                      >
+                        <Icon name="clock" /> {snapshot.timeLeft ?? 120}
+                        <small>秒</small>
+                      </span>
+                    ) : mode === "endless" ? (
+                      <>
+                        <FruitIcon fruit={currentFruit} decorative />{" "}
+                        {currentFruit.name}
+                      </>
+                    ) : currentFruit !== target ? (
+                      <>
+                        <FruitIcon fruit={currentFruit} decorative />
+                        <i className="fruit-path-arrow">→</i>
+                        <FruitIcon fruit={target} decorative />
+                      </>
+                    ) : (
+                      <>
+                        <FruitIcon fruit={target} decorative /> ×1
+                      </>
+                    )}
+                  </strong>
+                </div>
                 <button
-                  key={lane}
-                  className={snapshot.dropLane === lane ? "active" : ""}
-                  aria-label={
-                    lane < 0 ? "落在左侧" : lane > 0 ? "落在右侧" : "落在中央"
-                  }
-                  onClick={() => controlsRef.current?.setDropLane(lane)}
+                  className="top-action tool-action"
+                  onClick={() => openGamePanel("tools")}
+                  aria-label={`打开道具栏，${availableToolboxItems.length} 种可用`}
                 >
-                  {lane < 0 ? "左" : lane > 0 ? "右" : "中"}
+                  <i>
+                    <Icon name="bag" />
+                    <em>{availableToolboxItems.length}</em>
+                  </i>
+                  <span>道具</span>
                 </button>
-              ))}
-            </div>
-            <div
-              className={`combo-pill ${snapshot.combo >= 3 ? "hot" : ""}`}
-              aria-hidden={snapshot.combo < 2}
-            >
-              COMBO <b>×{snapshot.combo}</b>
-            </div>
-            {toast ? (
+                <button
+                  className="top-action"
+                  onClick={() => openGamePanel("menu")}
+                  aria-label="打开游戏菜单"
+                >
+                  <i>
+                    <Icon name="gear" />
+                  </i>
+                  <span>菜单</span>
+                </button>
+              </header>
               <div
-                key={toast.id}
-                className={`game-toast toast-${toast.tone}`}
-                role="status"
-              >
-                {toast.message}
-              </div>
-            ) : null}
-            {tutorialStep ? (
-              <div
-                className={`tutorial-coach tutorial-${tutorialStep}`}
-                role="status"
+                className={`challenge-status ${snapshot.timeLeft !== null && snapshot.timeLeft <= 20 ? "urgent" : ""}`}
               >
                 <span>
-                  {tutorialStep === "pick"
-                    ? "① 点有绿边的亮牌，先收集相同水果"
-                    : tutorialStep === "tray"
-                      ? "② 凑齐三张，卡槽会自动消除并落果"
-                      : "③ 选择左、中、右，决定下一颗水果落点"}
+                  {DIFFICULTIES[mode === "daily" ? "expert" : difficulty].name}{" "}
+                  · {MODE_INFO[mode].name}
                 </span>
-                <button onClick={finishTutorial}>跳过</button>
+                <b>
+                  {mode === "sprint"
+                    ? `${snapshot.timeLeft ?? 120}s`
+                    : mode === "daily"
+                      ? challenge.key
+                      : `第 ${mode === "endless" ? snapshot.wave : level + 1} ${mode === "endless" ? "波" : "关"}`}
+                </b>
               </div>
-            ) : null}
-            {gamePanel && !result ? (
-              <div className="game-panel-layer" role="dialog" aria-modal="true">
-                <section className={`game-panel-card panel-${gamePanel}`}>
+              <div className="drop-lane-control" aria-label="选择下次落果位置">
+                {([-1, 0, 1] as const).map((lane) => (
                   <button
-                    className="panel-close"
-                    onClick={closeGamePanel}
-                    aria-label="关闭"
+                    key={lane}
+                    className={snapshot.dropLane === lane ? "active" : ""}
+                    aria-label={
+                      lane < 0 ? "落在左侧" : lane > 0 ? "落在右侧" : "落在中央"
+                    }
+                    onClick={() => controlsRef.current?.setDropLane(lane)}
                   >
-                    ×
+                    {lane < 0 ? "左" : lane > 0 ? "右" : "中"}
                   </button>
-                  {gamePanel === "tools" ? (
-                    <>
-                      <small>ORCHARD TOOL BAR</small>
-                      <h2>道具栏</h2>
-                      <p className="toolbox-summary">
-                        <b>{availableToolboxItems.length}</b> 种可用
-                        <span>点击后立即生效</span>
-                      </p>
-                      <div className="tool-groups" aria-label="本局道具栏">
-                        {toolGroups.map((group) => (
-                          <section className="tool-group" key={group.id}>
-                            <header>
-                              <span>
-                                <b>{group.title}</b>
-                                <small>{group.hint}</small>
-                              </span>
-                              <em>
-                                {
-                                  group.items.filter((item) => item.left > 0)
-                                    .length
-                                }
-                                /{group.items.length}
-                              </em>
-                            </header>
-                            <div className="toolbox-grid">
-                              {group.items.map((item) => (
-                                <button
-                                  key={item.id}
-                                  disabled={item.left <= 0}
-                                  onClick={() => useToolById(item.id)}
-                                  aria-label={`${item.label}，${item.description}，剩余 ${item.left} 次`}
-                                >
-                                  <i>{<Icon name={item.icon} />}</i>
-                                  <span>
-                                    <b>{item.label}</b>
-                                    <small>{item.description}</small>
-                                  </span>
-                                  <em>
-                                    {item.left > 0 ? `×${item.left}` : "未配置"}
-                                  </em>
-                                </button>
-                              ))}
-                            </div>
-                          </section>
-                        ))}
-                      </div>
-                    </>
-                  ) : null}
-                  {gamePanel === "help" ? (
-                    <>
-                      <small>HOW TO PLAY</small>
-                      <h2>玩法说明</h2>
-                      <div className="help-flow" aria-label="玩法流程">
-                        <span>点亮卡</span>
-                        <i>›</i>
-                        <span>三张入槽</span>
-                        <i>›</i>
-                        <span>选择落点</span>
-                        <i>›</i>
-                        <span>同果合成</span>
-                      </div>
-                      <div className="help-rules">
-                        <span>默认每次生成 1 果</span>
-                        <span>温室培育最高 3 果</span>
-                        <span>水果落稳后才会合成</span>
-                        <span>点击水果会弹向同级伙伴</span>
-                      </div>
-                      <h3>区域道具</h3>
-                      <div className="zone-tool-legend">
-                        <span>
-                          牌桌 · <Icon name="dice" /> 洗牌 /{" "}
-                          <Icon name="hammer" /> 清顶 / <Icon name="sun" /> 净化
-                        </span>
-                        <span>
-                          果箱 · <Icon name="bomb" /> 炸弹 / <Icon name="ice" />{" "}
-                          冰冻 / <Icon name="gear" /> 搅拌
-                        </span>
-                      </div>
-                      <h3>特殊牌角标</h3>
-                      <div className="special-legend">
-                        <span>
-                          <Icon name="ice" /> 冰冻
-                        </span>
-                        <span>
-                          <Icon name="bomb" /> 炸弹
-                        </span>
-                        <span>
-                          <Icon name="leaf" /> 藤蔓
-                        </span>
-                        <span>
-                          <Icon name="candy" /> 甜度
-                        </span>
-                        <span>
-                          <Icon name="wheat" /> 丰收
-                        </span>
-                        <span>
-                          <Icon name="gem" /> 棱镜
-                        </span>
-                        <span>
-                          <Icon name="wind" /> 季风
-                        </span>
-                      </div>
-                      <h3>合成路径</h3>
-                      <div className="help-chain">
-                        {helpChain.map((fruit, index) => (
-                          <span key={fruit.name}>
-                            <b>
-                              <FruitIcon fruit={fruit} decorative />
-                            </b>
-                            <small>{fruit.name}</small>
-                            {index < helpChain.length - 1 ? <i>›</i> : null}
-                          </span>
-                        ))}
-                      </div>
-                    </>
-                  ) : null}
-                  {gamePanel === "menu" ? (
-                    <>
-                      <small>MENU</small>
-                      <h2>游戏菜单</h2>
-                      {mode === "expedition" ? (
-                        <div className="run-build">
-                          <div className="run-build-head">
-                            <b>当前构筑</b>
-                            <span>{activeRelics.length} 件奇物</span>
-                          </div>
-                          {snapshot.mutator ? (
-                            <div className="run-mutator">
-                              <small>本关变异 · {snapshot.mutator}</small>
-                              <span>{snapshot.mutatorHint}</span>
-                            </div>
-                          ) : null}
-                          <div className="run-relics">
-                            {activeRelics.length ? (
-                              activeRelics.map((relic) => (
-                                <span key={relic.id} title={relic.description}>
-                                  <i>{<Icon name={relic.icon} />}</i>
-                                  <small>{relic.name}</small>
-                                </span>
-                              ))
-                            ) : (
-                              <em>完成本关后选择第一件奇物</em>
-                            )}
-                          </div>
-                        </div>
-                      ) : null}
-                      <button
-                        className="panel-primary"
-                        onClick={closeGamePanel}
-                      >
-                        继续游戏
-                      </button>
-                      <div className="panel-actions">
-                        <button
-                          aria-pressed={!muted}
-                          onClick={() => {
-                            sounds.setMuted(!muted);
-                            setMuted(!muted);
-                          }}
-                        >
-                          <Icon name="volume" />{" "}
-                          {muted ? "开启音效" : "关闭音效"}
-                        </button>
-                        <button onClick={() => setGamePanel("help")}>
-                          <Icon name="book" /> 玩法说明
-                        </button>
-                        <button
-                          onClick={() => {
-                            setGamePanel(null);
-                            beginGame(level, mode, {
-                              wave,
-                              relics,
-                              score: carryScore,
-                            });
-                          }}
-                        >
-                          <Icon name="spiral" /> 重新开始
-                        </button>
-                        <button onClick={backHome}>
-                          <Icon name="home" /> 返回首页
-                        </button>
-                      </div>
-                    </>
-                  ) : null}
-                </section>
+                ))}
               </div>
-            ) : null}
-            {result ? (
-              <div className="result-layer" role="dialog" aria-modal="true">
-                <div className={`result-card result-${result.status}`}>
-                  <div className="result-rays" />
-                  <div className="result-emoji">
-                    {result.status === "won" ? (
-                      <FruitIcon
-                        fruit={mode === "sprint" ? currentFruit : target}
-                        decorative
-                      />
-                    ) : mode === "endless" ? (
-                      "∞"
-                    ) : (
-                      <Icon name="juice" />
-                    )}
-                  </div>
-                  <div className="result-kicker">
-                    {isRelicReward
-                      ? `Rogue 第 ${result.wave} 关`
-                      : mode === "expedition" && result.status === "won"
-                        ? "Rogue 完成"
-                        : mode === "daily"
-                          ? `每日鲜摘 · ${result.challengeKey}`
-                          : mode === "sprint"
-                            ? `限时榨汁 · ${DIFFICULTIES[result.difficulty].name}`
-                            : mode === "endless"
-                              ? `无尽第 ${result.wave} 波`
-                              : result.status === "won"
-                                ? `第 ${level + 1} 关完成`
-                                : "本局结束"}
-                  </div>
-                  <h2>
-                    {isRelicReward
-                      ? "选择一项构筑强化"
-                      : mode === "expedition" && result.status === "won"
-                        ? "Rogue 通关！"
-                        : mode === "sprint"
-                          ? result.status === "won"
-                            ? "鲜榨时间到"
-                            : "鲜榨挑战结束"
-                          : mode === "daily"
-                            ? result.status === "won"
-                              ? "今日鲜摘完成"
-                              : "今日鲜摘结算"
-                            : mode === "endless"
-                              ? "无尽模式结算"
-                              : result.status === "won"
-                                ? "甜度通关！"
-                                : "差一点就合成了"}
-                  </h2>
-                  <p>{result.reason}</p>
-                  <div className="score-total">
-                    <small>本局得分</small>
-                    <strong>{formatScore(result.score)}</strong>
-                  </div>
-                  <div className="result-stats">
-                    <span>
-                      <small>最高连击</small>
-                      <b>×{result.maxCombo}</b>
-                    </span>
-                    <span>
-                      <small>最大水果</small>
-                      <b>
+              <div
+                className={`combo-pill ${snapshot.combo >= 3 ? "hot" : ""}`}
+                aria-hidden={snapshot.combo < 2}
+              >
+                COMBO <b>×{snapshot.combo}</b>
+              </div>
+              {toast ? (
+                <div
+                  key={toast.id}
+                  className={`game-toast toast-${toast.tone}`}
+                  role="status"
+                >
+                  {toast.message}
+                </div>
+              ) : null}
+              {gamePanel && !result ? (
+                <div
+                  className="game-panel-layer"
+                  role="dialog"
+                  aria-modal="true"
+                >
+                  <section className={`game-panel-card panel-${gamePanel}`}>
+                    <button
+                      className="panel-close"
+                      onClick={closeGamePanel}
+                      aria-label="关闭"
+                    >
+                      ×
+                    </button>
+                    {gamePanel === "tools" ? (
+                      <>
+                        <h2>技能与道具</h2>
+                        <p className="toolbox-summary">
+                          <b>{availableToolboxItems.length}</b> 种可用
+                        </p>
+                        <div className="tool-groups" aria-label="本局道具栏">
+                          {toolGroups.map((group) => (
+                            <section className="tool-group" key={group.id}>
+                              <header>
+                                <span>
+                                  <b>{group.title}</b>
+                                </span>
+                                <em>
+                                  {
+                                    group.items.filter((item) => item.left > 0)
+                                      .length
+                                  }
+                                  /{group.items.length}
+                                </em>
+                              </header>
+                              <div className="toolbox-grid">
+                                {group.items.map((item) => (
+                                  <button
+                                    key={item.id}
+                                    disabled={item.left <= 0}
+                                    onClick={() => useToolById(item.id)}
+                                    aria-label={`${item.label}，${item.description}，剩余 ${item.left} 次`}
+                                  >
+                                    <i>{<Icon name={item.icon} />}</i>
+                                    <span>
+                                      <b>{item.label}</b>
+                                      <small>{item.description}</small>
+                                    </span>
+                                    <em>
+                                      {item.left > 0
+                                        ? `×${item.left}`
+                                        : "未配置"}
+                                    </em>
+                                  </button>
+                                ))}
+                              </div>
+                            </section>
+                          ))}
+                        </div>
+                      </>
+                    ) : null}
+                    {gamePanel === "help" ? (
+                      <>
+                        <small>HOW TO PLAY</small>
+                        <h2>玩法说明</h2>
+                        <div className="help-flow" aria-label="玩法流程">
+                          <span>点亮卡</span>
+                          <i>›</i>
+                          <span>三张入槽</span>
+                          <i>›</i>
+                          <span>选择落点</span>
+                          <i>›</i>
+                          <span>同果合成</span>
+                        </div>
+                        <div className="help-rules">
+                          <span>默认每次生成 1 果</span>
+                          <span>温室培育最高 3 果</span>
+                          <span>水果落稳后才会合成</span>
+                          <span>点击水果会弹向同级伙伴</span>
+                        </div>
+                        <h3>区域道具</h3>
+                        <div className="zone-tool-legend">
+                          <span>
+                            牌桌 · <Icon name="dice" /> 洗牌 /{" "}
+                            <Icon name="hammer" /> 清顶 / <Icon name="sun" />{" "}
+                            净化
+                          </span>
+                          <span>
+                            果箱 · <Icon name="bomb" /> 炸弹 /{" "}
+                            <Icon name="ice" /> 冰冻 / <Icon name="gear" /> 搅拌
+                          </span>
+                        </div>
+                        <h3>特殊牌角标</h3>
+                        <div className="special-legend">
+                          <span>
+                            <Icon name="ice" /> 冰冻
+                          </span>
+                          <span>
+                            <Icon name="bomb" /> 炸弹
+                          </span>
+                          <span>
+                            <Icon name="leaf" /> 藤蔓
+                          </span>
+                          <span>
+                            <Icon name="candy" /> 甜度
+                          </span>
+                          <span>
+                            <Icon name="wheat" /> 丰收
+                          </span>
+                          <span>
+                            <Icon name="gem" /> 棱镜
+                          </span>
+                          <span>
+                            <Icon name="wind" /> 季风
+                          </span>
+                        </div>
+                        <h3>合成路径</h3>
+                        <div className="help-chain">
+                          {helpChain.map((fruit, index) => (
+                            <span key={fruit.name}>
+                              <b>
+                                <FruitIcon fruit={fruit} decorative />
+                              </b>
+                              <small>{fruit.name}</small>
+                              {index < helpChain.length - 1 ? <i>›</i> : null}
+                            </span>
+                          ))}
+                        </div>
+                      </>
+                    ) : null}
+                    {gamePanel === "menu" ? (
+                      <>
+                        <small>MENU</small>
+                        <h2>游戏菜单</h2>
+                        {snapshot.weather ? (
+                          <div className="run-mutator">
+                            <small>
+                              {snapshot.weather.name} ·{" "}
+                              {snapshot.weather.seconds}s
+                            </small>
+                            <span>{snapshot.weather.hint}</span>
+                          </div>
+                        ) : null}
+                        {mode === "expedition" ? (
+                          <div className="run-build">
+                            <div className="run-build-head">
+                              <b>当前构筑</b>
+                              <span>{activeRelics.length} 件奇物</span>
+                            </div>
+                            {snapshot.mutator ? (
+                              <div className="run-mutator">
+                                <small>本关变异 · {snapshot.mutator}</small>
+                                <span>{snapshot.mutatorHint}</span>
+                              </div>
+                            ) : null}
+                            <div className="run-relics">
+                              {activeRelics.length ? (
+                                activeRelics.map((relic) => (
+                                  <span
+                                    key={relic.id}
+                                    title={relic.description}
+                                  >
+                                    <i>{<Icon name={relic.icon} />}</i>
+                                    <small>{relic.name}</small>
+                                  </span>
+                                ))
+                              ) : (
+                                <em>完成本关后选择第一件奇物</em>
+                              )}
+                            </div>
+                          </div>
+                        ) : null}
+                        <button
+                          className="panel-primary"
+                          onClick={closeGamePanel}
+                        >
+                          继续游戏
+                        </button>
+                        <div className="panel-actions">
+                          <button
+                            aria-pressed={!muted}
+                            onClick={() => {
+                              sounds.setMuted(!muted);
+                              setMuted(!muted);
+                            }}
+                          >
+                            <Icon name="volume" />{" "}
+                            {muted ? "开启音效" : "关闭音效"}
+                          </button>
+                          <button onClick={() => setGamePanel("help")}>
+                            <Icon name="book" /> 玩法说明
+                          </button>
+                          <button
+                            onClick={() => {
+                              setGamePanel(null);
+                              beginGame(level, mode, {
+                                wave,
+                                relics,
+                                score: carryScore,
+                              });
+                            }}
+                          >
+                            <Icon name="spiral" /> 重新开始
+                          </button>
+                          <button onClick={backHome}>
+                            <Icon name="home" /> 返回首页
+                          </button>
+                        </div>
+                      </>
+                    ) : null}
+                  </section>
+                </div>
+              ) : null}
+              {result ? (
+                <div className="result-layer" role="dialog" aria-modal="true">
+                  <div className={`result-card result-${result.status}`}>
+                    <div className="result-rays" />
+                    <div className="result-emoji">
+                      {result.status === "won" ? (
                         <FruitIcon
-                          fruit={
-                            FRUITS[
-                              Math.min(result.maxFruitTier, FRUITS.length - 1)
-                            ]
-                          }
+                          fruit={mode === "sprint" ? currentFruit : target}
                           decorative
                         />
-                      </b>
-                    </span>
-                    <span>
-                      <small>用时</small>
-                      <b>
-                        {Math.max(1, Math.round(result.durationMs / 1000))}s
-                      </b>
-                    </span>
-                  </div>
-                  <div className="coin-reward">
-                    <Icon name="coin" /> +{formatScore(lastCoinReward)}{" "}
-                    果币已存入温室
-                    {lastCoinStarterGift ? <small> · 含新手礼 60</small> : null}
-                  </div>
-                  {isRelicReward ? (
-                    <div className="relic-choices">
-                      {rewardOptions.map((relic) => (
-                        <button
-                          key={relic.id}
-                          className={`relic-choice relic-${relic.tone} rarity-${relic.rarity}`}
-                          onClick={() => chooseRelic(relic.id)}
-                        >
-                          <i>{<Icon name={relic.icon} />}</i>
-                          <span className="relic-copy">
-                            <span className="relic-meta">
-                              <em>{RELIC_RARITY_LABEL[relic.rarity]}</em>
-                              <small>{relic.archetype}</small>
-                            </span>
-                            <b>{relic.name}</b>
-                            <small>{relic.description}</small>
-                          </span>
-                        </button>
-                      ))}
-                    </div>
-                  ) : (
-                    <div className={`save-box ${!runId ? "save-offline" : ""}`}>
-                      {saveState === "saved" ? (
-                        <div className="saved-message">
-                          {storage.persistent
-                            ? "✓ 战绩已自动保存到本机"
-                            : "已记入本次会话，请导出存档"}
-                        </div>
-                      ) : !runId ? (
-                        <div className="offline-score-note">
-                          <b>战绩保存在本机</b>
-                          <small>浏览器存储不可用，请导出存档保留战绩。</small>
-                        </div>
+                      ) : mode === "endless" ? (
+                        "∞"
                       ) : (
-                        <>
-                          <label htmlFor="username">
-                            留下果王名号，保存本局分数
-                          </label>
-                          <div className="name-row">
-                            <input
-                              id="username"
-                              value={username}
-                              maxLength={20}
-                              placeholder="输入用户名"
-                              autoComplete="nickname"
-                              onChange={(event) =>
-                                setUsername(event.target.value)
-                              }
-                              onKeyDown={(event) => {
-                                if (event.key === "Enter") void submitScore();
-                              }}
-                            />
-                            <button
-                              disabled={
-                                !username.trim() ||
-                                saveState === "saving" ||
-                                !runId
-                              }
-                              onClick={() => void submitScore()}
-                            >
-                              {saveState === "saving" ? "保存中" : "保存"}
-                            </button>
-                          </div>
-                          {saveError ? (
-                            <small className="save-error">{saveError}</small>
-                          ) : null}
-                        </>
+                        <Icon name="juice" />
                       )}
                     </div>
-                  )}
-                  {isRelicReward ? (
-                    <button
-                      className="button button-ghost result-home"
-                      onClick={backHome}
-                    >
-                      结束远征并返回
-                    </button>
-                  ) : (
-                    <div className="result-actions">
+                    <div className="result-kicker">
+                      {isRelicReward
+                        ? `Rogue 第 ${result.wave} 关`
+                        : mode === "expedition" && result.status === "won"
+                          ? "Rogue 完成"
+                          : mode === "daily"
+                            ? `每日鲜摘 · ${result.challengeKey}`
+                            : mode === "sprint"
+                              ? `限时榨汁 · ${DIFFICULTIES[result.difficulty].name}`
+                              : mode === "endless"
+                                ? `无尽第 ${result.wave} 波`
+                                : result.status === "won"
+                                  ? `第 ${level + 1} 关完成`
+                                  : "本局结束"}
+                    </div>
+                    <h2>
+                      {isRelicReward
+                        ? "选择一项构筑强化"
+                        : mode === "expedition" && result.status === "won"
+                          ? "Rogue 通关！"
+                          : mode === "sprint"
+                            ? result.status === "won"
+                              ? "鲜榨时间到"
+                              : "鲜榨挑战结束"
+                            : mode === "daily"
+                              ? result.status === "won"
+                                ? "今日鲜摘完成"
+                                : "今日鲜摘结算"
+                              : mode === "endless"
+                                ? "无尽模式结算"
+                                : result.status === "won"
+                                  ? "甜度通关！"
+                                  : "差一点就合成了"}
+                    </h2>
+                    <p>{result.reason}</p>
+                    <div className="score-total">
+                      <small>本局得分</small>
+                      <strong>{formatScore(result.score)}</strong>
+                    </div>
+                    <div className="result-stats">
+                      <span>
+                        <small>最高连击</small>
+                        <b>×{result.maxCombo}</b>
+                      </span>
+                      <span>
+                        <small>最大水果</small>
+                        <b>
+                          <FruitIcon
+                            fruit={
+                              FRUITS[
+                                Math.min(result.maxFruitTier, FRUITS.length - 1)
+                              ]
+                            }
+                            decorative
+                          />
+                        </b>
+                      </span>
+                      <span>
+                        <small>用时</small>
+                        <b>
+                          {Math.max(1, Math.round(result.durationMs / 1000))}s
+                        </b>
+                      </span>
+                    </div>
+                    <div className="coin-reward">
+                      <Icon name="coin" /> +{formatScore(lastCoinReward)}{" "}
+                      果币已存入温室
+                      {lastCoinStarterGift ? (
+                        <small> · 含新手礼 60</small>
+                      ) : null}
+                    </div>
+                    {isRelicReward ? (
+                      <div className="relic-choices">
+                        {rewardOptions.map((relic) => (
+                          <button
+                            key={relic.id}
+                            className={`relic-choice relic-${relic.tone} rarity-${relic.rarity}`}
+                            onClick={() => chooseRelic(relic.id)}
+                          >
+                            <i>{<Icon name={relic.icon} />}</i>
+                            <span className="relic-copy">
+                              <span className="relic-meta">
+                                <em>{RELIC_RARITY_LABEL[relic.rarity]}</em>
+                                <small>{relic.archetype}</small>
+                              </span>
+                              <b>{relic.name}</b>
+                              <small>{relic.description}</small>
+                            </span>
+                          </button>
+                        ))}
+                      </div>
+                    ) : (
+                      <div
+                        className={`save-box ${!runId ? "save-offline" : ""}`}
+                      >
+                        {saveState === "saved" ? (
+                          <div className="saved-message">
+                            {storage.persistent
+                              ? "✓ 战绩已自动保存到本机"
+                              : "已记入本次会话，请导出存档"}
+                          </div>
+                        ) : !runId ? (
+                          <div className="offline-score-note">
+                            <b>战绩保存在本机</b>
+                            <small>
+                              浏览器存储不可用，请导出存档保留战绩。
+                            </small>
+                          </div>
+                        ) : (
+                          <>
+                            <label htmlFor="username">
+                              留下果王名号，保存本局分数
+                            </label>
+                            <div className="name-row">
+                              <input
+                                id="username"
+                                value={username}
+                                maxLength={20}
+                                placeholder="输入用户名"
+                                autoComplete="nickname"
+                                onChange={(event) =>
+                                  setUsername(event.target.value)
+                                }
+                                onKeyDown={(event) => {
+                                  if (event.key === "Enter") void submitScore();
+                                }}
+                              />
+                              <button
+                                disabled={
+                                  !username.trim() ||
+                                  saveState === "saving" ||
+                                  !runId
+                                }
+                                onClick={() => void submitScore()}
+                              >
+                                {saveState === "saving" ? "保存中" : "保存"}
+                              </button>
+                            </div>
+                            {saveError ? (
+                              <small className="save-error">{saveError}</small>
+                            ) : null}
+                          </>
+                        )}
+                      </div>
+                    )}
+                    {isRelicReward ? (
                       <button
-                        className="button button-ghost"
+                        className="button button-ghost result-home"
                         onClick={backHome}
                       >
-                        返回果园
+                        结束远征并返回
                       </button>
-                      <button
-                        className="button button-primary"
-                        onClick={continueGame}
-                      >
-                        {mode === "story" &&
-                        result.status === "won" &&
-                        level < LEVELS.length - 1
-                          ? "下一关"
-                          : mode === "expedition"
-                            ? "重新远征"
-                            : mode === "endless"
-                              ? "再战无尽"
-                              : "再来一局"}
-                      </button>
-                    </div>
-                  )}
+                    ) : (
+                      <div className="result-actions">
+                        <button
+                          className="button button-ghost"
+                          onClick={backHome}
+                        >
+                          返回果园
+                        </button>
+                        <button
+                          className="button button-primary"
+                          onClick={continueGame}
+                        >
+                          {mode === "story" &&
+                          result.status === "won" &&
+                          level < LEVELS.length - 1
+                            ? "下一关"
+                            : mode === "expedition"
+                              ? "重新远征"
+                              : mode === "endless"
+                                ? "再战无尽"
+                                : "再来一局"}
+                        </button>
+                      </div>
+                    )}
+                  </div>
                 </div>
+              ) : null}
+            </div>
+            <div className="skill-dock" aria-label="快捷技能">
+              <div
+                className={`weather-status ${snapshot.weather?.phase ?? "calm"}`}
+                role="status"
+                title={snapshot.weather?.hint ?? "暂无天气事件"}
+                aria-label={
+                  snapshot.weather
+                    ? `${snapshot.weather.phase === "warning" ? "即将到来：" : ""}${snapshot.weather.name}，${snapshot.weather.hint}，${snapshot.weather.seconds} 秒`
+                    : "天气平静"
+                }
+              >
+                <Icon name={snapshot.weather?.icon ?? "leaf"} />
+                <span>
+                  {snapshot.weather?.name ?? "晴好"}
+                  <small>
+                    {snapshot.weather
+                      ? `${snapshot.weather.phase === "warning" ? "即将 " : ""}${snapshot.weather.seconds}s`
+                      : ""}
+                  </small>
+                </span>
               </div>
-            ) : null}
+              <button
+                onClick={() => controlsRef.current?.insight()}
+                disabled={
+                  Boolean(result || gamePanel) ||
+                  snapshot.insightLeft <= 0 ||
+                  snapshot.insightSeconds > 0
+                }
+                title="标记最易凑齐的同果卡，持续 8 秒"
+                aria-label={`透视镜，剩余 ${snapshot.insightLeft} 次`}
+              >
+                <Icon name="compass" />
+                <span>
+                  透视
+                  <small>
+                    {snapshot.insightSeconds > 0
+                      ? `${snapshot.insightSeconds}s`
+                      : `×${snapshot.insightLeft}`}
+                  </small>
+                </span>
+              </button>
+              <button
+                onClick={() => controlsRef.current?.vortex()}
+                disabled={
+                  Boolean(result || gamePanel) ||
+                  snapshot.vortexLeft <= 0 ||
+                  snapshot.vortexSeconds > 0
+                }
+                title="同果吸引增强，持续 10 秒"
+                aria-label={`聚果场，剩余 ${snapshot.vortexLeft} 次`}
+              >
+                <Icon name="spiral" />
+                <span>
+                  聚果
+                  <small>
+                    {snapshot.vortexSeconds > 0
+                      ? `${snapshot.vortexSeconds}s`
+                      : `×${snapshot.vortexLeft}`}
+                  </small>
+                </span>
+              </button>
+            </div>
           </div>
         </section>
       )}
@@ -2205,7 +2235,7 @@ export default function App() {
             </div>
             <div className="shop-section-head">
               <span>道具补给</span>
-              <small>购买后每局携带 · 未购买不出现</small>
+              <small>升级每局次数</small>
             </div>
             <div className="supply-grid">
               {TOOLS.map((item) => {

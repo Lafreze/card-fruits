@@ -65,7 +65,9 @@ export function validScore(value: unknown): value is Record<string, unknown> {
     ["story", "endless", "expedition", "sprint", "daily"].includes(
       String(v.mode),
     ) &&
-    ["relaxed", "classic", "expert", "master"].includes(String(v.difficulty)) &&
+    ["relaxed", "classic", "expert", "master", "extreme"].includes(
+      String(v.difficulty),
+    ) &&
     integer(v.score, 1e12) &&
     integer(v.level, 100000) &&
     integer(v.maxCombo, 100000) &&
