@@ -1,95 +1,7 @@
-"""Original vector artwork. Run to regenerate the Orchard Club asset family."""
+"""Regenerate vector UI icons. Fruit illustrations are packaged separately."""
 from pathlib import Path
-import math, re
-from refine_fruits import finish_art
-ROOT=Path(__file__).resolve().parent.parent
-out=ROOT/'public/art'
-ink='#30492e'
-def path(d,fill,stroke=ink,sw=2.5): return f'<path d="{d}" fill="{fill}" stroke="{stroke}" stroke-width="{sw}" stroke-linejoin="round" stroke-linecap="round"/>'
-def ellipse(x,y,rx,ry,fill,stroke=ink,sw=2.5): return f'<ellipse cx="{x}" cy="{y}" rx="{rx}" ry="{ry}" fill="{fill}" stroke="{stroke}" stroke-width="{sw}"/>'
-def circle(x,y,r,fill,stroke=ink,sw=2.5): return ellipse(x,y,r,r,fill,stroke,sw)
-def leaf(x=60,y=26):
-    return path(f'M{x} {y}C{x+4} {y-20} {x+20} {y-22} {x+31} {y-17}C{x+25} {y-1} {x+12} {y+3} {x} {y}Z','#63964b')+path(f'M{x+2} {y-1}Q{x+16} {y-13} {x+27} {y-15}M{x+11} {y-8}l-1 -6M{x+17} {y-11}l7 1','none','#c1d998',1)
-
-def stem(x=58,y=30): return path(f'M{x} {y}q-5 -13 1 -21','none','#785034',4)
-def body(color,shape='round'):
-    if shape=='pear': return path('M51 25C30 28 43 48 27 65C6 91 30 113 62 111C96 111 113 87 91 62C77 47 81 26 62 25Z',color)
-    if shape=='oval': return ellipse(61,70,35,43,color)
-    if shape=='apple': return path('M61 35C30 11 8 41 21 77C29 103 42 115 61 104C81 116 99 95 105 66C111 31 86 19 61 35Z',color)
-    if shape=='mango': return path('M36 30C64 10 99 36 99 66C101 107 56 121 30 103C6 88 26 68 24 51Q24 37 36 30Z',color)
-    return ellipse(62,71,43,40,color)
-def seeds(points,color='#fbefb3'):
-    return ''.join(ellipse(x,y,1.7,3,color,'none') for x,y in points)
-def star(cx,cy,r1,r2,n,color):
-    pts=[]
-    for i in range(n*2):
-        a=i*math.pi/n-math.pi/2;r=r1 if i%2==0 else r2
-        pts.append(f'{cx+math.cos(a)*r:.2f},{cy+math.sin(a)*r:.2f}')
-    return f'<polygon points="{" ".join(pts)}" fill="{color}" stroke="{ink}" stroke-width="2.5" stroke-linejoin="round"/>'
-art=[]
-art.append(''.join(circle(x,y,r,c) for x,y,r,c in [(45,74,27,'#6c87bd'),(80,77,25,'#8098cb'),(61,50,26,'#859fd4')])+star(61,38,9,4,5,'#d1dce9')+leaf(66,24))
-art.append(ellipse(50,74,25,36,'#91a454')+ellipse(84,79,23,31,'#b0bc72')+leaf(52,35)+stem(50,38))
-art.append(''.join(circle(x,y,16,c) for x,y,c in [(43,43,'#aa8bbd'),(75,44,'#b39ac5'),(30,67,'#9d7db2'),(60,66,'#b29ac6'),(88,68,'#9674ac'),(47,89,'#9470ab'),(75,91,'#a17db5'),(62,108,'#865e9f')])+leaf(62,23))
-art.append(path('M38 74Q45 43 65 20Q78 46 88 69','none',ink,4)+circle(36,86,26,'#da6266')+circle(87,82,26,'#e77a75')+leaf(65,20))
-art.append(path('M20 53C22 19 101 20 104 53C107 76 72 114 62 114C47 113 17 74 20 53Z','#ed796e')+star(61,32,26,11,5,'#6f914b')+seeds([(37,54),(60,52),(84,54),(47,73),(74,74),(61,94)]))
-art.append(path('M16 68Q7 61 19 53Q37 14 77 28Q104 38 108 64Q122 71 108 80Q87 116 49 105Q22 99 16 68Z','#efcf58')+leaf(66,25))
-art.append(ellipse(63,70,43,43,'#bba078')+ellipse(63,70,34,34,'#a9c568')+ellipse(63,70,12,20,'#eee6b4')+''.join(ellipse(63+22*math.cos(i),70+24*math.sin(i),1.8,3,ink,'none') for i in range(12)))
-art.append(body('#e77d64')+star(62,35,25,9,6,'#698c44'))
-art.append(body('#91b25d','pear')+path('M55 36C42 40 49 55 36 70C19 93 40 104 62 104C86 104 99 88 83 68C72 55 74 37 63 36Z','#d9dda3')+circle(61,81,19,'#b67d50')+ellipse(56,75,6,9,'#d0a071','none'))
-art.append(body('#efaa55')+leaf()+stem())
-art.append(body('#adbf67','apple')+leaf()+stem())
-art.append(body('#dd7062','apple')+leaf()+stem())
-art.append(body('#cbd281','pear')+leaf()+stem())
-art.append(body('#edaaa0','apple')+path('M62 38Q78 68 62 103','none','#d1807a',2)+leaf())
-art.append(body('#efbd62','mango')+leaf(52,26))
-art.append(path('M23 28Q17 94 91 100L106 84Q49 99 40 24Z','#e7bd47')+path('M41 24Q33 82 103 84L111 69Q62 85 56 23Z','#f6db72')+path('M57 22Q48 61 105 68L112 56Q76 65 72 23Z','#f9e89a')+path('M39 28L38 14L71 14L72 25Z','#709244'))
-art.append(ellipse(61,75,44,36,'#aa7d58')+ellipse(61,66,39,31,'#f2e4cb')+ellipse(61,65,28,21,'#fff9e8'))
-art.append(body('#e8c267','oval')+''.join(path(f'M{x} 32l42 67M{x+30} 32l-42 67','none','#bc934e',1.2) for x in [18,36,54,72])+path('M47 35L32 12L54 21L61 3L69 23L94 11L77 38Z','#70944e'))
-art.append(body('#df8998','oval')+path('M35 43L20 32L30 63L15 69L33 82M87 43L105 29L96 65L111 71L91 87','none','#89a55e',5)+ellipse(64,76,27,32,'#fff3df')+seeds([(52,54),(74,63),(48,77),(70,86),(58,97)],ink))
-art.append(body('#b8c998')+''.join(path(f'M{x} 33q30 37 0 77','none','#e8e4b2',2) for x in [33,51,69,87])+stem())
-art.append(body('#da9856')+ellipse(63,72,26,40,'#edaf65')+ellipse(63,72,10,40,'#f4bb72')+stem())
-art.append(body('#8daa63')+''.join(path(f'M{x} 33q-18 37 0 77','none','#4f7851',6) for x in [35,55,75,95])+stem())
-art.append(body('#d57c79')+path('M45 36L43 16L58 25L67 14L75 35Z','#d99570')+path('M65 58Q108 58 103 92Q96 113 68 104Z','#f6c4ac')+seeds([(77,72),(91,77),(77,88),(90,94)],'#b95157'))
-art.append(body('#eeb76a','oval')+ellipse(62,76,24,31,'#ed8d53')+ellipse(62,76,10,23,'#56482f')+seeds([(61,65),(64,76),(59,87)],'#8f8062'))
-art.append(body('#a6b96c','oval')+''.join(star(x,y,3.5,2,4,'#d0d598') for x in range(36,92,12) for y in range(43,106,13))+stem())
-art.append(body('#8d6d93')+ellipse(70,84,26,25,'#f6e7da')+''.join(ellipse(70+13*math.cos(a),84+12*math.sin(a),7,11,'#fff8e8') for a in range(6))+star(57,32,25,12,5,'#70904b'))
-art.append(star(63,67,52,24,5,'#e6c95e')+star(63,67,34,16,5,'#f6dd81'))
-art.append(body('#c4cb7b','pear')+leaf())
-art.append(body('#997b9d','pear')+path('M63 43C43 66 27 95 53 105C78 118 98 98 83 76Z','#dba3a1')+seeds([(61,65),(55,81),(73,83),(65,96)]))
-art.append(path('M40 25Q60 15 80 25L90 71Q117 106 89 112L61 105L33 113Q8 104 32 72Z','#dc8a87')+leaf(49,24))
-art.append(body('#d78f85')+''.join(circle(x,y,3,'#eeb7a0','none') for x in range(33,98,13) for y in range(48,101,14))+leaf())
-art.append(body('#b4c981')+ellipse(64,76,31,30,'#eda6a0')+ellipse(64,76,13,17,'#f5d3b1')+seeds([(60,67),(70,78),(60,89)],'#9e7458')+leaf())
-art.append(ellipse(45,77,25,32,'#e9ad5e')+ellipse(82,74,25,32,'#f1bd76')+leaf(57,34))
-art.append(body('#b5c98c','pear')+''.join(ellipse(x,y,10,13,'#c6d49c') for y,xs in [(46,[50,71]),(67,[35,56,78,95]),(90,[40,61,82])] for x in xs)+stem())
-art.append(body('#b78159','pear')+''.join(path(f'M{x-5} {y}l5 5l5 -5','none','#875a3e',1.5) for y in range(45,104,12) for x in range(37,94,12))+stem())
-art.append(body('#a9bd7a')+''.join(path(f'M{x} 35q15 35 0 70','none','#d5dca2',3) for x in range(31,100,14))+leaf())
-art.append(body('#cc9568','oval')+''.join(path(f'M{x} 29q-16 40 0 78','none','#9a654c',3) for x in [40,60,80])+stem())
-art.append(path('M33 24Q9 28 18 49Q2 64 23 79Q24 112 48 109Q69 112 71 88Q91 77 80 59Q86 35 64 35Q53 11 33 24Z','#bf986b')+path('M33 39L53 50M28 68L50 78M42 93L56 89','none','#8d6d4c',2))
-art.append(body('#eaa366')+star(62,35,26,10,4,'#6b8951'))
-art.append(body('#897ca7')+leaf()+stem()+path('M65 39Q75 70 63 106','none','#675c8c',2))
-art.append(ellipse(45,77,24,31,'#e9af56')+ellipse(84,76,23,32,'#f2c56c')+leaf(56,32))
-art.append(body('#a4808f')+ellipse(68,79,29,31,'#eed39b')+''.join(circle(x,y,3,'#72523c') for x,y in [(57,65),(75,62),(84,80),(69,91),(53,84),(68,77)])+leaf())
-art.append(''.join(circle(x,y,24,c) for x,y,c in [(40,78,'#c2a77c'),(80,80,'#d9bf91'),(61,45,'#ceb382')])+ellipse(81,80,18,19,'#f3e5c6')+circle(81,81,10,'#554936')+leaf(61,24))
-art.append(body('#bf7784')+''.join(circle(x,y,3,'#e19f9e','none') for x in range(29,101,10) for y in range(44,107,11))+leaf())
-art.append(body('#e0d2a5','oval')+''.join(path(f'M{x} 38q23 35 0 65','none','#ab93ac',3) for x in [35,55,75])+leaf())
-art.append(body('#e4bf69','pear')+leaf())
-art.append(body('#dfb06b','oval')+''.join(star(x,y,8,3,3,'#eac58a') for x,y in [(31,45),(83,38),(99,70),(36,99),(84,105),(31,72),(69,68)]))
-art.append(path('M26 104Q8 68 30 33Q39 20 44 38L40 70L51 20Q58 8 64 23L60 68L78 20Q87 15 86 31L78 74L100 39Q112 36 107 50L92 94Q73 118 26 104Z','#e6c76a')+leaf(23,98))
-art.append(body('#cf9ca8','oval')+''.join(star(x,y,4,1.5,4,'#efc8c1') for x,y in [(35,55),(85,49),(37,88),(88,89)])+ellipse(64,29,14,10,'#9bad69'))
-art.append(body('#d2b86c')+''.join(star(x,y,6,2.5,3,'#f0d88c') for x in range(30,103,15) for y in range(49,105,16))+path('M38 38L30 12L51 24L64 5L78 24L99 12L90 39Z','#e5b54d')+circle(64,23,4,'#d78368'))
-assert len(art)==50,len(art)
-# Refined silhouettes and anatomy for the most frequently handled fruits.
-art[0]=''.join(circle(x,y,r,c)+path(f'M{x-8} {y-10}l5 2l3 -5l3 5l5 -2l-2 6l-6 2l-6 -2Z','#495d9c', '#495d9c',1) for x,y,r,c in [(42,77,26,'#5977b7'),(83,80,25,'#668ac5'),(62,48,26,'#7493cf')])+leaf(69,22)
-art[3]=path('M36 72C36 48 55 39 64 15C64 38 83 46 87 68','none','#6c8144',3)+circle(34,86,26,'#cc3b56')+circle(88,81,27,'#e35162')+leaf(63,19)
-art[4]=path('M19 51C21 29 40 23 61 29C84 22 104 31 107 52C105 78 76 110 62 115C46 109 18 75 19 51Z','#e85460')+path('M34 35Q42 22 55 29Q52 15 62 11Q69 21 67 29Q84 18 93 30L75 37L87 47Q70 46 62 39Q49 49 36 44L48 36Z','#579747')+''.join(ellipse(x,y,1.4,2.8,'#ffe09a','#d88651',.6) for x,y in [(31,52),(47,50),(65,53),(83,50),(96,57),(39,68),(57,68),(77,68),(89,76),(48,85),(66,84),(77,94),(61,101)])
-art[6]=ellipse(63,70,44,43,'#9e7953')+ellipse(63,70,39,38,'#c7d67b')+ellipse(63,70,35,34,'#8fbf4c')+''.join(path(f'M{63+13*math.cos(a):.2f} {70+15*math.sin(a):.2f}L{63+31*math.cos(a):.2f} {70+30*math.sin(a):.2f}','none','#e1e9ab',.85) for a in [n*math.pi/16 for n in range(32)])+ellipse(63,70,12,17,'#f5efcc')+''.join(ellipse(63+21*math.cos(a),70+23*math.sin(a),1.4,2.4,'#423c28','none') for a in [n*math.pi/10 for n in range(20)])
-art[17]='<defs><clipPath id="pine"><ellipse cx="61" cy="75" rx="34" ry="38"/></clipPath></defs>'+ellipse(61,75,34,38,'#e6b543')+'<g clip-path="url(#pine)">'+''.join(path(f'M{x} 35l70 80M{x+65} 35l-70 80','none','#bb8c30',1.1) for x in [-40,-20,0,20,40,60,80,100])+''.join(path(f'M{x-2} {y}q3 -3 6 0','none','#fff0a1',1) for x in range(35,94,13) for y in range(50,110,14))+'</g>'+path('M43 43Q34 23 24 18Q42 16 51 35Q44 13 53 3L63 31Q70 9 83 7L74 36Q88 22 103 26L80 45Z','#5b9854')+path('M62 38L57 15M72 39L82 26M51 40L40 28','none','#b6cf76',1.2)
-for tier,color,line in [(19,'#b2cc89','#e4e6ba'),(21,'#6bab69','#2f7b4b')]:
-    art[tier]='<defs><clipPath id="rind"><ellipse cx="62" cy="72" rx="43" ry="40"/></clipPath></defs>'+ellipse(62,72,43,40,color)+'<g clip-path="url(#rind)">'+''.join(path(f'M{x} 29C{x-17} 52 {x-14} 92 {x+3} 115','none',line,3 if tier==19 else 5) for x in [26,45,65,85,106])+'</g>'+stem(62,32)+path('M62 12q15 -9 17 0q-1 7 -7 4','none','#637e38',2)
-art[49]=body('#c8ac47')+''.join(path(f'M{x-5} {y+4}Q{x-2} {y-4} {x} {y-6}L{x+5} {y+4}Z','#dfc66c','#9c873c',1) for y in [49,64,79,94] for x in range(34+(7 if y%2 else 0),97,14))+path('M35 35L29 12L48 22L63 4L78 22L98 12L90 37Z','#efc54b')+path('M38 31L87 32','none','#fff1b2',1.5)+circle(63,22,4,'#d75c53')+circle(42,25,2,'#fff1b5')+circle(84,25,2,'#fff1b5')
-for i,a in enumerate(art):
-    svg=f'<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 128 128"><title>Orchard fruit {i+1:02}</title>{finish_art(a,i)}</svg>'
-    (out/f'fruit-{i:02}.svg').write_text(svg)
+ROOT = Path(__file__).resolve().parent.parent
+(ROOT / "public/icons").mkdir(parents=True, exist_ok=True)
 # All interface illustrations are paths, never font glyphs.
 icons={
 'leaf':'M7 28C4 10 15 4 34 5C36 26 23 36 7 28ZM8 29L27 13',
@@ -151,4 +63,4 @@ for name,d in icons.items():
     if name=='sun': extra='<circle cx="20" cy="20" r="9" fill="#edbc67" stroke="#35533b" stroke-width="2.4"/>'
     if name=='gear': extra+='<circle cx="20" cy="20" r="5" fill="#fff7df" stroke="#35533b" stroke-width="2.4"/>'
     (ROOT/'public/icons'/f'{name}.svg').write_text(f'<svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="-2 -2 44 44">{extra}<path d="{d}" fill="none" stroke="#35533b" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>')
-print(f'Drew {len(art)} fruits and {len(icons)} interface icons.')
+print(f'Drew {len(icons)} interface icons.')

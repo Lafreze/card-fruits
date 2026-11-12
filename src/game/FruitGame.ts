@@ -1168,7 +1168,7 @@ export class FruitGame implements GameControls {
       .roundRect(-13, -23, 26, 5.5, 2.75)
       .fill({ color: 0xffffff, alpha: 0.28 });
     sheen.label = "card-sheen";
-    const fruitIcon = this.makeFruitIcon(tier, fruit.icon ? 37 : 31);
+    const fruitIcon = this.makeFruitIcon(tier, fruit.icon ? 42 : 31);
     fruitIcon.position.set(0, -2.5);
     fruitIcon.label = "card-symbol";
     const serial = new Text({

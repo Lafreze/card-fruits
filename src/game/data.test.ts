@@ -537,13 +537,13 @@ test("fruit scale and roguelike catalog stay balanced", () => {
     }
   });
   assert.ok(FRUITS.at(-1)!.radius / FRUITS[0].radius <= 5.2);
-  assert.equal(
-    FRUITS.find((fruit) => fruit.name === "香蕉")?.icon,
-    "/art/fruit-15.svg",
+  assert.match(
+    FRUITS.find((fruit) => fruit.name === "香蕉")!.icon,
+    /^\/fruit-toons\/banana\.[a-f0-9]{12}\.webp$/,
   );
-  assert.equal(
-    FRUITS.find((fruit) => fruit.name === "西瓜")?.icon,
-    "/art/fruit-21.svg",
+  assert.match(
+    FRUITS.find((fruit) => fruit.name === "西瓜")!.icon,
+    /^\/fruit-toons\/watermelon\.[a-f0-9]{12}\.webp$/,
   );
   [
     "石榴",

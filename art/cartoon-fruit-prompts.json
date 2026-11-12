@@ -1,0 +1,259 @@
+{
+  "tool": "Built-in image_gen",
+  "styleReference": "banana",
+  "prefix": "Use case: stylized-concept. Create ONE beautiful CARTOON fruit icon for a polished casual mobile matching game. Use the attached banana as STYLE REFERENCE ONLY; do not include bananas. SUBJECT: ",
+  "suffix": ". STYLE: sophisticated 2D cartoon illustration matching the reference: smooth playful rounded curves, clean rich color blocks, restrained 2-3-tone cel shading, crisp curved cream highlights, thin contour in darker local color, charming polished game art. NOT realistic, NOT photographic, NOT botanical realism, NOT 3D render, no grain, no pores, no microtexture. Characteristic seeds/scales are simplified clear graphic details. No eyes or faces. Square composition, one compact fruit/group as specified, centered, fully visible with 12% transparent padding. Genuine transparent background. NO CAST SHADOW, no ellipse below, no floor, no drop shadow, no halo, no background, no text, no frame. Only the fruit.",
+  "subjects": [
+    {
+      "index": 0,
+      "slug": "blueberry",
+      "subject": "Three plump indigo blueberries with five-point calyx stars and a tiny green leaf"
+    },
+    {
+      "index": 1,
+      "slug": "olive",
+      "subject": "Two green olives on a short twig with two narrow leaves"
+    },
+    {
+      "index": 2,
+      "slug": "grape",
+      "subject": "A compact tapered bunch of plump amethyst purple grapes, curling vine and one broad leaf"
+    },
+    {
+      "index": 3,
+      "slug": "cherry",
+      "subject": "Two plump crimson cherries joined by graceful green stems and one leaf"
+    },
+    {
+      "index": 4,
+      "slug": "strawberry",
+      "subject": "A plump heart-shaped red strawberry with neatly spaced little golden seeds and a curling green leafy crown"
+    },
+    {
+      "index": 5,
+      "slug": "lemon",
+      "subject": "A golden lemon with softly tapered tips and a curved green leaf"
+    },
+    {
+      "index": 6,
+      "slug": "kiwi",
+      "subject": "A kiwi half facing front, thin brown rind, vibrant green flesh, simple black seed ring and ivory core"
+    },
+    {
+      "index": 7,
+      "slug": "tomato",
+      "subject": "A plump coral-red tomato with gently lobed shoulders and a green star-shaped calyx"
+    },
+    {
+      "index": 8,
+      "slug": "avocado",
+      "subject": "An upright avocado half, rounded pear silhouette, dark green rind, pale green flesh and a large shiny brown pit"
+    },
+    {
+      "index": 9,
+      "slug": "orange",
+      "subject": "A round bright orange with a top dimple, tiny stem and a fresh green leaf"
+    },
+    {
+      "index": 10,
+      "slug": "green-apple",
+      "subject": "A crisp lime-green apple with lovely lobed shoulders, short brown stem and a leaf"
+    },
+    {
+      "index": 11,
+      "slug": "red-apple",
+      "subject": "A plump ruby-red apple with lovely lobed shoulders, short brown stem and a leaf"
+    },
+    {
+      "index": 12,
+      "slug": "pear",
+      "subject": "A yellow-green pear with graceful narrow neck, plump round base, curved brown stem and a small leaf"
+    },
+    {
+      "index": 13,
+      "slug": "peach",
+      "subject": "A rosy-pink peach, warm peach color, distinct curving cleft and two slim green leaves"
+    },
+    {
+      "index": 14,
+      "slug": "mango",
+      "subject": "A curved golden mango with orange-red blush on one side and a small green leaf"
+    },
+    {
+      "index": 15,
+      "slug": "banana",
+      "subject": "Three golden bananas"
+    },
+    {
+      "index": 16,
+      "slug": "coconut",
+      "subject": "A coconut half tilted toward viewer, smooth simplified brown shell, thick clean white flesh ring and hollow center"
+    },
+    {
+      "index": 17,
+      "slug": "pineapple",
+      "subject": "A golden pineapple with a tidy stylized diamond scale pattern and a layered green spear-leaf crown"
+    },
+    {
+      "index": 18,
+      "slug": "dragon-fruit",
+      "subject": "A dragon fruit half, bright pink rind with green-tipped scales, white cut face and clearly spaced tiny black seeds"
+    },
+    {
+      "index": 19,
+      "slug": "melon",
+      "subject": "A whole round sage-green cantaloupe with simple elegant cream net lines and a short curved stem"
+    },
+    {
+      "index": 20,
+      "slug": "pumpkin",
+      "subject": "A small plump orange pumpkin with six gracefully curved ribs and a curling woody stem"
+    },
+    {
+      "index": 21,
+      "slug": "watermelon",
+      "subject": "A round green watermelon with broad dark-green curved stripes and a little curly stem"
+    },
+    {
+      "index": 22,
+      "slug": "pomegranate",
+      "subject": "A red pomegranate with crown-shaped calyx and an open wedge displaying tidy ruby seeds in cream pith"
+    },
+    {
+      "index": 23,
+      "slug": "papaya",
+      "subject": "An elongated papaya half tilted upright, orange flesh, green-gold rind and a long central cavity of round black seeds"
+    },
+    {
+      "index": 24,
+      "slug": "jackfruit",
+      "subject": "A compact oval golden-green jackfruit with tidy simplified pointed scales and a stout short stem"
+    },
+    {
+      "index": 25,
+      "slug": "mangosteen",
+      "subject": "A dark purple mangosteen opened in front to show five plump white segments, topped by four broad green calyx leaves"
+    },
+    {
+      "index": 26,
+      "slug": "starfruit",
+      "subject": "A single thick golden starfruit slice, clearly five-pointed star shape, green-edged ridges and small central seeds"
+    },
+    {
+      "index": 27,
+      "slug": "pomelo",
+      "subject": "A large round pale yellow pomelo with subtly tapered top, tiny stem and green leaf; broad round citrus shape"
+    },
+    {
+      "index": 28,
+      "slug": "fig",
+      "subject": "A purple teardrop fig half, cut face showing rosy pink flesh, cream rim and simple tiny golden seeds"
+    },
+    {
+      "index": 29,
+      "slug": "wax-apple",
+      "subject": "A glossy coral-red wax apple with narrow top and broad scalloped bell-shaped bottom, short green stem"
+    },
+    {
+      "index": 30,
+      "slug": "lychee",
+      "subject": "One whole pink-red lychee with simple scalloped rind beside one peeled pearly white lychee"
+    },
+    {
+      "index": 31,
+      "slug": "guava",
+      "subject": "A guava half with light green rind, bright pink flesh and cream seeds in the center, a small green leaf"
+    },
+    {
+      "index": 32,
+      "slug": "loquat",
+      "subject": "Two oval golden-orange loquats on a short twig, tiny brown blossom-end stars and one long green leaf"
+    },
+    {
+      "index": 33,
+      "slug": "sugar-apple",
+      "subject": "A light green heart-shaped sugar apple, composed of rounded overlapping polygonal scales and a short stem"
+    },
+    {
+      "index": 34,
+      "slug": "salak",
+      "subject": "A chestnut-brown teardrop salak fruit, pointed tip, elegant stylized overlapping scale pattern"
+    },
+    {
+      "index": 35,
+      "slug": "breadfruit",
+      "subject": "A round lime-green breadfruit with a simple tidy honeycomb surface pattern and a short stout stem"
+    },
+    {
+      "index": 36,
+      "slug": "cacao",
+      "subject": "An elongated terracotta-red cacao pod with golden ridges, deep long curved ribs, tapered ends and woody stem"
+    },
+    {
+      "index": 37,
+      "slug": "tamarind",
+      "subject": "A curved cinnamon-brown tamarind pod with three plump rounded seed bulges, elegant bean-like silhouette"
+    },
+    {
+      "index": 38,
+      "slug": "persimmon",
+      "subject": "A squat round orange persimmon topped with four broad olive-green calyx leaves"
+    },
+    {
+      "index": 39,
+      "slug": "plum",
+      "subject": "A violet plum with a curving crease, purple-blue shading, thin brown stem and green leaf"
+    },
+    {
+      "index": 40,
+      "slug": "kumquat",
+      "subject": "Two small oval golden kumquats joined on a tiny twig with narrow green leaves"
+    },
+    {
+      "index": 41,
+      "slug": "passion-fruit",
+      "subject": "A passion fruit half with thick purple rind, ivory pith and golden pulp containing clear dark seeds"
+    },
+    {
+      "index": 42,
+      "slug": "longan",
+      "subject": "Two whole tan longan fruits beside one peeled ivory longan showing a large dark round seed"
+    },
+    {
+      "index": 43,
+      "slug": "yangmei",
+      "subject": "A deep raspberry-red yangmei bayberry with neat rounded tiny lobes across the surface and a small leaf"
+    },
+    {
+      "index": 44,
+      "slug": "pepino",
+      "subject": "A creamy ivory-yellow oval pepino melon with four curved purple stripes and a tiny green calyx"
+    },
+    {
+      "index": 45,
+      "slug": "canistel",
+      "subject": "A golden-yellow canistel eggfruit with pointed oval silhouette and a small dark green calyx"
+    },
+    {
+      "index": 46,
+      "slug": "kiwano",
+      "subject": "An oval golden-orange kiwano melon with several playful short conical horns"
+    },
+    {
+      "index": 47,
+      "slug": "buddhas-hand",
+      "subject": "A golden Buddha's hand citron with seven graceful curving finger-like lobes joined at a plump base and a tiny green leaf"
+    },
+    {
+      "index": 48,
+      "slug": "prickly-pear",
+      "subject": "A magenta prickly pear fruit, rounded oval silhouette, sparse tiny decorative areoles and a pale green blossom end"
+    },
+    {
+      "index": 49,
+      "slug": "fruit-king",
+      "subject": "A majestic golden durian, oval silhouette with rounded stylized golden pyramidal spikes, topped with a small gold crown and one ruby"
+    }
+  ],
+  "bananaPrompt": "Create one beautiful CARTOON fruit icon for a polished casual mobile matching game. SUBJECT: a compact bunch of THREE ripe bananas, pleasing plump rounded curved shapes, clearly individual bananas joining a small green stem, each tapering to a tiny brown tip. STYLE: sophisticated 2D cartoon illustration, smooth playful curves, clean golden yellow color blocks, restrained 2-3-tone cel shading and a few crisp cream-colored curved highlights. Thin warm ochre contour lines, no black heavy outlines. Charming hand-drawn game art. Absolutely NOT realistic, NOT photographic, NOT botanical realism, NOT textured, no pores, no freckles, no fibers, no realistic skin. No eyes or faces. Not primitive curved rectangular strips: bananas must have flowing organic curves and lovely rounded volume. Square composition, full fruit centered and fully visible, 12% transparent padding on all sides. Genuine transparent background. NO CAST SHADOW of any kind, no ellipse below it, no floor, no drop shadow, no background, no halo, no text, no frame. Only the cartoon bananas."
+}
