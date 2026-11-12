@@ -1,13 +1,16 @@
 """Original vector artwork. Run to regenerate the Orchard Club asset family."""
 from pathlib import Path
 import math, re
+from refine_fruits import finish_art
 ROOT=Path(__file__).resolve().parent.parent
 out=ROOT/'public/art'
 ink='#30492e'
 def path(d,fill,stroke=ink,sw=2.5): return f'<path d="{d}" fill="{fill}" stroke="{stroke}" stroke-width="{sw}" stroke-linejoin="round" stroke-linecap="round"/>'
 def ellipse(x,y,rx,ry,fill,stroke=ink,sw=2.5): return f'<ellipse cx="{x}" cy="{y}" rx="{rx}" ry="{ry}" fill="{fill}" stroke="{stroke}" stroke-width="{sw}"/>'
 def circle(x,y,r,fill,stroke=ink,sw=2.5): return ellipse(x,y,r,r,fill,stroke,sw)
-def leaf(x=60,y=26): return path(f'M{x} {y}q9 -22 29 -15q-7 24 -29 15','#698d43')+path(f'M{x+3} {y-2}l17 -9','none','#456831',1.5)
+def leaf(x=60,y=26):
+    return path(f'M{x} {y}C{x+4} {y-20} {x+20} {y-22} {x+31} {y-17}C{x+25} {y-1} {x+12} {y+3} {x} {y}Z','#63964b')+path(f'M{x+2} {y-1}Q{x+16} {y-13} {x+27} {y-15}M{x+11} {y-8}l-1 -6M{x+17} {y-11}l7 1','none','#c1d998',1)
+
 def stem(x=58,y=30): return path(f'M{x} {y}q-5 -13 1 -21','none','#785034',4)
 def body(color,shape='round'):
     if shape=='pear': return path('M51 25C30 28 43 48 27 65C6 91 30 113 62 111C96 111 113 87 91 62C77 47 81 26 62 25Z',color)
@@ -75,8 +78,17 @@ art.append(path('M26 104Q8 68 30 33Q39 20 44 38L40 70L51 20Q58 8 64 23L60 68L78 
 art.append(body('#cf9ca8','oval')+''.join(star(x,y,4,1.5,4,'#efc8c1') for x,y in [(35,55),(85,49),(37,88),(88,89)])+ellipse(64,29,14,10,'#9bad69'))
 art.append(body('#d2b86c')+''.join(star(x,y,6,2.5,3,'#f0d88c') for x in range(30,103,15) for y in range(49,105,16))+path('M38 38L30 12L51 24L64 5L78 24L99 12L90 39Z','#e5b54d')+circle(64,23,4,'#d78368'))
 assert len(art)==50,len(art)
+# Refined silhouettes and anatomy for the most frequently handled fruits.
+art[0]=''.join(circle(x,y,r,c)+path(f'M{x-8} {y-10}l5 2l3 -5l3 5l5 -2l-2 6l-6 2l-6 -2Z','#495d9c', '#495d9c',1) for x,y,r,c in [(42,77,26,'#5977b7'),(83,80,25,'#668ac5'),(62,48,26,'#7493cf')])+leaf(69,22)
+art[3]=path('M36 72C36 48 55 39 64 15C64 38 83 46 87 68','none','#6c8144',3)+circle(34,86,26,'#cc3b56')+circle(88,81,27,'#e35162')+leaf(63,19)
+art[4]=path('M19 51C21 29 40 23 61 29C84 22 104 31 107 52C105 78 76 110 62 115C46 109 18 75 19 51Z','#e85460')+path('M34 35Q42 22 55 29Q52 15 62 11Q69 21 67 29Q84 18 93 30L75 37L87 47Q70 46 62 39Q49 49 36 44L48 36Z','#579747')+''.join(ellipse(x,y,1.4,2.8,'#ffe09a','#d88651',.6) for x,y in [(31,52),(47,50),(65,53),(83,50),(96,57),(39,68),(57,68),(77,68),(89,76),(48,85),(66,84),(77,94),(61,101)])
+art[6]=ellipse(63,70,44,43,'#9e7953')+ellipse(63,70,39,38,'#c7d67b')+ellipse(63,70,35,34,'#8fbf4c')+''.join(path(f'M{63+13*math.cos(a):.2f} {70+15*math.sin(a):.2f}L{63+31*math.cos(a):.2f} {70+30*math.sin(a):.2f}','none','#e1e9ab',.85) for a in [n*math.pi/16 for n in range(32)])+ellipse(63,70,12,17,'#f5efcc')+''.join(ellipse(63+21*math.cos(a),70+23*math.sin(a),1.4,2.4,'#423c28','none') for a in [n*math.pi/10 for n in range(20)])
+art[17]='<defs><clipPath id="pine"><ellipse cx="61" cy="75" rx="34" ry="38"/></clipPath></defs>'+ellipse(61,75,34,38,'#e6b543')+'<g clip-path="url(#pine)">'+''.join(path(f'M{x} 35l70 80M{x+65} 35l-70 80','none','#bb8c30',1.1) for x in [-40,-20,0,20,40,60,80,100])+''.join(path(f'M{x-2} {y}q3 -3 6 0','none','#fff0a1',1) for x in range(35,94,13) for y in range(50,110,14))+'</g>'+path('M43 43Q34 23 24 18Q42 16 51 35Q44 13 53 3L63 31Q70 9 83 7L74 36Q88 22 103 26L80 45Z','#5b9854')+path('M62 38L57 15M72 39L82 26M51 40L40 28','none','#b6cf76',1.2)
+for tier,color,line in [(19,'#b2cc89','#e4e6ba'),(21,'#6bab69','#2f7b4b')]:
+    art[tier]='<defs><clipPath id="rind"><ellipse cx="62" cy="72" rx="43" ry="40"/></clipPath></defs>'+ellipse(62,72,43,40,color)+'<g clip-path="url(#rind)">'+''.join(path(f'M{x} 29C{x-17} 52 {x-14} 92 {x+3} 115','none',line,3 if tier==19 else 5) for x in [26,45,65,85,106])+'</g>'+stem(62,32)+path('M62 12q15 -9 17 0q-1 7 -7 4','none','#637e38',2)
+art[49]=body('#c8ac47')+''.join(path(f'M{x-5} {y+4}Q{x-2} {y-4} {x} {y-6}L{x+5} {y+4}Z','#dfc66c','#9c873c',1) for y in [49,64,79,94] for x in range(34+(7 if y%2 else 0),97,14))+path('M35 35L29 12L48 22L63 4L78 22L98 12L90 37Z','#efc54b')+path('M38 31L87 32','none','#fff1b2',1.5)+circle(63,22,4,'#d75c53')+circle(42,25,2,'#fff1b5')+circle(84,25,2,'#fff1b5')
 for i,a in enumerate(art):
-    svg=f'<svg xmlns="http://www.w3.org/2000/svg" width="128" height="128" viewBox="0 0 128 128"><title>Orchard fruit {i+1:02}</title><ellipse cx="64" cy="116" rx="34" ry="5" fill="#30492e" opacity=".09"/>{a}<path d="M37 50q-6 7 -6 14" fill="none" stroke="#fff9dd" stroke-width="5" stroke-linecap="round" opacity=".5"/></svg>'
+    svg=f'<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 128 128"><title>Orchard fruit {i+1:02}</title>{finish_art(a,i)}</svg>'
     (out/f'fruit-{i:02}.svg').write_text(svg)
 # All interface illustrations are paths, never font glyphs.
 icons={
@@ -140,13 +152,3 @@ for name,d in icons.items():
     if name=='gear': extra+='<circle cx="20" cy="20" r="5" fill="#fff7df" stroke="#35533b" stroke-width="2.4"/>'
     (ROOT/'public/icons'/f'{name}.svg').write_text(f'<svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="-2 -2 44 44">{extra}<path d="{d}" fill="none" stroke="#35533b" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>')
 print(f'Drew {len(art)} fruits and {len(icons)} interface icons.')
-# Bind fruit definitions to new artwork, remove font-based fallbacks.
-f=ROOT/'src/game/data.ts';s=f.read_text(); a,b=s.split('const B =',1)
-a=re.sub(r'  emoji: string;\n','',a);a=a.replace('icon?: string','icon: string')
-a=re.sub(r'emoji: "[^"]*",\s*','',a);a=re.sub(r'icon: "[^"]*",\s*','',a)
-idx=[-1]
-def bind(m):
-    idx[0]+=1
-    return m[0]+f' icon: "/art/fruit-{idx[0]:02}.svg",'
-a=re.sub(r'name: "[^"]*",',bind,a)
-f.write_text(a+'const B ='+b)
