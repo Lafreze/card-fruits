@@ -1,52 +1,55 @@
-export type Difficulty =
-  "relaxed" | "classic" | "expert" | "master" | "extreme";
+export type Difficulty = "relaxed" | "classic" | "expert" | "nightmare";
 export const DIFFICULTIES = {
   relaxed: {
-    name: "悠闲",
+    name: "简单",
+    stars: 1,
     slots: 8,
     danger: 3.5,
     score: 0.8,
     special: -0.12,
     size: 0.94,
-    hint: "8 格 · 得分 ×0.8",
+    hint: "通关 1 星 · 8 格",
   },
   classic: {
-    name: "标准",
+    name: "普通",
+    stars: 2,
     slots: 7,
     danger: 1.8,
     score: 1,
     special: 0.04,
     size: 1,
-    hint: "7 格 · 得分 ×1",
+    hint: "通关 2 星 · 7 格",
   },
   expert: {
     name: "困难",
+    stars: 3,
     slots: 6,
     danger: 1.4,
     score: 1.4,
     special: 0.16,
     size: 1.04,
-    hint: "6 格 · 得分 ×1.4",
+    hint: "通关 3 星 · 6 格",
   },
-  master: {
-    name: "大师",
+  nightmare: {
+    name: "隐藏四星",
+    stars: 4,
     slots: 5,
-    danger: 1.1,
-    score: 1.8,
-    special: 0.26,
-    size: 1.08,
-    hint: "5 格 · 得分 ×1.8",
-  },
-  extreme: {
-    name: "极限",
-    slots: 4,
-    danger: 0.9,
+    danger: 1.05,
     score: 2.4,
-    special: 0.34,
-    size: 1.12,
-    hint: "4 格 · 得分 ×2.4",
+    special: 0.48,
+    size: 1.08,
+    hint: "通关 4 星 · 90 秒 · 随机阻碍",
   },
 } as const;
+export const NIGHTMARE_SECONDS = 90;
+export const awardStars = (difficulty: Difficulty, won: boolean) =>
+  won ? DIFFICULTIES[difficulty].stars : 0;
+export const normalizeDifficulty = (value: string): Difficulty =>
+  value === "master" || value === "extreme"
+    ? "expert"
+    : value in DIFFICULTIES
+      ? (value as Difficulty)
+      : "classic";
 export function seededRandom(seed: string) {
   let value = 2166136261;
   for (const char of seed)
@@ -65,7 +68,7 @@ export function dailyChallenge(date = new Date()) {
   return {
     key,
     level: 3 + Math.floor(random() * 9),
-    seed: `orchard-v5-${key}`,
+    seed: `orchard-v6-${key}`,
     difficulty: "expert" as const,
   };
 }

@@ -392,7 +392,7 @@ export const MODE_INFO: Record<
   story: {
     icon: "map",
     name: "闯关模式",
-    tagline: "47 关，逐关合成果王",
+    tagline: "53 关，探索珍果群岛",
   },
   endless: {
     icon: "infinity",
@@ -690,7 +690,9 @@ export type ToolId =
   | "insight"
   | "vortex"
   | "cushion"
-  | "barometer";
+  | "barometer"
+  | "pruner"
+  | "fan";
 
 export type ToolDefinition = {
   id: ToolId;
@@ -703,6 +705,22 @@ export type ToolDefinition = {
 
 // 道具购买的是“每局可用次数”，不是一次性消耗品；玩家用果币构筑自己的补给方案。
 export const TOOLS: ToolDefinition[] = [
+  {
+    id: "pruner",
+    name: "清障剪",
+    icon: "scissors",
+    maxLevel: 2,
+    costs: [320, 880],
+    description: "清除荆棘球，解除最多三张冰锁或藤蔓卡",
+  },
+  {
+    id: "fan",
+    name: "果园风车",
+    icon: "wind",
+    maxLevel: 2,
+    costs: [260, 720],
+    description: "向左吹动水果 8 秒，覆盖当前风向",
+  },
   {
     id: "cushion",
     icon: "bubble",

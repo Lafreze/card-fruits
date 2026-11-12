@@ -11,7 +11,7 @@
     "build": "tsc -b && vite build",
     "start": "node server/index.mjs",
     "typecheck": "tsc -b --pretty false",
-    "test": "node --disable-warning=ExperimentalWarning --experimental-strip-types --test src/game/*.test.ts src/*.test.ts",
+    "test": "node --disable-warning=ExperimentalWarning --experimental-strip-types --test src/game/*.test.ts src/*.test.ts server/*.test.mjs",
     "art": "python3 scripts/draw-art.py"
   },
   "dependencies": {

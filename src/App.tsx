@@ -2,12 +2,22 @@ import { Icon } from "./Icon";
 import {
   DIFFICULTIES,
   dailyChallenge,
+  awardStars,
   type Difficulty,
 } from "./game/challenges";
-import { storage, exportSave, importSave } from "./storage";
+import {
+  storage,
+  exportSave,
+  importSave,
+  readStars,
+  mergeStars,
+} from "./storage";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   getLeaderboard,
+  getPlayer,
+  renamePlayer,
+  syncPending,
   saveScore,
   startRun,
   type LeaderboardEntry,
@@ -72,6 +82,9 @@ const EMPTY_SNAPSHOT: GameSnapshot = {
   insightLeft: 1,
   vortexLeft: 1,
   cushionLeft: 1,
+  prunerLeft: 1,
+  fanLeft: 1,
+  fanSeconds: 0,
   barometerLeft: 1,
   cushionSeconds: 0,
   insightSeconds: 0,
@@ -107,6 +120,8 @@ const FRUIT_BASE_TOOL_IDS = new Set<ToolId>([
   "vortex",
   "cushion",
   "barometer",
+  "pruner",
+  "fan",
 ]);
 const BASE_TOOL_IDS = new Set<ToolId>([
   ...CARD_BASE_TOOL_IDS,
@@ -335,23 +350,43 @@ function Leaderboard({
   onRefresh: () => void;
 }) {
   const [filter, setFilter] = useState<Difficulty | "all">("all");
-  const filteredEntries = entries.filter(
-    (entry) => filter === "all" || entry.difficulty === filter,
-  );
+  const [difficultyEntries, setDifficultyEntries] = useState<
+    LeaderboardEntry[]
+  >([]);
+  const [filterLoading, setFilterLoading] = useState(false);
+  useEffect(() => {
+    let live = true;
+    if (filter === "all") {
+      setFilterLoading(false);
+      return;
+    }
+    setFilterLoading(true);
+    void getLeaderboard(mode, filter)
+      .then((result) => {
+        if (live) setDifficultyEntries(result.scores);
+      })
+      .finally(() => {
+        if (live) setFilterLoading(false);
+      });
+    return () => {
+      live = false;
+    };
+  }, [filter, mode]);
+  const filteredEntries = filter === "all" ? entries : difficultyEntries;
   return (
     <div
       className="modal-backdrop"
       role="dialog"
       aria-modal="true"
-      aria-label="本机战绩榜"
+      aria-label="全服排行榜"
     >
       <section className="modal-card leaderboard-card">
-        <div className="modal-kicker">YOUR ORCHARD RECORDS</div>
-        <h2>我的收成记录</h2>
+        <div className="modal-kicker">ORCHARD LEADERBOARD</div>
+        <h2>全服排行榜</h2>
         <p className="modal-copy">
           {mode === "story"
-            ? "此浏览器内的最佳战绩 · 按难度分别保存"
-            : "本机历史最佳 · 每日挑战按日期分别记录"}
+            ? "每位玩家一条最佳成绩"
+            : "全服最佳 · 每日挑战按日期记录"}
         </p>
         <div className="leaderboard-tabs">
           {(Object.keys(MODE_INFO) as GameMode[]).map((item) => (
@@ -382,13 +417,11 @@ function Leaderboard({
           ))}
         </div>
         <div className="rank-list">
-          {loading ? (
+          {loading || filterLoading ? (
             <div className="empty-state">正在采摘最新战绩…</div>
           ) : null}
           {!loading && offline ? (
-            <div className="empty-state">
-              浏览器未允许保存数据，可导出存档备份。
-            </div>
+            <div className="empty-state">服务器暂时不可用，显示本机缓存。</div>
           ) : null}
           {!loading && !offline && filteredEntries.length === 0 ? (
             <div className="empty-state">第一名正在等你来拿。</div>
@@ -444,6 +477,11 @@ export default function App() {
     () => storage.getItem("fruit-king-muted") === "true",
   );
   const [screen, setScreen] = useState<Screen>("home");
+  const [stars, setStars] = useState(readStars);
+  const [profileName, setProfileName] = useState(
+    () => storage.getItem("fruit-king-name") || "果园旅人",
+  );
+  const [profileMessage, setProfileMessage] = useState("");
   const [difficulty, setDifficulty] = useState<Difficulty>("classic");
   const [challenge, setChallenge] = useState(dailyChallenge);
   const [archiveOpen, setArchiveOpen] = useState(false);
@@ -456,7 +494,6 @@ export default function App() {
   const [snapshot, setSnapshot] = useState<GameSnapshot>(EMPTY_SNAPSHOT);
   const [result, setResult] = useState<GameResult | null>(null);
   const [runId, setRunId] = useState<string | null>(null);
-  const [username, setUsername] = useState("");
   const [saveState, setSaveState] = useState<"idle" | "saving" | "saved">(
     "idle",
   );
@@ -497,6 +534,49 @@ export default function App() {
     tools,
   });
 
+  useEffect(() => {
+    const sync = async () => {
+      try {
+        await syncPending().catch(() => {});
+        const profile = await getPlayer();
+        storage.setItem("fruit-king-name", profile.username);
+        if (document.activeElement?.tagName !== "INPUT")
+          setProfileName(profile.username);
+        const restored = mergeStars(profile.stars);
+        setStars(restored);
+        const completed = Object.entries(restored)
+          .filter(([, value]) => value > 0)
+          .map(([key]) => Number(key) + 1);
+        const progress = Math.min(
+          LEVELS.length - 1,
+          Math.max(readProgress(), 0, ...completed),
+        );
+        storage.setItem("fruit-king-unlocked", String(progress));
+        setUnlocked(progress);
+      } catch {
+        /* Results remain queued locally until the server returns. */
+      }
+    };
+    void sync();
+    window.addEventListener("online", sync);
+    const interval = window.setInterval(sync, 30000);
+    return () => {
+      window.removeEventListener("online", sync);
+      window.clearInterval(interval);
+    };
+  }, []);
+  const saveNickname = async () => {
+    setProfileMessage("保存中…");
+    try {
+      const profile = await renamePlayer(profileName);
+      setProfileName(profile.username);
+      setProfileMessage("昵称已更新");
+    } catch (error) {
+      setProfileMessage(
+        error instanceof Error ? error.message : "昵称更新失败",
+      );
+    }
+  };
   const persistCoins = useCallback((next: number) => {
     storage.setItem("fruit-king-coins", String(next));
     setCoins(next);
@@ -578,7 +658,10 @@ export default function App() {
       setLastCoinReward(reward);
       persistCoins(readCoins() + reward);
       if (next.status === "won") {
-        if (mode === "story") persistUnlocked(level + 1);
+        if (mode === "story") {
+          persistUnlocked(level + 1);
+          setStars(mergeStars({ [level]: awardStars(next.difficulty, true) }));
+        }
         if (mode === "expedition" && next.wave < 8)
           setRewardOptions(
             pickRelics(
@@ -593,8 +676,11 @@ export default function App() {
   );
   useEffect(() => {
     if (!result || !runId) return;
+    setSaveState("saving");
     void saveScore({
       runId,
+      status: result.status === "won" ? "won" : "lost",
+      durationMs: Math.round(result.durationMs),
       username: storage.getItem("fruit-king-name") || "果园旅人",
       score: result.score,
       maxCombo: result.maxCombo,
@@ -602,9 +688,22 @@ export default function App() {
       level: mode === "endless" || mode === "sprint" ? result.wave : level,
     })
       .then(() => setSaveState("saved"))
-      .catch((error: Error) => setSaveError(error.message));
+      .catch((error: Error) => {
+        setSaveState("idle");
+        setSaveError(error.message);
+      });
   }, [result, runId, mode, level]);
 
+  useEffect(() => {
+    const synced = (event: Event) => {
+      if ((event as CustomEvent).detail === runId) {
+        setSaveState("saved");
+        setSaveError("");
+      }
+    };
+    window.addEventListener("fruit-score-synced", synced);
+    return () => window.removeEventListener("fruit-score-synced", synced);
+  }, [runId]);
   const handleToast = useCallback(
     (message: string, tone: "gold" | "pink" | "cyan" = "pink") => {
       if (toastTimer.current) window.clearTimeout(toastTimer.current);
@@ -634,6 +733,12 @@ export default function App() {
       ) {
         void document.documentElement.requestFullscreen().catch(() => {});
       }
+      const chosenDifficulty =
+        difficulty === "nightmare" &&
+        (targetMode !== "story" || (readStars()[targetLevel] || 0) < 3)
+          ? "expert"
+          : difficulty;
+      setDifficulty(chosenDifficulty);
       sounds.prepare();
       gameUpgrades.current = {
         fever: upgrades.fever,
@@ -660,7 +765,6 @@ export default function App() {
       setRewardOptions([]);
       setSaveState("idle");
       setSaveError("");
-      setUsername("");
       setRunId(null);
       setGamePanel(null);
       setLastCoinStarterGift(false);
@@ -674,7 +778,7 @@ export default function App() {
           targetMode === "endless" || targetMode === "sprint"
             ? nextWave
             : targetLevel,
-          targetMode === "daily" ? "expert" : difficulty,
+          targetMode === "daily" ? "expert" : chosenDifficulty,
           targetMode === "daily" ? day.key : "",
         ).runId,
       );
@@ -821,22 +925,15 @@ export default function App() {
   };
 
   const submitScore = async () => {
-    if (!result || !runId || !username.trim() || saveState === "saving") return;
     setSaveState("saving");
     setSaveError("");
     try {
-      await saveScore({
-        runId,
-        username,
-        score: result.score,
-        maxCombo: result.maxCombo,
-        fruitTier: result.maxFruitTier,
-      });
+      await syncPending();
       setSaveState("saved");
       loadLeaderboard(mode);
     } catch (error) {
       setSaveState("idle");
-      setSaveError(error instanceof Error ? error.message : "分数保存失败");
+      setSaveError(error instanceof Error ? error.message : "服务器暂时不可用");
     }
   };
 
@@ -952,6 +1049,22 @@ export default function App() {
     result?.status === "won" &&
     rewardOptions.length > 0;
   const toolboxItems = [
+    {
+      id: "pruner",
+      icon: "scissors",
+      label: "清障剪",
+      description: "清荆棘 · 解三张冰藤",
+      category: "card",
+      left: snapshot.prunerLeft,
+    },
+    {
+      id: "fan",
+      icon: "wind",
+      label: "果园风车",
+      description: "向左吹 · 8 秒",
+      category: "fruit",
+      left: snapshot.fanLeft,
+    },
     {
       id: "cushion",
       icon: "bubble",
@@ -1124,13 +1237,15 @@ export default function App() {
     left: number;
   }>;
   const toolSeconds = (id: ToolId) =>
-    id === "cushion"
-      ? snapshot.cushionSeconds
-      : id === "vortex"
-        ? snapshot.vortexSeconds
-        : id === "insight"
-          ? snapshot.insightSeconds
-          : 0;
+    id === "fan"
+      ? snapshot.fanSeconds
+      : id === "cushion"
+        ? snapshot.cushionSeconds
+        : id === "vortex"
+          ? snapshot.vortexSeconds
+          : id === "insight"
+            ? snapshot.insightSeconds
+            : 0;
   const availableToolboxItems = toolboxItems.filter((item) => item.left > 0);
   const toolGroups = [
     {
@@ -1235,10 +1350,10 @@ export default function App() {
               </div>
               <div className="intro-bottom">
                 <span>
-                  <b>50</b> 种卡通水果
+                  <b>{FRUITS.length}</b> 种卡通水果
                 </span>
                 <span>
-                  <b>47</b> 个关卡
+                  <b>{LEVELS.length}</b> 个关卡
                 </span>
                 <span>
                   <b>5</b> 种玩法
@@ -1266,7 +1381,11 @@ export default function App() {
                     key={item}
                     className={mode === item ? "active" : ""}
                     aria-pressed={mode === item}
-                    onClick={() => setMode(item)}
+                    onClick={() => {
+                      setMode(item);
+                      if (item !== "story" && difficulty === "nightmare")
+                        setDifficulty("expert");
+                    }}
                   >
                     <i>
                       <Icon name={MODE_INFO[item].icon} />
@@ -1276,7 +1395,7 @@ export default function App() {
                       <small>
                         {
                           {
-                            story: "47 关",
+                            story: `${LEVELS.length} 关`,
                             endless: "不限时",
                             expedition: "8 关远征",
                             sprint: "120 秒",
@@ -1297,23 +1416,29 @@ export default function App() {
                   </small>
                 </div>
                 <div className="difficulty-switch" aria-label="选择难度">
-                  {(Object.keys(DIFFICULTIES) as Difficulty[]).map((item) => (
-                    <button
-                      key={item}
-                      aria-pressed={
-                        (mode === "daily" ? "expert" : difficulty) === item
-                      }
-                      disabled={mode === "daily"}
-                      className={
-                        (mode === "daily" ? "expert" : difficulty) === item
-                          ? "active"
-                          : ""
-                      }
-                      onClick={() => setDifficulty(item)}
-                    >
-                      {DIFFICULTIES[item].name}
-                    </button>
-                  ))}
+                  {(Object.keys(DIFFICULTIES) as Difficulty[])
+                    .filter(
+                      (item) =>
+                        item !== "nightmare" ||
+                        (mode === "story" && (stars[level] || 0) >= 3),
+                    )
+                    .map((item) => (
+                      <button
+                        key={item}
+                        aria-pressed={
+                          (mode === "daily" ? "expert" : difficulty) === item
+                        }
+                        disabled={mode === "daily"}
+                        className={
+                          (mode === "daily" ? "expert" : difficulty) === item
+                            ? "active"
+                            : ""
+                        }
+                        onClick={() => setDifficulty(item)}
+                      >
+                        {DIFFICULTIES[item].name}
+                      </button>
+                    ))}
                 </div>
                 <p>
                   {mode === "daily"
@@ -1336,11 +1461,26 @@ export default function App() {
                         className={`level-dot ${index <= unlocked ? "unlocked" : ""} ${index === level ? "selected" : ""}`}
                         disabled={index > unlocked}
                         aria-label={`${item.name}${index > unlocked ? "，未解锁" : ""}`}
-                        onClick={() => setLevel(index)}
+                        onClick={() => {
+                          setLevel(index);
+                          if (
+                            difficulty === "nightmare" &&
+                            (stars[index] || 0) < 3
+                          )
+                            setDifficulty("expert");
+                        }}
                       >
-                        {index < unlocked
-                          ? "✓"
-                          : String(index + 1).padStart(2, "0")}
+                        {String(index + 1).padStart(2, "0")}
+                        {stars[index] ? (
+                          <span
+                            className="level-stars"
+                            aria-label={`${stars[index]} 星`}
+                          >
+                            {Array.from({ length: stars[index] }, (_, i) => (
+                              <Icon key={i} name="star" />
+                            ))}
+                          </span>
+                        ) : null}
                       </button>
                     ))}
                   </div>
@@ -1530,8 +1670,8 @@ export default function App() {
                   · {MODE_INFO[mode].name}
                 </span>
                 <b>
-                  {mode === "sprint"
-                    ? `${snapshot.timeLeft ?? 120}s`
+                  {snapshot.timeLeft !== null
+                    ? `${snapshot.timeLeft}s`
                     : mode === "daily"
                       ? challenge.key
                       : `第 ${mode === "endless" ? snapshot.wave : level + 1} ${mode === "endless" ? "波" : "关"}`}
@@ -1800,6 +1940,19 @@ export default function App() {
                         <Icon name="juice" />
                       )}
                     </div>
+                    {result.status === "won" && (
+                      <div
+                        className="result-stars"
+                        aria-label={`${awardStars(result.difficulty, true)} 星通关`}
+                      >
+                        {Array.from(
+                          { length: awardStars(result.difficulty, true) },
+                          (_, i) => (
+                            <Icon key={i} name="star" />
+                          ),
+                        )}
+                      </div>
+                    )}
                     <div className="result-kicker">
                       {isRelicReward
                         ? `Rogue 第 ${result.wave} 关`
@@ -1895,52 +2048,19 @@ export default function App() {
                       <div
                         className={`save-box ${!runId ? "save-offline" : ""}`}
                       >
-                        {saveState === "saved" ? (
-                          <div className="saved-message">
-                            {storage.persistent
-                              ? "✓ 战绩已自动保存到本机"
-                              : "已记入本次会话，请导出存档"}
-                          </div>
-                        ) : !runId ? (
-                          <div className="offline-score-note">
-                            <b>战绩保存在本机</b>
-                            <small>
-                              浏览器存储不可用，请导出存档保留战绩。
-                            </small>
-                          </div>
-                        ) : (
+                        <div className="saved-message">
+                          {saveState === "saved"
+                            ? "成绩已保存 · 全服可见"
+                            : saveState === "saving"
+                              ? "成绩同步中…"
+                              : "成绩已暂存 · 等待同步"}
+                        </div>
+                        {saveError && (
                           <>
-                            <label htmlFor="username">
-                              留下果王名号，保存本局分数
-                            </label>
-                            <div className="name-row">
-                              <input
-                                id="username"
-                                value={username}
-                                maxLength={20}
-                                placeholder="输入用户名"
-                                autoComplete="nickname"
-                                onChange={(event) =>
-                                  setUsername(event.target.value)
-                                }
-                                onKeyDown={(event) => {
-                                  if (event.key === "Enter") void submitScore();
-                                }}
-                              />
-                              <button
-                                disabled={
-                                  !username.trim() ||
-                                  saveState === "saving" ||
-                                  !runId
-                                }
-                                onClick={() => void submitScore()}
-                              >
-                                {saveState === "saving" ? "保存中" : "保存"}
-                              </button>
-                            </div>
-                            {saveError ? (
-                              <small className="save-error">{saveError}</small>
-                            ) : null}
+                            <small className="save-error">{saveError}</small>
+                            <button onClick={() => void submitScore()}>
+                              重试同步
+                            </button>
                           </>
                         )}
                       </div>
@@ -2065,21 +2185,23 @@ export default function App() {
             <span className="modal-kicker">TAKE YOUR ORCHARD WITH YOU</span>
             <h2>把果园装进口袋</h2>
             <p className="modal-copy">
-              关卡、果币、温室和最高分保存在当前浏览器。换设备或清理浏览器前，记得导出一份存档。
+              成绩与星级自动同步到服务器；果币和温室保存在本机。
             </p>
             <label className="profile-name">
               你的果园名号
               <input
                 maxLength={20}
-                defaultValue={storage.getItem("fruit-king-name") || "果园旅人"}
-                onChange={(e) =>
-                  storage.setItem(
-                    "fruit-king-name",
-                    e.target.value.trim().slice(0, 20) || "果园旅人",
-                  )
-                }
+                value={profileName}
+                onChange={(e) => setProfileName(e.target.value)}
               />
             </label>
+            <button
+              className="button button-primary"
+              onClick={() => void saveNickname()}
+            >
+              更新昵称
+            </button>
+            {profileMessage && <p role="status">{profileMessage}</p>}
             <button
               className="button button-primary"
               onClick={() => {
@@ -2110,6 +2232,7 @@ export default function App() {
                     setUpgrades(readUpgrades());
                     setTools(readTools());
                     setUnlocked(readProgress());
+                    setStars(readStars());
                     setLevel(readProgress());
                     const nextMuted =
                       storage.getItem("fruit-king-muted") === "true";

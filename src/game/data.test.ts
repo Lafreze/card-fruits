@@ -112,7 +112,7 @@ test("rotated card coverage follows the visible footprint", () => {
 });
 
 test("all story levels have valid, playable layouts", () => {
-  assert.equal(LEVELS.length, 47);
+  assert.equal(LEVELS.length, 53);
 
   LEVELS.forEach((level, index) => {
     const slots = expandLayout(level.layout);
@@ -297,7 +297,7 @@ test("endless high-tier seeds are progressive", () => {
   assert.equal(endlessSeedTier(2, FRUITS.length), null);
   assert.equal(endlessSeedTier(3, FRUITS.length), 4);
   assert.ok(endlessSeedTier(10, FRUITS.length)! >= 11);
-  assert.equal(endlessSeedTier(50, FRUITS.length), FRUITS.length - 3);
+  assert.equal(endlessSeedTier(100, FRUITS.length), FRUITS.length - 3);
 });
 
 test("fusion reveal stays gentle and story harvest can finish by clear or full tray", () => {
@@ -512,9 +512,9 @@ test("fusion planning keeps one partner per fruit and prioritizes card bonds", (
 });
 
 test("fruit scale and roguelike catalog stay balanced", () => {
-  assert.equal(FRUITS.length, 50);
+  assert.equal(FRUITS.length, 56);
   assert.deepEqual(
-    FRUITS.slice(-12).map((fruit) => fruit.name),
+    FRUITS.slice(38, 50).map((fruit) => fruit.name),
     [
       "柿子",
       "李子",
@@ -531,7 +531,7 @@ test("fruit scale and roguelike catalog stay balanced", () => {
     ],
   );
   FRUITS.forEach((fruit, index) => {
-    assert.ok(fruit.radius <= 41, `${fruit.name} 不应重新撑满果箱`);
+    assert.ok(fruit.radius <= 41.1, `${fruit.name} 不应重新撑满果箱`);
     if (index > 0) {
       assert.ok(fruit.radius > FRUITS[index - 1].radius);
       assert.ok(
@@ -586,7 +586,7 @@ test("fruit scale and roguelike catalog stay balanced", () => {
   assert.equal(MUTATORS.length, 10);
   assert.ok(MUTATORS.every((mutator) => mutator.description.length > 0));
   assert.equal(UPGRADES.length, 12);
-  assert.equal(TOOLS.length, 20);
+  assert.equal(TOOLS.length, 22);
   assert.equal(new Set(TOOLS.map((tool) => tool.id)).size, TOOLS.length);
   assert.ok(
     TOOLS.every(

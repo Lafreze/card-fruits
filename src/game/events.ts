@@ -77,6 +77,32 @@ export const WEATHER_EVENTS = [
     gravity: 1,
     damping: 1,
   },
+  {
+    id: "hail",
+    name: "跳跳冰雹",
+    icon: "ice",
+    hint: "果箱弹性增强 · 得分 ×1.3",
+    duration: 10,
+    drift: 0,
+    magnet: 0.8,
+    danger: 1,
+    score: 1.3,
+    gravity: 1,
+    damping: 1,
+  },
+  {
+    id: "nectar",
+    name: "蜜露",
+    icon: "honey",
+    hint: "吸引增强 · 得分 ×1.6",
+    duration: 10,
+    drift: 0,
+    magnet: 1.3,
+    danger: 1,
+    score: 1.6,
+    gravity: 0.9,
+    damping: 1,
+  },
 ] as const;
 export type WeatherEvent = (typeof WEATHER_EVENTS)[number];
 export type WeatherSnapshot = {

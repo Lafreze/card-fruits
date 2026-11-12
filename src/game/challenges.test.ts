@@ -46,11 +46,11 @@ test("daily challenge uses the same UTC date and deal across devices, changes ne
   }
   assert.deepEqual(deal(), deal());
 });
-test("five difficulties trade capacity and grace period for score", () => {
+test("three difficulties and one hidden difficulty trade capacity and grace period for score", () => {
   const rules = Object.values(DIFFICULTIES);
   assert.deepEqual(
     rules.map((r) => r.slots),
-    [8, 7, 6, 5, 4],
+    [8, 7, 6, 5],
   );
   for (let i = 1; i < rules.length; i++) {
     assert.ok(rules[i].score > rules[i - 1].score);
@@ -63,22 +63,36 @@ test("sprint clock clamps its final second and cannot go negative", () => {
   assert.equal(secondsRemaining(120, 120), 0);
   assert.equal(secondsRemaining(123, 120), 0);
 });
-test("all 50 fruits have distinct WebP artwork with matching cache fingerprints", () => {
-  assert.equal(new Set(FRUITS.map((f) => f.icon)).size, 50);
+test("all 56 fruits have distinct cartoon artwork with matching cache fingerprints", () => {
+  assert.equal(new Set(FRUITS.map((f) => f.icon)).size, 56);
   FRUITS.forEach((f) => {
     const file = `public${f.icon}`;
     assert.ok(existsSync(file), file);
     const content = readFileSync(file);
-    assert.equal(content.toString("ascii", 0, 4), "RIFF");
-    assert.equal(content.toString("ascii", 8, 12), "WEBP");
+    if (f.icon.endsWith(".webp")) {
+      assert.equal(content.toString("ascii", 0, 4), "RIFF");
+      assert.equal(content.toString("ascii", 8, 12), "WEBP");
+    } else assert.ok(content.toString().includes("<svg"));
     const digest = createHash("sha256")
       .update(content)
       .digest("hex")
       .slice(0, 12);
-    assert.ok(
-      f.icon.endsWith(`.${digest}.webp`),
-      `${f.name}: stale artwork URL`,
-    );
+    assert.ok(f.icon.includes(`.${digest}.`), `${f.name}: stale artwork URL`);
     assert.ok(content.length < 150_000, `${f.name}: oversized card artwork`);
   });
+});
+
+test("winning stars follow difficulty exactly and losses give no stars", async () => {
+  const { awardStars, normalizeDifficulty } = await import("./challenges.ts");
+  for (const [difficulty, value] of [
+    ["relaxed", 1],
+    ["classic", 2],
+    ["expert", 3],
+    ["nightmare", 4],
+  ] as const) {
+    assert.equal(awardStars(difficulty, true), value);
+    assert.equal(awardStars(difficulty, false), 0);
+  }
+  assert.equal(normalizeDifficulty("extreme"), "expert");
+  assert.equal(normalizeDifficulty("master"), "expert");
 });

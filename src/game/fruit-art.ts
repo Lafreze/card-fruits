@@ -49,5 +49,11 @@ export const FRUIT_ART = [
   "/fruit-toons/kiwano.059476d6b17c.webp",
   "/fruit-toons/buddhas-hand.b18fb0f8c340.webp",
   "/fruit-toons/prickly-pear.f0b8ac8fe33e.webp",
-  "/fruit-toons/fruit-king.cb5df05d370c.webp"
+  "/fruit-toons/fruit-king.cb5df05d370c.webp",
+  "/fruit-toons/cranberry.6fc488f5d566.svg",
+  "/fruit-toons/apricot.f66842afc167.svg",
+  "/fruit-toons/blackberry.18aea44806fe.svg",
+  "/fruit-toons/rambutan.462922d7ffa1.svg",
+  "/fruit-toons/durian.6fd62b1a4b01.svg",
+  "/fruit-toons/rosehip.8393fdd2d698.svg",
 ] as const;

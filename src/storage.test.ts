@@ -89,7 +89,7 @@ test("blocked browser storage falls back to the session and remains exportable",
 });
 
 test("extreme records and new skill upgrades survive save export and import", async () => {
-  const { runId } = startRun("story", 3, "extreme");
+  const { runId } = startRun("story", 3, "nightmare");
   await saveScore({
     runId,
     username: "极限园丁",
@@ -104,7 +104,7 @@ test("extreme records and new skill upgrades survive save export and import", as
   const backup = exportSave();
   importSave(backup);
   assert.equal(
-    (await getLeaderboard("story", "extreme")).scores[0].score,
+    (await getLeaderboard("story", "nightmare")).scores[0].score,
     1400,
   );
   assert.deepEqual(JSON.parse(storage.getItem("fruit-king-tools")!), {

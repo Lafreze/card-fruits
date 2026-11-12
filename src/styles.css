@@ -3235,3 +3235,39 @@ body {
 .toolbox-grid button {
   border: 0;
 }
+.difficulty-switch {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+.difficulty-switch:has(button:nth-child(4)) {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+.level-dot {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  min-height: 52px;
+}
+.level-stars {
+  display: flex;
+  justify-content: center;
+  gap: 0;
+}
+.level-stars .drawn-icon {
+  width: 10px;
+  height: 10px;
+}
+.result-stars {
+  display: flex;
+  justify-content: center;
+  gap: 8px;
+  margin: 8px 0;
+}
+.result-stars .drawn-icon {
+  width: 32px;
+  height: 32px;
+}
+.profile-name + .button {
+  margin-bottom: 12px;
+}

@@ -33,6 +33,9 @@ export type GameSnapshot = {
   insightLeft: number;
   vortexLeft: number;
   cushionLeft: number;
+  prunerLeft: number;
+  fanLeft: number;
+  fanSeconds: number;
   barometerLeft: number;
   cushionSeconds: number;
   insightSeconds: number;
@@ -107,6 +110,8 @@ export type GameControls = {
   insight: () => void;
   vortex: () => void;
   cushion: () => void;
+  pruner: () => void;
+  fan: () => void;
   barometer: () => void;
   setDropLane: (lane: -1 | 0 | 1) => void;
   pause: () => void;

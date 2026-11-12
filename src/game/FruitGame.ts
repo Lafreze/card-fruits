@@ -6,6 +6,7 @@ import {
   seededRandom,
   secondsRemaining,
   SPRINT_SECONDS,
+  NIGHTMARE_SECONDS,
   type Difficulty,
 } from "./challenges";
 import {
@@ -287,6 +288,16 @@ export class FruitGame implements GameControls {
   private barometerLeft = 1;
   private cushionUntil = 0;
   private weatherGravity = 1;
+  private prunerLeft = 1;
+  private fanLeft = 1;
+  private fanUntil = 0;
+  private nextObstacle = 10;
+  private obstacles: Array<{
+    body: Matter.Body;
+    view: Graphics;
+    until: number;
+  }> = [];
+  private temporaryLocks = new Map<number, number>();
   private insightUntil = 0;
   private vortexUntil = 0;
   private insightIds = new Set<number>();
@@ -332,9 +343,7 @@ export class FruitGame implements GameControls {
     this.challengeKey = config.challengeKey || "";
     this.weather = new WeatherCycle(
       config.seed ? seededRandom(`${config.seed}:weather`) : Math.random,
-      { relaxed: 42, classic: 30, expert: 25, master: 21, extreme: 18 }[
-        this.difficulty
-      ],
+      { relaxed: 42, classic: 30, expert: 25, nightmare: 12 }[this.difficulty],
     );
     this.wave = Math.max(1, config.wave || 1);
     this.relics = [...(config.relics || [])];
@@ -377,6 +386,8 @@ export class FruitGame implements GameControls {
     this.vortexLeft += Math.max(0, tools.vortex || 0);
     this.cushionLeft += Math.max(0, tools.cushion || 0);
     this.barometerLeft += Math.max(0, tools.barometer || 0);
+    this.prunerLeft += Math.max(0, tools.pruner || 0);
+    this.fanLeft += Math.max(0, tools.fan || 0);
     // 奇物只强化已经用果币配置的道具，不会绕过温室直接解锁。
     if (this.hasRelic("tool_belt")) {
       if (tools.shuffle) this.shuffleLeft += 1;
@@ -596,9 +607,14 @@ export class FruitGame implements GameControls {
       echo.fromB = map(echo.fromB, "box");
       echo.center = map(echo.center, "box");
     });
+    this.obstacles.forEach((o) => {
+      const p = map(o.body.position, "box");
+      Body.setPosition(o.body, p);
+      o.view.position.copyFrom(p);
+    });
     this.sceneDecor.forEach((child) => child.destroy({ children: true }));
     Composite.allBodies(this.engine.world)
-      .filter((body) => body.isStatic)
+      .filter((body) => body.isStatic && body.label !== "thorn")
       .forEach((body) => Composite.remove(this.engine.world, body));
     this.layout = next;
     this.app.renderer.resize(next.width, next.height);
@@ -1199,7 +1215,10 @@ export class FruitGame implements GameControls {
     );
     const { tiers, openingSlots: protectedOpeningSlots } = deal;
     let disruptiveSpecials = 0;
-    const disruptiveLimit = Math.max(1, Math.floor(cardCount * 0.16));
+    const disruptiveLimit = Math.max(
+      1,
+      Math.floor(cardCount * (this.difficulty === "nightmare" ? 0.45 : 0.16)),
+    );
 
     tiers.forEach((tier, index) => {
       const slot = slots[index];
@@ -1207,7 +1226,11 @@ export class FruitGame implements GameControls {
       const y = slot.y;
       const protectedOpening = protectedOpeningSlots.has(index);
       const specialRate = Math.min(
-        this.mode === "story" || this.mode === "daily" ? 0.3 : 0.52,
+        this.difficulty === "nightmare"
+          ? 0.75
+          : this.mode === "story" || this.mode === "daily"
+            ? 0.3
+            : 0.52,
         definition.specialRate +
           (this.mode === "endless" || this.mode === "sprint"
             ? this.wave * 0.018
@@ -3299,10 +3322,12 @@ export class FruitGame implements GameControls {
 
   private updateEffects() {
     this.weather.tick(this.activeSeconds);
+    this.updateObstacles();
     const weather = this.weather.active;
     this.engine.gravity.x =
       (weather?.drift ?? 0) *
       (weather?.id === "tempest" ? Math.sin(this.activeSeconds * 1.8) : 1);
+    if (this.activeSeconds < this.fanUntil) this.engine.gravity.x = -0.28;
     this.engine.gravity.y =
       (this.engine.gravity.y / this.weatherGravity) * (weather?.gravity ?? 1);
     this.weatherGravity = weather?.gravity ?? 1;
@@ -3311,7 +3336,11 @@ export class FruitGame implements GameControls {
     Composite.allBodies(this.engine.world)
       .filter((body) => body.label === "floor")
       .forEach((body) => {
-        body.restitution = bouncing ? 0.82 : 0.12;
+        body.restitution = bouncing
+          ? 0.82
+          : weather?.id === "hail"
+            ? 0.62
+            : 0.12;
       });
     if (this.activeSeconds >= this.insightUntil) this.insightIds.clear();
     const state = JSON.stringify([
@@ -3319,12 +3348,125 @@ export class FruitGame implements GameControls {
       Math.max(0, Math.ceil(this.insightUntil - this.activeSeconds)),
       Math.max(0, Math.ceil(this.vortexUntil - this.activeSeconds)),
       Math.max(0, Math.ceil(this.cushionUntil - this.activeSeconds)),
+      Math.max(0, Math.ceil(this.fanUntil - this.activeSeconds)),
     ]);
     if (state !== this.lastEffectState) {
       this.lastEffectState = state;
       this.emitSnapshot();
     }
   }
+
+  private updateObstacles() {
+    for (const [id, until] of this.temporaryLocks)
+      if (this.activeSeconds >= until) {
+        const card = this.cards.find((card) => card.id === id);
+        if (card) {
+          card.locked = false;
+          card.view.getChildByLabel("lock")?.destroy();
+        }
+        this.temporaryLocks.delete(id);
+        this.updateCardAccess();
+      }
+    this.obstacles = this.obstacles.filter((obstacle) => {
+      if (this.activeSeconds < obstacle.until) return true;
+      Composite.remove(this.engine.world, obstacle.body);
+      obstacle.view.destroy();
+      return false;
+    });
+    if (
+      this.difficulty !== "nightmare" ||
+      this.activeSeconds < this.nextObstacle
+    )
+      return;
+    this.nextObstacle = this.activeSeconds + 10 + this.random() * 4;
+    const roll = this.random();
+    const exposed = this.cards.filter(
+      (c) =>
+        c.active && !c.locked && !this.isCovered(c) && c.special === "normal",
+    );
+    if (roll < 0.34 && exposed.length > 1) {
+      const card = exposed[Math.floor(this.random() * exposed.length)];
+      card.locked = true;
+      this.addCardBadge(card.view, "ice", 0x6c91b5, "lock");
+      this.temporaryLocks.set(card.id, this.activeSeconds + 6);
+      this.updateCardAccess();
+      this.callbacks.onToast("霜锁 · 6 秒", "cyan");
+    } else if (roll < 0.72 && this.obstacles.length < 2) {
+      const box = this.layout.box,
+        x = box.x + 70 + this.random() * (box.width - 140),
+        y = box.y + box.height * 0.64;
+      const body = Bodies.circle(x, y, 18, {
+        isStatic: true,
+        label: "thorn",
+        friction: 0.5,
+        restitution: 0.25,
+      });
+      const view = new Graphics()
+        .star(0, 0, 9, 23, 17)
+        .fill(0x75925a)
+        .circle(-4, -4, 12)
+        .fill(0xaac683);
+      view.position.set(x, y);
+      this.fruitLayer.addChild(view);
+      Composite.add(this.engine.world, body);
+      this.obstacles.push({ body, view, until: this.activeSeconds + 8 });
+      this.callbacks.onToast("荆棘球 · 8 秒", "gold");
+    } else {
+      for (let i = 0; i < 3; i++)
+        this.spawnFruit(
+          Math.max(0, this.maxFruitTier - 3 - i),
+          this.layout.box.x + 65 + i * 125,
+          this.layout.box.y + 24,
+        );
+      this.callbacks.onToast("乱果雨", "pink");
+    }
+  }
+
+  pruner = () => {
+    if (this.paused || this.status !== "playing" || this.prunerLeft <= 0)
+      return;
+    const locked = this.cards.filter(
+      (c) => c.active && (c.locked || c.special === "vine"),
+    );
+    if (!this.obstacles.length && !locked.length) {
+      this.callbacks.onToast("暂时没有可清除的障碍", "cyan");
+      return;
+    }
+    this.obstacles.forEach((o) => {
+      Composite.remove(this.engine.world, o.body);
+      o.view.destroy();
+    });
+    this.obstacles = [];
+    locked.slice(0, 3).forEach((c) => {
+      c.locked = false;
+      c.special = "normal";
+      c.view.getChildByLabel("lock")?.destroy();
+      c.view.getChildByLabel("special-icon")?.destroy();
+      this.temporaryLocks.delete(c.id);
+    });
+    this.prunerLeft--;
+    this.updateCardAccess();
+    this.emitSnapshot();
+    this.callbacks.onToast("障碍已清除", "gold");
+  };
+  fan = () => {
+    if (
+      this.paused ||
+      this.status !== "playing" ||
+      this.fanLeft <= 0 ||
+      this.activeSeconds < this.fanUntil
+    )
+      return;
+    if (!this.fruits.size) {
+      this.callbacks.onToast("先让水果落进果箱", "cyan");
+      return;
+    }
+    this.fanLeft--;
+    this.fanUntil = this.activeSeconds + 8;
+    this.updateEffects();
+    this.emitSnapshot();
+    this.callbacks.onToast("风车 · 向左吹 8 秒", "cyan");
+  };
 
   cushion = () => {
     if (
@@ -3446,14 +3588,22 @@ export class FruitGame implements GameControls {
         if (this.destroyed) return;
       }
     }
-    if (this.mode === "sprint" && this.status === "playing") {
-      const left = secondsRemaining(this.activeSeconds, SPRINT_SECONDS);
+    if (
+      (this.mode === "sprint" || this.difficulty === "nightmare") &&
+      this.status === "playing"
+    ) {
+      const left = secondsRemaining(
+        this.activeSeconds,
+        this.difficulty === "nightmare" ? NIGHTMARE_SECONDS : SPRINT_SECONDS,
+      );
       if (left !== this.lastClockSecond) {
         this.lastClockSecond = left;
         this.emitSnapshot();
       }
       if (left === 0)
-        this.finish("won", "两分钟鲜榨完成！这就是你的本轮收成。");
+        this.difficulty === "nightmare"
+          ? this.finish("lost", "合成时间已结束")
+          : this.finish("won", "两分钟鲜榨完成！这就是你的本轮收成。");
     }
     if (this.status === "playing") this.updateEffects();
     const fruitFrozen = this.fruitFreezeActive;
@@ -3947,6 +4097,9 @@ export class FruitGame implements GameControls {
       syrupLeft: this.syrupLeft,
       insightLeft: this.insightLeft,
       vortexLeft: this.vortexLeft,
+      prunerLeft: this.prunerLeft,
+      fanLeft: this.fanLeft,
+      fanSeconds: Math.max(0, Math.ceil(this.fanUntil - this.activeSeconds)),
       cushionLeft: this.cushionLeft,
       barometerLeft: this.barometerLeft,
       cushionSeconds: Math.max(
@@ -3985,9 +4138,11 @@ export class FruitGame implements GameControls {
       dropLane: this.dropLane,
       difficulty: this.difficulty,
       timeLeft:
-        this.mode === "sprint"
-          ? secondsRemaining(this.activeSeconds, SPRINT_SECONDS)
-          : null,
+        this.difficulty === "nightmare"
+          ? secondsRemaining(this.activeSeconds, NIGHTMARE_SECONDS)
+          : this.mode === "sprint"
+            ? secondsRemaining(this.activeSeconds, SPRINT_SECONDS)
+            : null,
       challengeKey: this.challengeKey,
     };
   }
@@ -3995,6 +4150,12 @@ export class FruitGame implements GameControls {
   private finish(status: "won" | "lost", reason: string) {
     if (this.status !== "playing") return;
     this.status = status;
+    this.fanUntil = this.activeSeconds;
+    this.obstacles.forEach((o) => {
+      Composite.remove(this.engine.world, o.body);
+      o.view.destroy();
+    });
+    this.obstacles = [];
     this.engine.gravity.x = 0;
     this.engine.gravity.y /= this.weatherGravity;
     this.weatherGravity = 1;

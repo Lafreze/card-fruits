@@ -379,6 +379,48 @@ export const FRUITS: FruitDefinition[] = [
     color: 0xc9a21f,
     glow: 0xffdc67,
   },
+  {
+    name: "蔓越莓",
+    icon: FRUIT_ART[50],
+    radius: 41.01,
+    color: 0xe74465,
+    glow: 0xffe5a3,
+  },
+  {
+    name: "杏子",
+    icon: FRUIT_ART[51],
+    radius: 41.02,
+    color: 0xffb849,
+    glow: 0xffe5a3,
+  },
+  {
+    name: "黑莓",
+    icon: FRUIT_ART[52],
+    radius: 41.03,
+    color: 0x69629b,
+    glow: 0xffe5a3,
+  },
+  {
+    name: "红毛丹",
+    icon: FRUIT_ART[53],
+    radius: 41.04,
+    color: 0xed6374,
+    glow: 0xffe5a3,
+  },
+  {
+    name: "榴莲",
+    icon: FRUIT_ART[54],
+    radius: 41.05,
+    color: 0xa7bf50,
+    glow: 0xffe5a3,
+  },
+  {
+    name: "刺梨",
+    icon: FRUIT_ART[55],
+    radius: 41.06,
+    color: 0xf8aa40,
+    glow: 0xffe5a3,
+  },
 ];
 
 const B = (
@@ -1033,6 +1075,48 @@ export const LEVELS: LevelDefinition[] = [
     cards: ladderCards(49, 153),
     specialRate: 0.64,
     layout: KING_ASCENSION,
+  },
+  {
+    name: "莓红溪谷",
+    target: 50,
+    cards: ladderCards(50, 156),
+    specialRate: 0.64,
+    layout: crownTower(52),
+  },
+  {
+    name: "杏花山坡",
+    target: 51,
+    cards: ladderCards(51, 159),
+    specialRate: 0.65,
+    layout: crownTower(53),
+  },
+  {
+    name: "黑莓夜林",
+    target: 52,
+    cards: ladderCards(52, 162),
+    specialRate: 0.66,
+    layout: crownTower(54),
+  },
+  {
+    name: "红毛秘境",
+    target: 53,
+    cards: ladderCards(53, 165),
+    specialRate: 0.67,
+    layout: crownTower(55),
+  },
+  {
+    name: "榴莲堡垒",
+    target: 54,
+    cards: ladderCards(54, 168),
+    specialRate: 0.68,
+    layout: crownTower(56),
+  },
+  {
+    name: "刺梨星海",
+    target: 55,
+    cards: ladderCards(55, 171),
+    specialRate: 0.69,
+    layout: crownTower(57),
   },
 ];
 
